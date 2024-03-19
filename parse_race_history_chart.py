@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 
 import fitz
 import pandas as pd
@@ -69,7 +70,55 @@ def parse_race_history_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     tables = []
     for page in doc:
         tables.append(parse_race_history_chart_page(page))
-    return pd.concat(tables, ignore_index=True)
+    df = pd.concat(tables, ignore_index=True)
+
+    # Clean up
+    """
+    There is one tricky place: when a car is lapped (GAP col. is "LAP"), he actual lap number for
+    the lapped car should be the lap number in PDF minus the #. of laps being lapped. I.e., when
+    the leader starts lap 10, the lapped car starts lap 9.
+    
+    The lapping itself is easy to fix, but when a lapped car is in pit stop, the PDF shows "PIT" in
+    the GAP col., so we cannot distinguish between a normal car in pit versus a lapped car in pit,
+    and as a result we cannot fix the lap number for the lapped car. After applying the above fix,
+    we will get duplicated lap numbers for a lapped car if it pits after being lapped. We shift the
+    lap number for the lapped car by 1 to get the correct lap number. See the below example: we
+    have lap number 30, 31, 33, 33 and it should be 30, 31, 32, 33. We shift the first "33" to "32"
+    to fix it.
+
+    in PDF              before fix      after fix "1 LAP"   after fix "PIT"
+
+    LAP 31              lap time        lap time            lap time
+    1 LAP   1:39.757    31  1:39.757    30  1:39.757        30  1:39.757
+                                        ↑↑
+
+    LAP 32
+    1 LAP   1:39.748    32  1:39.748    31  1:39.748        31  1:39.748
+                                        ↑↑
+
+    LAP 33
+    PIT     1:44.296    33  1:44.296    33  1:44.296        32  1:44.296
+                                                            ↑↑
+
+    LAP 34
+    PIT     2:18.694    34  2:18.694    33  2:18.694        33  2:18.694
+                                        ↑↑
+
+    TODO: is this really mathematically correct? Can a lapped car pits and then gets unlapped?
+    """
+    df['lap'] = df['lap'] - df['gap'].apply(lambda x: int(re.findall(r'\d+', x)[0]) if 'LAP' in x
+                                                      else 0)
+    df.reset_index(drop=False, inplace=True)
+    df.sort_values(by=['driver_no', 'lap', 'index'], inplace=True)
+    df.loc[(df['driver_no'] == df['driver_no'].shift(-1)) & (df['lap'] == df['lap'].shift(-1)),
+           'lap'] -= 1
+    df.loc[(df['driver_no'] == df['driver_no'].shift(1)) & (df['lap'] == df['lap'].shift(1) + 2),
+           'lap'] -= 1
+    del df['index']
+
+    # TODO: Perez "retired and rejoined" in 2023 Japanese... Maybe just mechanically assign lap No.
+    #       col. as 1, 2, 3, ...?
+    return df
 
 
 if __name__ == '__main__':
