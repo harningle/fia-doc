@@ -1,8 +1,18 @@
 # -*- coding: utf-8 -*-
 import os
+import pickle
+import sys
+
+sys.path.append(os.getcwd() + os.sep + 'jolpica-f1')
 
 import fitz
+import django
 import pandas as pd
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'jolpica_api.settings')
+django.setup()
+
+from jolpica.formula_one.models import Lap, SessionEntry, SessionType
 
 W = None  # Page width
 
@@ -76,6 +86,36 @@ def parse_race_lap_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     for col in ['lap', 'position', 'driver_no']:
         df[col] = df[col].astype(int)
     return df
+
+
+def to_jolpica_lap(df: pd.DataFrame):
+    """Convert the parsed lap time df. to a list of django models
+
+    TODO: catch up with Jess to fix this
+    """
+
+    # Hard code 2023 Abu Dhabi for now
+    models = []
+    year = 2023
+    round_no = 22
+    drivers = SessionEntry.objects.filter(
+        session__type=SessionType.RACE,
+        session__round__season__year=year,
+        session__round__number=round_no
+    ).select_related("round_entry__team_driver__driver")
+
+    for driver in drivers:
+        temp = df[df['driver_no'] == driver.round_entry.car_number]
+        for _, row in temp.iterrows():
+            models.append(Lap(
+                session_entry=driver,
+                number=row['lap'],
+                position=row['position']
+            ))
+
+    with open('laps.pkl', 'wb') as f:
+        pickle.dump(models, f)
+    pass
 
 
 if __name__ == '__main__':
