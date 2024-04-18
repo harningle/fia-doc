@@ -1,20 +1,13 @@
 # -*- coding: utf-8 -*-
 import os
 import pickle
-import sys
-
-sys.path.append(os.getcwd() + os.sep + 'jolpica-f1')
 
 import fitz
-import django
 import pandas as pd
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'jolpica_api.settings')
-django.setup()
+from models.lap import Lap, LapData, SessionEntry
 
-from jolpica.formula_one.models import Lap, SessionEntry, SessionType
-
-W = None  # Page width
+W: int  # Page width
 
 
 def parse_race_lap_chart_page(page: fitz.Page) -> pd.DataFrame:
@@ -88,33 +81,77 @@ def parse_race_lap_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     return df
 
 
-def to_jolpica_lap(df: pd.DataFrame):
-    """Convert the parsed lap time df. to a list of django models
-
-    TODO: catch up with Jess to fix this
-    """
+def to_json(df: pd.DataFrame):
+    """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
 
     # Hard code 2023 Abu Dhabi for now
-    models = []
     year = 2023
     round_no = 22
-    drivers = SessionEntry.objects.filter(
-        session__type=SessionType.RACE,
-        session__round__season__year=year,
-        session__round__number=round_no
-    ).select_related("round_entry__team_driver__driver")
 
-    for driver in drivers:
-        temp = df[df['driver_no'] == driver.round_entry.car_number]
-        for _, row in temp.iterrows():
-            models.append(Lap(
-                session_entry=driver,
-                number=row['lap'],
-                position=row['position']
-            ))
+    # Hard code the team and driver
+    driver_team = {
+        1: 'Red Bull',
+        11: 'Red Bull',
+        16: 'Ferrari',
+        55: 'Ferrari',
+        63: 'Mercedes',
+        44: 'Mercedes',
+        31: 'Alpine',
+        10: 'Alpine',
+        81: 'McLaren',
+        4: 'McLaren',
+        77: 'Alfa Romeo',
+        24: 'Alfa Romeo',
+        18: 'Aston Martin',
+        14: 'Aston Martin',
+        20: 'Haas',
+        27: 'Haas',
+        3: 'AlphaTauri',
+        22: 'AlphaTauri',
+        23: 'Williams',
+        2: 'Williams',
+    }
+    driver_name = {
+        1: 'Max Verstappen',
+        11: 'Sergio Perez',
+        16: 'Charles Leclerc',
+        55: 'Carlos Sainz',
+        63: 'George Russell',
+        44: 'Lewis Hamilton',
+        31: 'Esteban Ocon',
+        10: 'Pierre Gasly',
+        81: 'Lando Norris',
+        4: 'Lando Norris',
+        77: 'Valtteri Bottas',
+        24: 'Zhou Guanyu',
+        18: 'Lance Stroll',
+        14: 'Fernando Alonso',
+        20: 'Kevin Magnussen',
+        27: 'Nico Hulkenberg',
+        3: 'Daniel Ricciardo',
+        22: 'Yuki Tsunoda',
+        23: 'Alexandre Albon',
+        2: 'Logan Sargeant',
+    }
 
+    # Convert to json
+    df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position']), axis=1)
+    df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
+    df['session_entry'] = df['driver_no'].map(
+        lambda x: SessionEntry(
+            round_number=round_no,
+            season_year=year,
+            team=driver_team[x],
+            driver=driver_name[x]
+        )
+    )
+    del df['driver_no']
+    lap_data = df.apply(
+        lambda x: LapData(foreign_keys=x['session_entry'], data=x['lap']).dict(),
+        axis=1
+    ).tolist()
     with open('laps.pkl', 'wb') as f:
-        pickle.dump(models, f)
+        pickle.dump(lap_data, f)
     pass
 
 
