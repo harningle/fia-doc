@@ -3,8 +3,9 @@
 {
     "object": "lap",
     "foreign_keys": {
-        "round_number": 22,
         "season_year": 2023,
+        "round_number": 22,
+        "type": "R",
         "team": "Red Bull",
         "driver": "Max Verstappen"
     },
@@ -24,6 +25,7 @@
 }
 """
 from datetime import timedelta
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -35,13 +37,14 @@ class Lap(BaseModel):
 
 
 class SessionEntry(BaseModel):
-    round_number: int
     season_year: int
+    round_number: int
+    type: str = Literal['R', 'Q', 'SR']  # Race, Quali, Sprint. TODO: enough?
     team: str
     driver: str
 
 
 class LapData(BaseModel):
-    object: str = 'lap'
+    object_type: str = 'lap'
     foreign_keys: SessionEntry
-    data: list[Lap]
+    objects: list[Lap]
