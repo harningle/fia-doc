@@ -87,6 +87,7 @@ def to_json(df: pd.DataFrame):
     # Hard code 2023 Abu Dhabi for now
     year = 2023
     round_no = 22
+    session_type = 'R'
 
     # Hard code the team and driver
     driver_team = {
@@ -139,15 +140,16 @@ def to_json(df: pd.DataFrame):
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(
         lambda x: SessionEntry(
-            round_number=round_no,
             season_year=year,
+            round_number=round_no,
+            type=session_type,
             team=driver_team[x],
             driver=driver_name[x]
         )
     )
     del df['driver_no']
     lap_data = df.apply(
-        lambda x: LapData(foreign_keys=x['session_entry'], data=x['lap']).dict(),
+        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).dict(),
         axis=1
     ).tolist()
     with open('laps.pkl', 'wb') as f:
