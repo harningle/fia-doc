@@ -7,7 +7,7 @@ import pandas as pd
 
 from models.lap import Lap, LapData, SessionEntry
 
-W: int  # Page width
+W: float  # Page width
 
 
 def parse_race_lap_chart_page(page: fitz.Page) -> pd.DataFrame:
@@ -89,62 +89,15 @@ def to_json(df: pd.DataFrame):
     round_no = 22
     session_type = 'R'
 
-    # Hard code the team and driver
-    driver_team = {
-        1: 'Red Bull',
-        11: 'Red Bull',
-        16: 'Ferrari',
-        55: 'Ferrari',
-        63: 'Mercedes',
-        44: 'Mercedes',
-        31: 'Alpine',
-        10: 'Alpine',
-        81: 'McLaren',
-        4: 'McLaren',
-        77: 'Alfa Romeo',
-        24: 'Alfa Romeo',
-        18: 'Aston Martin',
-        14: 'Aston Martin',
-        20: 'Haas',
-        27: 'Haas',
-        3: 'AlphaTauri',
-        22: 'AlphaTauri',
-        23: 'Williams',
-        2: 'Williams',
-    }
-    driver_name = {
-        1: 'Max Verstappen',
-        11: 'Sergio Perez',
-        16: 'Charles Leclerc',
-        55: 'Carlos Sainz',
-        63: 'George Russell',
-        44: 'Lewis Hamilton',
-        31: 'Esteban Ocon',
-        10: 'Pierre Gasly',
-        81: 'Lando Norris',
-        4: 'Lando Norris',
-        77: 'Valtteri Bottas',
-        24: 'Zhou Guanyu',
-        18: 'Lance Stroll',
-        14: 'Fernando Alonso',
-        20: 'Kevin Magnussen',
-        27: 'Nico Hulkenberg',
-        3: 'Daniel Ricciardo',
-        22: 'Yuki Tsunoda',
-        23: 'Alexandre Albon',
-        2: 'Logan Sargeant',
-    }
-
     # Convert to json
     df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position']), axis=1)
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(
         lambda x: SessionEntry(
-            season_year=year,
-            round_number=round_no,
+            year=year,
+            round=round_no,
             type=session_type,
-            team=driver_team[x],
-            driver=driver_name[x]
+            car_number=x
         )
     )
     del df['driver_no']
