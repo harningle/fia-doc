@@ -6,8 +6,7 @@
         "season_year": 2023,
         "round_number": 22,
         "type": "R",
-        "team": "Red Bull",
-        "driver": "Max Verstappen"
+        "car_number": 1
     },
     "object": [
         {
@@ -27,21 +26,20 @@
 from datetime import timedelta
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, PositiveInt
 
 
 class Lap(BaseModel):
-    number: int
-    position: int
-    # time: timedelta
+    number: PositiveInt
+    position: PositiveInt
+    time: timedelta
 
 
 class SessionEntry(BaseModel):
-    season_year: int
-    round_number: int
+    year: PositiveInt
+    round: PositiveInt
     type: str = Literal['R', 'Q', 'SR']  # Race, Quali, Sprint. TODO: enough?
-    team: str
-    driver: str
+    car_number: PositiveInt
 
 
 class LapData(BaseModel):

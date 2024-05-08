@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
+import datetime
 import os
+import pickle
 import re
+import warnings
 
 import fitz
 import pandas as pd
 
-W = None  # Page width and height
-H = None
+from models.lap import Lap, LapData, SessionEntry
+
+W: float  # Page width and height
+H: float
 
 
 def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
@@ -48,6 +53,11 @@ def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
         temp.columns = ['driver_no', 'gap', 'time']
         temp['lap'] = lap_no
         temp = temp[temp['driver_no'] != '']  # Sometimes we will get one additional empty row
+
+        # The row order/index is meaningful: it's the order/positions of the cars
+        # TODO: is this true for all cases? E.g. retirements?
+        temp.reset_index(drop=False, names=['position'], inplace=True)
+        temp['position'] += 1  # 1-indexed
         tables.append(temp)
     return pd.concat(tables, ignore_index=True)
 
@@ -67,10 +77,7 @@ def parse_race_history_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     H = page.bound()[3]
 
     # Parse all pages
-    tables = []
-    for page in doc:
-        tables.append(parse_race_history_chart_page(page))
-    df = pd.concat(tables, ignore_index=True)
+    df = pd.concat([parse_race_history_chart_page(page) for page in doc], ignore_index=True)
 
     # Clean up
     """
@@ -119,6 +126,73 @@ def parse_race_history_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     # TODO: Perez "retired and rejoined" in 2023 Japanese... Maybe just mechanically assign lap No.
     #       col. as 1, 2, 3, ...?
     return df
+
+
+def to_timedelta(s: str) -> datetime.timedelta:
+    """
+    Covert a time string to a timedelta object, e.g. "1:32.190" -->
+    datetime.timedelta(seconds=92, microseconds=190000)
+    """
+    # Parse by ":" and "."
+    n_colons = s.count(':')
+    h, m, sec, ms = 0, 0, 0, 0
+    match n_colons:
+        case 1:  # "1:32.190"
+            m, sec = s.split(':')
+            sec, ms = sec.split('.')
+        case 2:  # "1:32:19.190"
+            warnings.warn(f'''got an unusual time: {s}. Assuming it's "hh:mm:ss.ms"''')
+            h, m, sec = s.split(':')
+            sec, ms = sec.split('.')
+        case 0:  # "19.190"
+            warnings.warn(f'''got an unusual time: {s}. Assuming it's "ss.ms"''')
+            sec, ms = s.split('.')
+        case _:  # Weird case
+            raise ValueError(f'''got an unexpected time: {s}''')
+
+    # Check if the time is valid
+    assert 0 <= int(h) < 24, f'''hour should be in [0, 24), got {h} in {s}'''
+    assert 0 <= int(m) < 60, f'''minute should be in [0, 60), got {m} in {s}'''
+    assert 0 <= int(sec) < 60, f'''second should be in [0, 60), got {sec} in {s}'''
+    assert 0 <= int(ms) < 1000, f'''millisecond should be in [0, 1000), got {ms} in {s}'''
+
+    t = datetime.timedelta(hours=int(h), minutes=int(m), seconds=int(sec), milliseconds=int(ms))
+    if t == datetime.timedelta(0):
+        raise ValueError(f'''got an invalid time: {s}''')
+    return t
+
+
+def to_json(df: pd.DataFrame):
+    """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
+
+    # Hard code 2023 Abu Dhabi for now
+    year = 2023
+    round_no = 22
+    session_type = 'R'
+
+    # Convert string time time to timedelta, e.g. "1:32.190" -->
+    df['time'] = df['time'].apply(to_timedelta)
+
+    # Convert to json
+    df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position'], time=x['time']),
+                         axis=1)
+    df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
+    df['session_entry'] = df['driver_no'].map(
+        lambda x: SessionEntry(
+            year=year,
+            round=round_no,
+            type=session_type,
+            car_number=x
+        )
+    )
+    del df['driver_no']
+    lap_data = df.apply(
+        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).dict(),
+        axis=1
+    ).tolist()
+    with open('laps.pkl', 'wb') as f:
+        pickle.dump(lap_data, f)
+    pass
 
 
 if __name__ == '__main__':
