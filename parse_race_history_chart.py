@@ -19,7 +19,7 @@ def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
     Get the table(s) from a given page in "Race History Chart" PDF. There are multiple tables in a
     page, each of which correspond to a lap No. We concat all tables into one single dataframe
 
-    See `notebook/demo.ipynb` for the detailed explanation of the table structure
+    See `notebook/demo.ipynb` for the detailed explanation of the table structure.
 
     :param page: A `fitz.Page` object
     :return: A dataframe of [driver No., lap No., gap to leader, lap time]

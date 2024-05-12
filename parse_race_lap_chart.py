@@ -5,14 +5,14 @@ import pickle
 import fitz
 import pandas as pd
 
-from models.lap import Lap, LapData, SessionEntry
+from models.lap import Lap, LapData
+from models.foreign_key import SessionEntry
 
 W: float  # Page width
 
 
 def parse_race_lap_chart_page(page: fitz.Page) -> pd.DataFrame:
-    """
-    Get the table from a given page in "Race Lap Chart" PDF
+    """Get the table from a given page in "Race Lap Chart" PDF
 
     :param page: A `fitz.Page` object
     :return: A dataframe of [lap No., position, driver No.]
