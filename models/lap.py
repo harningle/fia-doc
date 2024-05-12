@@ -28,18 +28,13 @@ from typing import Literal
 
 from pydantic import BaseModel, PositiveInt
 
+from models.foreign_key import SessionEntry
+
 
 class Lap(BaseModel):
     number: PositiveInt
     position: PositiveInt
     time: timedelta
-
-
-class SessionEntry(BaseModel):
-    year: PositiveInt
-    round: PositiveInt
-    type: str = Literal['R', 'Q', 'SR']  # Race, Quali, Sprint. TODO: enough?
-    car_number: PositiveInt
 
 
 class LapData(BaseModel):

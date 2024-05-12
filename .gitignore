@@ -161,7 +161,7 @@ cython_debug/
 
 # Data files
 data/
-.pkl
+*.pkl
 
 # Jess's package
 jolpica-f1/
