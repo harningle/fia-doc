@@ -10,3 +10,8 @@ class SessionEntry(BaseModel):
     round: PositiveInt
     type: str = Literal['R', 'Q', 'SR']  # Race, Quali, Sprint. TODO: enough?
     car_number: PositiveInt
+
+
+class Round(BaseModel):
+    year: PositiveInt
+    round: PositiveInt

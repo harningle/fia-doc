@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
+import pickle
 
 import fitz
 import pandas as pd
+
+from models.foreign_key import SessionEntry
+from models.lap import FastestLap, FastestLapData
 
 
 def parse_race_fastest_laps(file: str | os.PathLike[str]) -> pd.DataFrame:
@@ -60,8 +64,40 @@ def parse_race_fastest_laps(file: str | os.PathLike[str]) -> pd.DataFrame:
     df = df[df['NO'] != '']
     df = df[['NO', 'ON']].reset_index(drop=True)
     df.rename(columns={'NO': 'driver_no', 'ON': 'lap'}, inplace=True)
-    df['fastest_lap_rank'] = range(1, len(df) + 1)
+    df['driver_no'] = df['driver_no'].astype(int)
+    df['lap'] = df['lap'].astype(int)
+    df['rank'] = range(1, len(df) + 1)  # Row order is the fastest lap rank
     return df
+
+
+def to_json(df: pd.DataFrame):
+    """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
+
+    # Hard code 2023 Abu Dhabi for now
+    year = 2023
+    round_no = 22
+    session_type = 'R'
+
+    # Convert to json
+    df['fastest_lap'] = df.apply(
+        lambda x: FastestLapData(
+            foreign_keys=SessionEntry(
+                year=year,
+                round=round_no,
+                type=session_type,
+                car_number=x['driver_no']
+            ),
+            objects=FastestLap(
+                lap_number=x['lap'],
+                fastest_lap_rank=x['rank']
+            )
+        ).dict(),
+        axis=1
+    )
+    fastest_lap_data = df['fastest_lap'].tolist()
+    with open('fastest_laps.pkl', 'wb') as f:
+        pickle.dump(fastest_lap_data, f)
+    pass
 
 
 if __name__ == '__main__':

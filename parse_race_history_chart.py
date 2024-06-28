@@ -124,7 +124,7 @@ def parse_race_history_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     del df['index']
 
     # TODO: Perez "retired and rejoined" in 2023 Japanese... Maybe just mechanically assign lap No.
-    #       col. as 1, 2, 3, ...?
+    #       as 1, 2, 3, ...?
     return df
 
 
