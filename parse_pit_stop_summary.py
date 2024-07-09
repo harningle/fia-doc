@@ -44,7 +44,7 @@ def parse_pit_stop_summary(file: str | os.PathLike[str]) -> pd.DataFrame:
     return df
 
 
-def to_json(df: pd.DataFrame):
+def to_json(df: pd.DataFrame) -> list[dict]:
     """Convert the parsed df. to a json obj. See jolpica/jolpica-f1#7"""
 
     # Hard code 2023 Abu Dhabi for now
