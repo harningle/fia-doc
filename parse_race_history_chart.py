@@ -162,7 +162,7 @@ def to_timedelta(s: str) -> datetime.timedelta:
     return t
 
 
-def to_json(df: pd.DataFrame):
+def to_json(df: pd.DataFrame) -> list[dict]:
     """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
 
     # Hard code 2023 Abu Dhabi for now
@@ -174,7 +174,7 @@ def to_json(df: pd.DataFrame):
     df['time'] = df['time'].apply(to_timedelta)
 
     # Convert to json
-    df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position'], time=x['time']),
+    df['lap'] = df.apply(lambda x: Lap(lap_number=x['lap'], position=x['position'], time=x['time']),
                          axis=1)
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(
@@ -192,8 +192,12 @@ def to_json(df: pd.DataFrame):
     ).tolist()
     with open('laps.pkl', 'wb') as f:
         pickle.dump(lap_data, f)
-    pass
+    return lap_data
 
 
 if __name__ == '__main__':
-    pass
+    df = parse_race_history_chart('race_history_chart.pdf')
+    lap_data = to_json(df)
+    assert isinstance(lap_data, list)
+    assert isinstance(lap_data[0], dict)
+    assert len(lap_data) == 20

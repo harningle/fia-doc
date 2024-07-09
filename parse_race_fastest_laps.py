@@ -70,7 +70,7 @@ def parse_race_fastest_laps(file: str | os.PathLike[str]) -> pd.DataFrame:
     return df
 
 
-def to_json(df: pd.DataFrame):
+def to_json(df: pd.DataFrame) -> list[dict]:
     """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
 
     # Hard code 2023 Abu Dhabi for now
@@ -97,8 +97,12 @@ def to_json(df: pd.DataFrame):
     fastest_lap_data = df['fastest_lap'].tolist()
     with open('fastest_laps.pkl', 'wb') as f:
         pickle.dump(fastest_lap_data, f)
-    pass
+    return fastest_lap_data
 
 
 if __name__ == '__main__':
-    pass
+    df = parse_race_fastest_laps('race_fastest_laps.pdf')
+    fastest_lap_data = to_json(df)
+    assert isinstance(fastest_lap_data, list)
+    assert isinstance(fastest_lap_data[0], dict)
+    assert len(fastest_lap_data) == 20

@@ -77,4 +77,5 @@ def parse_race_final_classification_page(file: str | os.PathLike) -> pd.DataFram
 
 
 if __name__ == '__main__':
-    pass
+    df = parse_race_final_classification_page('race_final_classification.pdf')
+    assert len(df) == 20

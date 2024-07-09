@@ -75,8 +75,12 @@ def to_json(df: pd.DataFrame):
     ).tolist()
     with open('pit_stops.pkl', 'wb') as f:
         pickle.dump(pit_stop_data, f)
-    pass
+    return pit_stop_data
 
 
 if __name__ == '__main__':
-    pass
+    df = parse_pit_stop_summary('race_pit_stop_summary.pdf')
+    pit_stop_data = to_json(df)
+    assert isinstance(pit_stop_data, list)
+    assert isinstance(pit_stop_data[0], dict)
+    assert len(pit_stop_data) == 20
