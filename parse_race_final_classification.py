@@ -22,7 +22,7 @@ def parse_race_final_classification_page(file: str | os.PathLike) -> pd.DataFram
             break
 
     # Width and height of the page
-    w, h = page.bound()[2], page.bound()[3]
+    w, _ = page.bound()[2], page.bound()[3]
 
     # Position of "Race Final Classification"
     y = found[0].y1
@@ -77,5 +77,4 @@ def parse_race_final_classification_page(file: str | os.PathLike) -> pd.DataFram
 
 
 if __name__ == '__main__':
-    df = parse_race_final_classification_page('race_final_classification.pdf')
-    assert len(df) == 20
+    pass

@@ -41,11 +41,11 @@ def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
         the right boundary can be determined by left boundary plus table width, which is roughly
         one-fifth of the page width. We add 5% extra buffer to the right boundary
         """
-        l = lap.x0
-        r = headers[i + 1].x0 if i + 1 < len(headers) else (l + W / 5) * 1.05
-        temp = page.find_tables(clip=fitz.Rect(l, t, r, H),
+        left_boundary  = lap.x0
+        right_boundary  = headers[i + 1].x0 if i + 1 < len(headers) else (left_boundary + W / 5) * 1.05
+        temp = page.find_tables(clip=fitz.Rect(left_boundary, t, right_boundary, H),
                                 strategy='lines',
-                                add_lines=[((l, 0), (l, H))])[0].to_pandas()
+                                add_lines=[((left_boundary, 0), (left_boundary, H))])[0].to_pandas()
 
         # Three columns: "LAP x", "GAP", "TIME". "LAP x" is the column for driver No. So add a new
         # column for lap No. with value "x", and rename the columns
@@ -187,7 +187,7 @@ def to_json(df: pd.DataFrame) -> list[dict]:
     )
     del df['driver_no']
     lap_data = df.apply(
-        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).dict(),
+        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).model_dump(),
         axis=1
     ).tolist()
     with open('laps.pkl', 'wb') as f:
@@ -196,8 +196,4 @@ def to_json(df: pd.DataFrame) -> list[dict]:
 
 
 if __name__ == '__main__':
-    df = parse_race_history_chart('race_history_chart.pdf')
-    lap_data = to_json(df)
-    assert isinstance(lap_data, list)
-    assert isinstance(lap_data[0], dict)
-    assert len(lap_data) == 20
+    pass

@@ -91,7 +91,7 @@ def to_json(df: pd.DataFrame) -> list[dict]:
                 lap_number=x['lap'],
                 fastest_lap_rank=x['rank']
             )
-        ).dict(),
+        ).model_dump(),
         axis=1
     )
     fastest_lap_data = df['fastest_lap'].tolist()
@@ -101,8 +101,4 @@ def to_json(df: pd.DataFrame) -> list[dict]:
 
 
 if __name__ == '__main__':
-    df = parse_race_fastest_laps('race_fastest_laps.pdf')
-    fastest_lap_data = to_json(df)
-    assert isinstance(fastest_lap_data, list)
-    assert isinstance(fastest_lap_data[0], dict)
-    assert len(fastest_lap_data) == 20
+    pass

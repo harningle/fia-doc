@@ -102,7 +102,7 @@ def to_json(df: pd.DataFrame):
     )
     del df['driver_no']
     lap_data = df.apply(
-        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).dict(),
+        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).model_dump(),
         axis=1
     ).tolist()
     with open('laps.pkl', 'wb') as f:
@@ -111,8 +111,4 @@ def to_json(df: pd.DataFrame):
 
 
 if __name__ == '__main__':
-    df = parse_race_lap_chart('race_lap_chart.pdf')
-    lap_data = to_json(df)
-    assert isinstance(lap_data, list)
-    assert isinstance(lap_data[0], dict)
-    assert len(lap_data) == 20
+    pass

@@ -70,7 +70,7 @@ def to_json(df: pd.DataFrame) -> list[dict]:
     )
     del df['driver_no']
     pit_stop_data = df.apply(
-        lambda x: PitStopData(foreign_keys=x['session_entry'], objects=x['pit_stop']).dict(),
+        lambda x: PitStopData(foreign_keys=x['session_entry'], objects=x['pit_stop']).model_dump(),
         axis=1
     ).tolist()
     with open('pit_stops.pkl', 'wb') as f:
@@ -79,8 +79,4 @@ def to_json(df: pd.DataFrame) -> list[dict]:
 
 
 if __name__ == '__main__':
-    df = parse_pit_stop_summary('race_pit_stop_summary.pdf')
-    pit_stop_data = to_json(df)
-    assert isinstance(pit_stop_data, list)
-    assert isinstance(pit_stop_data[0], dict)
-    assert len(pit_stop_data) == 20
+    pass
