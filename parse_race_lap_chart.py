@@ -90,7 +90,7 @@ def to_json(df: pd.DataFrame):
     session_type = 'R'
 
     # Convert to json
-    df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position']), axis=1)
+    df['lap'] = df.apply(lambda x: Lap(lap_number=x['lap'], position=x['position'], time=0.0), axis=1)
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(
         lambda x: SessionEntry(
@@ -102,12 +102,12 @@ def to_json(df: pd.DataFrame):
     )
     del df['driver_no']
     lap_data = df.apply(
-        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).dict(),
+        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).model_dump(),
         axis=1
     ).tolist()
     with open('laps.pkl', 'wb') as f:
         pickle.dump(lap_data, f)
-    pass
+    return lap_data
 
 
 if __name__ == '__main__':

@@ -41,11 +41,11 @@ def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
         the right boundary can be determined by left boundary plus table width, which is roughly
         one-fifth of the page width. We add 5% extra buffer to the right boundary
         """
-        l = lap.x0
-        r = headers[i + 1].x0 if i + 1 < len(headers) else (l + W / 5) * 1.05
-        temp = page.find_tables(clip=fitz.Rect(l, t, r, H),
+        left_boundary  = lap.x0
+        right_boundary  = headers[i + 1].x0 if i + 1 < len(headers) else (left_boundary + W / 5) * 1.05
+        temp = page.find_tables(clip=fitz.Rect(left_boundary, t, right_boundary, H),
                                 strategy='lines',
-                                add_lines=[((l, 0), (l, H))])[0].to_pandas()
+                                add_lines=[((left_boundary, 0), (left_boundary, H))])[0].to_pandas()
 
         # Three columns: "LAP x", "GAP", "TIME". "LAP x" is the column for driver No. So add a new
         # column for lap No. with value "x", and rename the columns
@@ -162,7 +162,7 @@ def to_timedelta(s: str) -> datetime.timedelta:
     return t
 
 
-def to_json(df: pd.DataFrame):
+def to_json(df: pd.DataFrame) -> list[dict]:
     """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
 
     # Hard code 2023 Abu Dhabi for now
@@ -174,7 +174,7 @@ def to_json(df: pd.DataFrame):
     df['time'] = df['time'].apply(to_timedelta)
 
     # Convert to json
-    df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position'], time=x['time']),
+    df['lap'] = df.apply(lambda x: Lap(lap_number=x['lap'], position=x['position'], time=x['time']),
                          axis=1)
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(
@@ -187,12 +187,12 @@ def to_json(df: pd.DataFrame):
     )
     del df['driver_no']
     lap_data = df.apply(
-        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).dict(),
+        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).model_dump(),
         axis=1
     ).tolist()
     with open('laps.pkl', 'wb') as f:
         pickle.dump(lap_data, f)
-    pass
+    return lap_data
 
 
 if __name__ == '__main__':
