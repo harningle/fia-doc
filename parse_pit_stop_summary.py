@@ -44,7 +44,7 @@ def parse_pit_stop_summary(file: str | os.PathLike[str]) -> pd.DataFrame:
     return df
 
 
-def to_json(df: pd.DataFrame):
+def to_json(df: pd.DataFrame) -> list[dict]:
     """Convert the parsed df. to a json obj. See jolpica/jolpica-f1#7"""
 
     # Hard code 2023 Abu Dhabi for now
@@ -70,12 +70,12 @@ def to_json(df: pd.DataFrame):
     )
     del df['driver_no']
     pit_stop_data = df.apply(
-        lambda x: PitStopData(foreign_keys=x['session_entry'], objects=x['pit_stop']).dict(),
+        lambda x: PitStopData(foreign_keys=x['session_entry'], objects=x['pit_stop']).model_dump(),
         axis=1
     ).tolist()
     with open('pit_stops.pkl', 'wb') as f:
         pickle.dump(pit_stop_data, f)
-    pass
+    return pit_stop_data
 
 
 if __name__ == '__main__':
