@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
+import pickle
 
 import fitz
 import pandas as pd
+
+from models.foreign_key import SessionEntry
+from models.quali_lap import Lap, LapData
 
 
 def parse_quali_final_classification(file: str | os.PathLike) -> pd.DataFrame:
@@ -48,6 +52,7 @@ def parse_quali_final_classification(file: str | os.PathLike) -> pd.DataFrame:
                   'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
     df.drop(columns=['_', 'NAT', 'ENTRANT'], inplace=True)
     df = df[df['NO'] != '']
+    df.dropna(subset='NO', inplace=True)
     return df
 
 
@@ -176,7 +181,136 @@ def parse_quali_lap_times(file: str | os.PathLike) -> pd.DataFrame:
     for page in doc:
         tables.append(parse_quali_lap_times_page(page))
     df = pd.concat(tables, ignore_index=True)
+    df['lap_no'] = df['lap_no'].astype(int)
     return df
+
+
+def parse_date(d: str) -> pd.Timedelta:
+    """Parse date string to datetime
+
+    There can be two possible input formats:
+
+    1. hh:mm:ss, e.g. 18:05:42. This is simply the local calendar time
+    2. mm:ss.SSS, e.g. 1:24.160. This is the lap time
+
+    TODO: maybe combine all time parsing functions into one file later
+    """
+    n_colon = d.count(':')
+    if n_colon == 2:
+        h, m, s = d.split(':')
+        return pd.Timedelta(hours=int(h), minutes=int(m), seconds=int(s))
+    elif n_colon == 1:
+        m, s = d.split(':')
+        s, ms = s.split('.')
+        return pd.Timedelta(minutes=int(m), seconds=int(s), milliseconds=int(ms))
+    else:
+        raise ValueError(f'unknown date format: {d}')
+
+
+def parse_quali(final_path: str | os.PathLike, lap_times_path: str | os.PathLike) -> pd.DataFrame:
+    """TODO: probably need to refactor this later... To tedious now"""
+    # Assign session to lap No., e.g. lap No. 7 is Q2, using final classification
+    df = parse_quali_lap_times(lap_times_path)
+    classification = parse_quali_final_classification(final_path)
+    classification['Q1_LAPS'] = classification['Q1_LAPS'].astype(float)
+    classification['Q2_LAPS'] = classification['Q2_LAPS'].astype(float) + classification['Q1_LAPS']
+    df = df.merge(classification[['NO', 'Q1_LAPS', 'Q2_LAPS']],
+                  left_on='car_no', right_on='NO', how='left')
+    # TODO: should check here if all drivers are merged. All unmerged ones should be not classified
+    del df['NO']
+    df['Q'] = 1
+    df.loc[df['lap_no'] > df['Q1_LAPS'], 'Q'] = 2
+    df.loc[df['lap_no'] > df['Q2_LAPS'], 'Q'] = 3
+    # TODO: should check the lap before the first Q2 and Q3 lap is pit lap. Or is it? Crashed?
+    del df['Q1_LAPS'], df['Q2_LAPS']
+
+    # Find which lap is the fastest lap, also using final classification
+    """
+    The final classification PDF identifies the fastest laps using calendar time, e.g. "18:17:46".
+    In the lap times PDF, each driver's first lap time is the calendar time, e.g. "18:05:42"; for
+    the rest laps, the time is the lap time, e.g. "1:24.160". Therefore, we can simply cumsum the
+    lap times to get the calendar time of each lap, e.g. 18:05:42 + 1:24.160 = 18:07:06.160. The
+    tricky part is rounding. Sometimes we have 18:17:15.674 -> 18:17:16, but in other times it is
+    18:17:46.783 -> 18:17:46. It seems to be not rounding to floor, not to ceil, and not to the
+    nearest... Therefore, we allow one second difference. For a given driver, it's impossible to
+    have two different laps finishing within one calendar second, so one second error in calendar
+    time is ok to identify a lap.
+    """
+    df['calendar_time'] = df['lap_time'].apply(parse_date)
+    df['calendar_time'] = df.groupby('car_no')['calendar_time'].cumsum()
+    df['is_fastest_lap'] = False
+    for q in [1, 2, 3]:
+        # Round to the floor
+        df['temp'] = df['calendar_time'].apply(lambda x: str(x).split('.')[0].split(' ')[-1])
+        df = df.merge(classification[['NO', f'Q{q}_TIME']],
+                      left_on=['car_no', 'temp'],
+                      right_on=['NO', f'Q{q}_TIME'],
+                      how='left')
+        del df['NO']
+        # Plus one to the floor, i.e. allow one second error in the merge
+        df['temp'] = df['calendar_time'].apply(
+            lambda x: str(x + pd.Timedelta(seconds=1)).split('.')[0].split(' ')[-1]
+        )
+        df = df.merge(classification[['NO', f'Q{q}_TIME']],
+                      left_on=['car_no', 'temp'],
+                      right_on=['NO', f'Q{q}_TIME'],
+                      how='left',
+                      suffixes=('', '_y'))
+        del df['NO'], df['temp']
+        df.fillna({f'Q{q}_TIME': df[f'Q{q}_TIME_y']}, inplace=True)
+        del df[f'Q{q}_TIME_y']
+        # Check if all drivers in the final classification are merged
+        temp = classification[['NO', f'Q{q}_TIME']].merge(
+            df[df[f'Q{q}_TIME'].notnull()][['car_no']],
+            left_on='NO',
+            right_on='car_no',
+            indicator=True
+        )
+        temp.dropna(subset=f'Q{q}_TIME', inplace=True)
+        assert (temp['_merge'] == 'both').all()
+        df.loc[df[f'Q{q}_TIME'].notnull(), 'is_fastest_lap'] = True
+        del df[f'Q{q}_TIME']
+
+    # Clean up
+    df['pit'] = (df['pit'] == 'P').astype(bool)
+    return df
+
+
+def to_json(df: pd.DataFrame):
+    """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
+    # Hard code 2023 Abu Dhabi for now
+    year = 2023
+    round_no = 22
+    session_type = 'Q'
+
+    # Convert to json
+    df = df[df['lap_time'].str.count(':') == 1]  # TODO: check this. We always lost the first lap?
+    df['lap_time'] = df['lap_time'].apply(parse_date)
+    df['lap'] = df.apply(
+        lambda x: Lap(
+            number=x['lap_no'],
+            time=x['lap_time'],
+            is_deleted=x['lap_time_deleted'],
+            is_fastest_lap=x['is_fastest_lap']
+        ),
+        axis=1
+    )
+    df = df.groupby('car_no')[['lap']].agg(list).reset_index()
+    df['session_entry'] = df['car_no'].map(
+        lambda x: SessionEntry(
+            year=year,
+            round=round_no,
+            type=session_type,
+            car_number=x
+        )
+    )
+    lap_data = df.apply(
+        lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).model_dump(),
+        axis=1
+    ).tolist()
+    with open('quali_lap_times.pkl', 'wb') as f:
+        pickle.dump(lap_data, f)
+    pass
 
 
 if __name__ == '__main__':
