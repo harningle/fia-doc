@@ -289,6 +289,7 @@ def to_json(df: pd.DataFrame):
     df['lap'] = df.apply(
         lambda x: Lap(
             number=x['lap_no'],
+            session=x['Q'],
             time=x['lap_time'],
             is_deleted=x['lap_time_deleted'],
             is_fastest_lap=x['is_fastest_lap']
