@@ -56,7 +56,7 @@ def parse_entry_list(file: str | os.PathLike) -> pd.DataFrame:
     :return: A dataframe of [car No., driver name, nationality, team, constructor, role]
     """
     doc = fitz.open(file)
-    page = doc[1]  # Assume the relevant table is on the second page
+    page = doc[1]  # TODO: can have multiple pages
     w, h = page.bound()[2], page.bound()[3]
     car_no = page.search_for("No.")[0]
     top_left = (car_no.x0, car_no.y0)
