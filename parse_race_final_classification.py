@@ -22,20 +22,20 @@ def parse_race_final_classification_page(file: str | os.PathLike) -> pd.DataFram
             break
 
     # Width and height of the page
-    w, _ = page.bound()[2], page.bound()[3]
+    page_width, _ = page.bound()[2], page.bound()[3]
 
     # Position of "Race Final Classification"
-    y = found[0].y1
+    page_top = found[0].y1
 
     # Position of "NOT CLASSIFIED" or "FASTEST LAP"
     not_classified = page.search_for('NOT CLASSIFIED')
     if not_classified:
-        b = not_classified[0].y0
+        page_bottom = not_classified[0].y0
     else:
-        b = page.search_for('FASTEST LAP')[0].y0
+        page_bottom = page.search_for('FASTEST LAP')[0].y0
 
     # Table bounding box
-    bbox = fitz.Rect(0, y, w, b)
+    bbox = fitz.Rect(0, page_top, page_width, page_bottom)
 
     # Positions of table headers/column names
     pos = {}
@@ -64,7 +64,7 @@ def parse_race_final_classification_page(file: str | os.PathLike) -> pd.DataFram
 
     # Find the table below "Race Final Classification"
     df = page.find_tables(
-        clip=fitz.Rect(pos['NO']['left'], y, w, b),
+        clip=fitz.Rect(pos['NO']['left'], page_top, page_width, page_bottom),
         strategy='lines',
         vertical_lines=aux_lines,
         snap_x_tolerance=pos['ON']['left'] - pos['FASTEST']['right']

@@ -8,10 +8,8 @@ import pandas as pd
 from models.lap import Lap, LapData
 from models.foreign_key import SessionEntry
 
-W: float  # Page width
 
-
-def parse_race_lap_chart_page(page: fitz.Page) -> pd.DataFrame:
+def parse_race_lap_chart_page(page: fitz.Page, page_width: float) -> pd.DataFrame:
     """Get the table from a given page in "Race Lap Chart" PDF
 
     :param page: A `fitz.Page` object
@@ -23,10 +21,10 @@ def parse_race_lap_chart_page(page: fitz.Page) -> pd.DataFrame:
     # Get the position of "POS" and "Page", between which the table is located vertically
     # TODO: Probably need to use some other text as reference point. If the race name has "POS" in
     #       it, then the current method will fail
-    t = page.search_for('POS')[0].y0
-    b = page.search_for('Page')[0].y0
+    page_top = page.search_for('POS')[0].y0
+    page_bottom = page.search_for('Page')[0].y0
 
-    df = page.find_tables(clip=fitz.Rect(0, t, W, b), strategy='text')[0].to_pandas()
+    df = page.find_tables(clip=fitz.Rect(0, page_top, page_width, page_bottom), strategy='text')[0].to_pandas()
 
     """
     The parsing is not always successful. We may have one of the following situations:
@@ -63,13 +61,12 @@ def parse_race_lap_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     # Get page width and height
     doc = fitz.open(file)
     page = doc[0]
-    global W
-    W = page.bound()[2]
+    page_width = page.bound()[2]
 
     # Parse all pages
     tables = []
     for page in doc:
-        tables.append(parse_race_lap_chart_page(page))
+        tables.append(parse_race_lap_chart_page(page, page_width))
     df = pd.concat(tables, ignore_index=True)
 
     # Reshape the table to long format, i.e. to lap-position level

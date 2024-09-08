@@ -75,14 +75,17 @@ def parse_entry_list(file: str | os.PathLike) -> pd.DataFrame:
             break
     bottom_right = (w, top)
 
+    # Invert y-coordinates for pymupdf (fitz)
     top_left = (int(top_left[0]), int(h - top_left[1]))
     bottom_right = (int(bottom_right[0]), int(h - bottom_right[1]) + 1)
 
+    # Parse using `pymupdf`
     bbox = (top_left[0], h - top_left[1], bottom_right[0], h - bottom_right[1])
     table_data = extract_table_from_bbox(page, bbox)
 
     processed_data = [row for row in table_data if len(row) == 5]
     df = pd.DataFrame(processed_data[1:], columns=processed_data[0])
+
     # Extract reserve drivers
     top += text_height
     bottom += text_height
