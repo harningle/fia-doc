@@ -81,7 +81,7 @@ def parse_race_lap_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     return df
 
 
-def to_json(df: pd.DataFrame):
+def to_json(df: pd.DataFrame) -> pd.DataFrame:
     """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
 
     # Hard code 2023 Abu Dhabi for now

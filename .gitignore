@@ -162,6 +162,7 @@ cython_debug/
 # Data files
 data/
 *.pkl
+*.zip
 
 # Jess's package
 jolpica-f1/

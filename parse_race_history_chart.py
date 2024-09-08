@@ -10,11 +10,8 @@ import pandas as pd
 
 from models.lap import Lap, LapData, SessionEntry
 
-W: float  # Page width and height
-H: float
 
-
-def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
+def parse_race_history_chart_page(page: fitz.Page, page_width: float, page_height: float) -> pd.DataFrame:
     """
     Get the table(s) from a given page in "Race History Chart" PDF. There are multiple tables in a
     page, each of which correspond to a lap No. We concat all tables into one single dataframe
@@ -26,11 +23,10 @@ def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
 
     TODO: probably use better type hint using pandera later
     """
-
     # Get the position of "Lap x"
     t = page.search_for('Race History Chart')[0].y1
     b = page.search_for('TIME')[0].y1
-    headers = page.search_for('Lap', clip=(0, t, W, b))
+    headers = page.search_for('Lap', clip=(0, t, page_width, b))
 
     # Iterate through the tables for each lap
     tables = []
@@ -42,10 +38,10 @@ def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
         one-fifth of the page width. We add 5% extra buffer to the right boundary
         """
         left_boundary  = lap.x0
-        right_boundary  = headers[i + 1].x0 if i + 1 < len(headers) else (left_boundary + W / 5) * 1.05
-        temp = page.find_tables(clip=fitz.Rect(left_boundary, t, right_boundary, H),
+        right_boundary  = headers[i + 1].x0 if i + 1 < len(headers) else (left_boundary + page_width / 5) * 1.05
+        temp = page.find_tables(clip=fitz.Rect(left_boundary, t, right_boundary, page_height),
                                 strategy='lines',
-                                add_lines=[((left_boundary, 0), (left_boundary, H))])[0].to_pandas()
+                                add_lines=[((left_boundary, 0), (left_boundary, page_height))])[0].to_pandas()
 
         # Three columns: "LAP x", "GAP", "TIME". "LAP x" is the column for driver No. So add a new
         # column for lap No. with value "x", and rename the columns
@@ -53,6 +49,7 @@ def parse_race_history_chart_page(page: fitz.Page) -> pd.DataFrame:
         temp.columns = ['driver_no', 'gap', 'time']
         temp['lap'] = lap_no
         temp = temp[temp['driver_no'] != '']  # Sometimes we will get one additional empty row
+        temp['driver_no'] = temp['driver_no'].apply(lambda x: int(x))
 
         # The row order/index is meaningful: it's the order/positions of the cars
         # TODO: is this true for all cases? E.g. retirements?
@@ -69,15 +66,15 @@ def parse_race_history_chart(file: str | os.PathLike[str]) -> pd.DataFrame:
     :param file: Path to PDF file
     :return: The output dataframe will be [driver No., lap No., gap to leader, lap time]
     """
+
     # Get page width and height
     doc = fitz.open(file)
     page = doc[0]
-    global W, H
-    W = page.bound()[2]
-    H = page.bound()[3]
+    page_width = page.bound()[2]
+    page_height = page.bound()[3]
 
     # Parse all pages
-    df = pd.concat([parse_race_history_chart_page(page) for page in doc], ignore_index=True)
+    df = pd.concat([parse_race_history_chart_page(page, page_width, page_height) for page in doc], ignore_index=True)
 
     # Clean up
     """
