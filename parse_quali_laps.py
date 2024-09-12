@@ -6,7 +6,7 @@ import fitz
 import pandas as pd
 
 from models.foreign_key import SessionEntry
-from models.quali_lap import Lap, LapData
+from models.lap import QualiLap, LapData
 
 
 def parse_quali_final_classification(file: str | os.PathLike) -> pd.DataFrame:
@@ -291,11 +291,11 @@ def to_json(df: pd.DataFrame):
     for q in [1, 2, 3]:
         temp = df[df['Q'] == q]
         temp['lap'] = temp.apply(
-            lambda x: Lap(
+            lambda x: QualiLap(
                 number=x['lap_no'],
                 time=x['lap_time'],
                 is_deleted=x['lap_time_deleted'],
-                is_fastest_lap=x['is_fastest_lap']
+                is_entry_fastest_lap=x['is_fastest_lap']
             ),
             axis=1
         )
@@ -304,7 +304,7 @@ def to_json(df: pd.DataFrame):
             lambda x: SessionEntry(
                 year=year,
                 round=round_no,
-                type=f'Q{q}',
+                session=f'Q{q}',
                 car_number=x
             )
         )
@@ -316,7 +316,7 @@ def to_json(df: pd.DataFrame):
     # Should add a smoke test here: 20-ish cars in Q1, 15 in Q2, 10 in Q3
     with open('quali_lap_times.pkl', 'wb') as f:
         pickle.dump(lap_data, f)
-    pass
+    return lap_data
 
 
 if __name__ == '__main__':

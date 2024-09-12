@@ -7,6 +7,7 @@ import fitz
 import pandas as pd
 
 from models.foreign_key import SessionEntry
+from models.lap import QualiLap, LapData
 
 
 def parse_sprint_shootout_final_classification(file: str | os.PathLike) -> pd.DataFrame:
@@ -229,9 +230,9 @@ def parse_sprint_shootout(final_path: str | os.PathLike, lap_times_path: str | o
     #       but made into SQ3? Shouldn't be SQ1 and box and SQ2 and box, so at least two pit stops?
     # TODO: should check here if all drivers are merged. All unmerged ones should be not classified
     del df['NO']
-    df['Q'] = 1
-    df.loc[df['lap_no'] > df['SQ1_LAPS'], 'Q'] = 2
-    df.loc[df['lap_no'] > df['SQ2_LAPS'], 'Q'] = 3
+    df['SQ'] = 1
+    df.loc[df['lap_no'] > df['SQ1_LAPS'], 'SQ'] = 2
+    df.loc[df['lap_no'] > df['SQ2_LAPS'], 'SQ'] = 3
     # TODO: should check the lap before the first Q2 and Q3 lap is pit lap. Or is it? Crashed?
     del df['SQ1_LAPS'], df['SQ2_LAPS']
 
@@ -275,3 +276,43 @@ def parse_sprint_shootout(final_path: str | os.PathLike, lap_times_path: str | o
     df['pit'] = (df['pit'] == 'P').astype(bool)
     return df
 
+
+def to_json(df: pd.DataFrame):
+    """Convert the parsed lap time df. to a json obj. See jolpica/jolpica-f1#7"""
+    # Hard code 2023 Brazil for now
+    year = 2023
+    round_no = 20
+
+    # Convert to json
+    lap_data = []
+    df = df[df['lap_time'].str.count(':') == 1]  # TODO: check this. We always lost the first lap?
+    df['lap_time'] = df['lap_time'].apply(parse_date)
+    for q in [1, 2, 3]:
+        temp = df[df['SQ'] == q]
+        temp['lap'] = temp.apply(
+            lambda x: QualiLap(
+                number=x['lap_no'],
+                time=x['lap_time'],
+                is_deleted=x['lap_time_deleted'],
+                is_entry_fastest_lap=x['is_fastest_lap']
+            ),
+            axis=1
+        )
+        temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
+        temp['session_entry'] = temp['car_no'].map(
+            lambda x: SessionEntry(
+                year=year,
+                round=round_no,
+                session=f'SQ{q}',
+                car_number=x
+            )
+        )
+        lap_data.extend(temp.apply(
+            lambda x: LapData(foreign_keys=x['session_entry'], objects=x['lap']).model_dump(),
+            axis=1
+        ).tolist())
+
+    # Should add a smoke test here: 20-ish cars in Q1, 15 in Q2, 10 in Q3
+    with open('sprint_quali_lap_times.pkl', 'wb') as f:
+        pickle.dump(lap_data, f)
+    return lap_data
