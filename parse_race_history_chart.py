@@ -132,6 +132,8 @@ def to_timedelta(s: str) -> datetime.timedelta:
     """
     Covert a time string to a timedelta object, e.g. "1:32.190" -->
     datetime.timedelta(seconds=92, microseconds=190000)
+
+    # TODO: move this to `utils.py`?
     """
     # Parse by ":" and "."
     n_colons = s.count(':')
@@ -174,14 +176,15 @@ def to_json(df: pd.DataFrame) -> list[dict]:
     df['time'] = df['time'].apply(to_timedelta)
 
     # Convert to json
-    df['lap'] = df.apply(lambda x: Lap(lap_number=x['lap'], position=x['position'], time=x['time']),
-                         axis=1)
+    df['lap'] = df.apply(
+        lambda x: Lap(number=x['lap'], position=x['position'], time=x['time']), axis=1
+    )
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(
         lambda x: SessionEntry(
             year=year,
             round=round_no,
-            type=session_type,
+            session=session_type,
             car_number=x
         )
     )

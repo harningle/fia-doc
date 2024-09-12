@@ -64,7 +64,7 @@ def to_json(df: pd.DataFrame) -> list[dict]:
         lambda x: SessionEntry(
             year=year,
             round=round_no,
-            type=session_type,
+            session=session_type,
             car_number=x
         )
     )
