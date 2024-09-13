@@ -27,13 +27,13 @@ from models.foreign_key import SessionEntry
 
 
 class PitStop(BaseModel):
-    lap: PositiveInt
-    number: PositiveInt
+    lap: PositiveInt     # Lap No.
+    number: PositiveInt  # Car No.
     duration: timedelta
     local_timestamp: str
 
 
-class PitStopData(BaseModel):
+class PitStopData(BaseModel):  # TODO: all xxxData can be combined into one class?
     object_type: str = 'pit_stop'
     foreign_keys: SessionEntry
     objects: list[PitStop]

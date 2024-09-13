@@ -84,7 +84,7 @@ def to_json(df: pd.DataFrame) -> list[dict]:
             foreign_keys=SessionEntry(
                 year=year,
                 round=round_no,
-                type=session_type,
+                session=session_type,
                 car_number=x['driver_no']
             ),
             objects=FastestLap(
