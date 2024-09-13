@@ -5,11 +5,11 @@ from parse_entry_list import parse_entry_list, to_json
 def test_parse_entry_list():
     df = parse_entry_list("fia_pdfs/race_entry_list.pdf")
     assert isinstance(df, pd.DataFrame)
-    assert len(df) == 24
+    assert len(df) == 24  # 20 drivers, 4 reserve
 
-    df = parse_entry_list("fia_pdfs/race_entry_list.pdf")
+    df = parse_entry_list("fia_pdfs/race_entry_list_2024.pdf")
     assert isinstance(df, pd.DataFrame)
-    assert len(df) == 24
+    assert len(df) == 21  # 20 drivers, 1 reserve
 
 
 def test_to_json():
