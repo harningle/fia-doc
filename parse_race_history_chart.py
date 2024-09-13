@@ -171,7 +171,7 @@ def to_json(df: pd.DataFrame) -> list[dict]:
     df['time'] = df['time'].apply(to_timedelta)
 
     # Convert to json
-    df['lap'] = df.apply(lambda x: Lap(lap_number=x['lap'], position=x['position'], time=x['time']),
+    df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position'], time=x['time']),
                          axis=1)
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(

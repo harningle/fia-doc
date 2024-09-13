@@ -87,7 +87,7 @@ def to_json(df: pd.DataFrame) -> pd.DataFrame:
     session_type = 'R'
 
     # Convert to json
-    df['lap'] = df.apply(lambda x: Lap(lap_number=x['lap'], position=x['position'], time=0.0),
+    df['lap'] = df.apply(lambda x: Lap(number=x['lap'], position=x['position'], time=0.0),
                          axis=1)
     df = df.groupby('driver_no')[['lap']].agg(list).reset_index()
     df['session_entry'] = df['driver_no'].map(
