@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+TODO: this is going to be merged with `parse_race_final_classification.py` for sure. The two  are
+effectively the same thing
+"""
 import os
 import pickle
 
@@ -9,19 +13,19 @@ from models.foreign_key import SessionEntry
 from models.classification import Classification, ClassificationData
 
 
-def parse_race_final_classification(file: str | os.PathLike) -> pd.DataFrame:
-    """Parse "Race Final Classification" PDF
+def parse_sprint_final_classification(file: str | os.PathLike) -> pd.DataFrame:
+    """Parse "Sprint Final Classification" PDF
 
     :param file: Path to PDF file
     :return: The output dataframe will be [driver No., laps completed, total time,
                                            finishing position, finishing status, fastest lap time,
                                            fastest lap speed, fastest lap No.]
     """
-    # Find the page with "Race Final Classification"
+    # Find the page with "Sprint Final Classification"
     doc = fitz.open(file)
     for i in range(len(doc)):
         page = doc[i]
-        found = page.search_for('Race Final Classification')
+        found = page.search_for('Sprint Final Classification')
         if found:
             break
 
@@ -88,7 +92,7 @@ def parse_race_final_classification(file: str | os.PathLike) -> pd.DataFrame:
     }, inplace=True)
     df.driver_no = df.driver_no.astype(int)
     df.laps_completed = df.laps_completed.astype(int)
-    df.time = pd.to_timedelta(df.time)  # TODO: change all df['x'] to df.x, for consistency
+    df.time = pd.to_timedelta('00:' + df.time)  # TODO: not the best way to handle this
     # TODO: gap to the leader is to be cleaned later, so we can use it for cross validation
     # TODO: the fastest lap data is to be cleaned
     # df.fastest_lap_time = pd.to_timedelta(df.fastest_lap_time)  # TODO: this can be missing?
@@ -99,9 +103,9 @@ def parse_race_final_classification(file: str | os.PathLike) -> pd.DataFrame:
 
 
 def to_json(df: pd.DataFrame) -> dict:
-    # Hard code 2023 Abu Dhabi for now
+    # Hard code 2023 Brazil for now
     year = 2023
-    round_no = 22
+    round_no = 20
 
     # Convert to json
     df['classification'] = df.apply(
@@ -109,7 +113,7 @@ def to_json(df: pd.DataFrame) -> dict:
             foreign_keys=SessionEntry(
                 year=year,
                 round=round_no,
-                session='R',
+                session='SR',
                 car_number=x['driver_no']
             ),
             objects=[
@@ -125,7 +129,7 @@ def to_json(df: pd.DataFrame) -> dict:
 
     # Dump to json
     classification_data = df['classification'].tolist()
-    with open('race_final_classification.pkl', 'wb') as f:
+    with open('sprint_final_classification.pkl', 'wb') as f:
         pickle.dump(classification_data, f)
     return classification_data
 
