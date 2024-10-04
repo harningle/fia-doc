@@ -3,8 +3,10 @@ import os
 import pickle
 
 import fitz
+import numpy as np
 import pandas as pd
 
+from models.classification import QualiClassification, QualiClassificationData
 from models.foreign_key import SessionEntry
 from models.lap import QualiLap, LapData
 
@@ -46,11 +48,20 @@ def parse_quali_final_classification(file: str | os.PathLike) -> pd.DataFrame:
     entrant = page.search_for('ENTRANT')[0]
     snap_x_tolerance = (entrant.x0 - nat.x1) * 1.2  # 20% buffer
 
-    # Parse
+    # Get the table
     df = page.find_tables(clip=bbox, snap_x_tolerance=snap_x_tolerance)[0].to_pandas()
-    df.columns = ['_', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS', 'Q1_%', 'Q1_TIME', 'Q2',
-                  'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
-    df.drop(columns=['_', 'NAT', 'ENTRANT'], inplace=True)
+
+    # Clean up column name: the first row is mistakenly taken as column names
+    cols = df.columns.tolist()
+    for i in range(len(df.columns)):
+        cols[i] = df.columns[i].removeprefix(f'{i}-')
+    df = pd.DataFrame(
+        np.vstack([cols, df]),
+        columns=['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS', 'Q1_%', 'Q1_TIME',
+                 'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
+    )
+
+    df.drop(columns=['NAT', 'ENTRANT'], inplace=True)
     df = df[df['NO'] != '']
     df.dropna(subset='NO', inplace=True)
     return df
@@ -276,6 +287,39 @@ def parse_quali(final_path: str | os.PathLike, lap_times_path: str | os.PathLike
     # Clean up
     df['pit'] = (df['pit'] == 'P').astype(bool)
     return df
+
+
+def to_json_classification(df: pd.DataFrame):
+    """I know this is bad. Will refactor later..."""
+    year = 2023
+    round_no = 22
+
+    data = []
+    for q in [1, 2, 3]:
+        temp = df[df[f'Q{q}_TIME'].notnull()][['position', 'NO', f'Q{q}_TIME']].copy()
+        temp['classification'] = temp.apply(
+            lambda x: QualiClassificationData(
+                foreign_keys=SessionEntry(
+                    year=year,
+                    round=round_no,
+                    session=f'Q{q}',
+                    car_number=x['NO']
+                ),
+                objects=[
+                    QualiClassification(
+                        position=x['position'],
+                        fastest_lap=x[f'Q{q}_TIME']
+                    )
+                ]
+            ).model_dump(),
+            axis=1
+        )
+        data.extend(temp['classification'].tolist())
+
+    # Dump to json
+    with open('quali_final_classification.pkl', 'wb') as f:
+        pickle.dump(data, f)
+    return data
 
 
 def to_json(df: pd.DataFrame):
