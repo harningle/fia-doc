@@ -9,27 +9,41 @@ from models.driver import Driver, RoundEntry
 from models.foreign_key import Round
 
 
-def extract_table_from_bbox(page, bbox):
-    blocks = page.get_text("dict", clip=bbox)["blocks"]
+def split_team_constructor(row_data: list[str]) -> list[str]:
+    """
+    Split cases where pymupdf combines the row, constructor columns
+    TODO: There has to be a more elegant way to fix this
+    """
+    team_constructor = row_data[3]
+
+    possible_team_endings = ["Racing", "Team"]
+    for team_ending in possible_team_endings:
+        if team_ending in team_constructor:
+            split_team_constructor = team_constructor.split(team_ending)
+            team = split_team_constructor[0] + team_ending
+            constructor = split_team_constructor[1].strip()
+            new_row_data = row_data[0:3] + [team, constructor]
+            return new_row_data
+    raise ValueError(f"Unable to split team and constructor for '{team_constructor}'")
+
+def extract_table_from_bbox(page, bbox) -> list[list[str, int]]:
+    blocks = page.get_text("dict", clip=bbox)["blocks"][-1]
     rows = {}
     last_y0 = None
     tolerance = 5
-
-    for block in blocks:
-        if "lines" not in block:
-            continue
-        for line in block["lines"]:
-            for span in line["spans"]:
-                x0, y0, x1, y1 = span["bbox"]
-                if last_y0 is not None and abs(y0 - last_y0) <= tolerance:
-                    y0 = last_y0
-                else:
-                    tolerance = max(5, (y1 - y0) / 2)
-                row_key = round(y0, -1)
-                last_y0 = y0
-                if row_key not in rows:
-                    rows[row_key] = []
-                rows[row_key].append((x0, span["text"].strip()))
+    
+    for line in blocks["lines"]:
+        for span in line["spans"]:
+            x0, y0, x1, y1 = span["bbox"]
+            if last_y0 is not None and abs(y0 - last_y0) <= tolerance:
+                y0 = last_y0
+            else:
+                tolerance = max(5, (y1 - y0) / 2)
+            row_key = round(y0, -1)
+            last_y0 = y0
+            if row_key not in rows:
+                rows[row_key] = []
+            rows[row_key].append((x0, span["text"].strip()))
 
     sorted_rows = sorted(rows.items(), key=lambda item: item[0])
     table = []
@@ -38,9 +52,18 @@ def extract_table_from_bbox(page, bbox):
         row_data = [text for _, text in sorted_row if text]
         if len(row_data) == 6:
             row_data = row_data[0:1] + row_data[2:]
+        elif len(row_data) == 4:
+            row_data = split_team_constructor(row_data)
+        elif len(row_data) < 4:
+            continue
+
+        if row_data[0] != "No.":
+            row_data[0] = int(row_data[0])
+            
         table.append(row_data)
 
     return table
+
 
 
 def parse_entry_list(file: str | os.PathLike) -> pd.DataFrame:
@@ -56,7 +79,7 @@ def parse_entry_list(file: str | os.PathLike) -> pd.DataFrame:
     :return: A dataframe of [car No., driver name, nationality, team, constructor, role]
     """
     doc = fitz.open(file)
-    page = doc[1]  # Assume the relevant table is on the second page
+    page = doc[1]  # TODO: can have multiple pages
     w, h = page.bound()[2], page.bound()[3]
     car_no = page.search_for("No.")[0]
     top_left = (car_no.x0, car_no.y0)
@@ -75,14 +98,17 @@ def parse_entry_list(file: str | os.PathLike) -> pd.DataFrame:
             break
     bottom_right = (w, top)
 
+    # Invert y-coordinates for pymupdf (fitz)
     top_left = (int(top_left[0]), int(h - top_left[1]))
     bottom_right = (int(bottom_right[0]), int(h - bottom_right[1]) + 1)
 
+    # Parse using `pymupdf`
     bbox = (top_left[0], h - top_left[1], bottom_right[0], h - bottom_right[1])
     table_data = extract_table_from_bbox(page, bbox)
 
     processed_data = [row for row in table_data if len(row) == 5]
     df = pd.DataFrame(processed_data[1:], columns=processed_data[0])
+
     # Extract reserve drivers
     top += text_height
     bottom += text_height
@@ -116,6 +142,8 @@ def parse_entry_list(file: str | os.PathLike) -> pd.DataFrame:
     else:
         reserve_df = pd.DataFrame(columns=df.columns)
 
+    print(reserve_df)
+
     df["role"] = "permanent"
     combined_df = pd.concat([df, reserve_df], ignore_index=True)
 
@@ -147,4 +175,6 @@ def to_json(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
+    df = parse_entry_list("fia_pdfs/race_entry_list.pdf")
+    df = parse_entry_list("fia_pdfs/race_entry_list_2024.pdf")
     pass
