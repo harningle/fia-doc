@@ -2,7 +2,7 @@
 """Driver entry models"""
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
-from models.foreign_key import Round
+from .foreign_key import Round
 
 
 class Driver(BaseModel):

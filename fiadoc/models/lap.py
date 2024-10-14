@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
-from models.foreign_key import SessionEntry
+from .foreign_key import SessionEntry
 
 
 class Lap(BaseModel):

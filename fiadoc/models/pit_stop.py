@@ -23,7 +23,7 @@ from datetime import timedelta
 
 from pydantic import BaseModel, PositiveInt
 
-from models.foreign_key import SessionEntry
+from .foreign_key import SessionEntry
 
 
 class PitStop(BaseModel):

@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
 
-from pydantic import BaseModel, ConfigDict, PositiveInt
+from pydantic import BaseModel, ConfigDict, NonNegativeFloat, NonNegativeInt, PositiveInt
 
-from models.foreign_key import SessionEntry
+from .foreign_key import SessionEntry
 
 
 class Classification(BaseModel):
-    points: float
+    position: PositiveInt
+    is_classified: bool
+    status: NonNegativeInt
+    points: NonNegativeFloat
     time: timedelta
-    laps_completed: int  # TODO: or positive int? What if a driver retires in lap 1?
+    laps_completed: NonNegativeInt  # TODO: or positive int? What if a driver retires in lap 1?
 
 
 class ClassificationData(BaseModel):
