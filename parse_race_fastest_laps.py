@@ -87,10 +87,10 @@ def to_json(df: pd.DataFrame) -> list[dict]:
                 session=session_type,
                 car_number=x['driver_no']
             ),
-            objects=FastestLap(
-                lap_number=x['lap'],
+            objects=[FastestLap(
+                number=x['lap'],
                 fastest_lap_rank=x['rank']
-            )
+            )]
         ).model_dump(),
         axis=1
     )

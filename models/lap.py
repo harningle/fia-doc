@@ -24,7 +24,7 @@ class QualiLap(BaseModel):
 
 
 class FastestLap(BaseModel):
-    lap_number: PositiveInt
+    number: PositiveInt
     fastest_lap_rank: PositiveInt
 
     model_config = ConfigDict(extra='forbid')
@@ -39,8 +39,8 @@ class LapData(BaseModel):
 
 
 class FastestLapData(BaseModel):
-    object_type: str = 'fastest_lap'
+    object_type: str = 'lap'
     foreign_keys: SessionEntry
-    objects: FastestLap
+    objects: list[FastestLap]
 
     model_config = ConfigDict(extra='forbid')
