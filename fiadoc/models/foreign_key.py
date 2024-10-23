@@ -17,9 +17,9 @@ class SessionEntry(BaseModel):
         match session:
             case 'R' | 'Q1' | 'Q2' | 'Q3' | 'SR' | 'SQ1' | 'SQ2' | 'SQ3' | 'FP1' | 'FP2' | 'FP3':
                 return session
-            case 'race':
+            case 'race' | 'Race':  # Some simple mapping
                 return 'R'
-            case 'sprint':
+            case 'sprint' | 'Sprint':
                 return 'SR'
             case _:
                 raise ValueError(f'Invalid session: {session}. Must be one of: "R", "Q1", "Q2",'

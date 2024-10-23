@@ -23,7 +23,7 @@ In case of sprint weekend, sprint quali./shootout can be parsed as if it's a usu
 
 ## Use
 
-```
+```python
 from fiadoc.parser import ClassificationParser
 
 parser = ClassificationParser('data/pdf/2023_18_race_final_classification.pdf', 2023, 18, 'race')

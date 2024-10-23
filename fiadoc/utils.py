@@ -3,19 +3,22 @@ import re
 import pandas as pd
 
 
-def parse_duration(s: str) -> pd.Timedelta:
-    """Convert a time duration string to `pd.Timedelta` object
+def duration_to_millisecond(s: str) -> int:
+    """Convert a time duration string to milliseconds
 
-    >>> parse_duration('1:36:48.076')
-    Timedelta('0 days 01:36:48.076000')
-    >>> parse_duration('17:39.564')
-    Timedelta('0 days 00:17:39.564000')
+    >>> duration_to_millisecond('1:36:48.076')
+    5808076
+    >>> duration_to_millisecond('17:39.564')
+    1059564
     """
-    has_hour_pat = re.compile(r'^\d{1,2}:\d{2}:\d{2}\.\d{3}$')
-    no_hour_pat = re.compile(r'^\d{2}:\d{2}\.\d{3}$')
-    if has_hour_pat.match(s):
-        return pd.Timedelta(s)
-    elif no_hour_pat.match(s):
-        return pd.Timedelta('0:' + s)
+    pat = re.compile(r'(?:(?P<hour>\d+):)?(?P<minute>\d{2}):(?P<sec>\d{2})\.(?P<millisec>\d{3})')
+    if m := pat.match(s):
+        hour = int(m.group('hour') or 0)
+        minute = int(m.group('minute'))
+        second = int(m.group('sec'))
+        millisecond = int(m.group('millisec'))
+        return hour * 3600000 + minute * 60000 + second * 1000 + millisecond
     else:
         raise ValueError(f'{s} is not a valid time duration')
+
+

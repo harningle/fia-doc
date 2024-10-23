@@ -9,7 +9,7 @@ import pymupdf
 
 from .models.foreign_key import SessionEntry
 from .models.classification import Classification, ClassificationData
-from .utils import parse_duration
+from .utils import duration_to_millisecond
 
 
 class ClassificationParser:
@@ -44,7 +44,7 @@ class ClassificationParser:
         """
         # Find the page with "Final Classification", on which the table is located
         doc = pymupdf.open(self.file)
-        found = False
+        found = []
         for i in range(len(doc)):
             page = doc[i]
             found = page.search_for('Final Classification')
@@ -161,7 +161,7 @@ class ClassificationParser:
             not_classified['finishing_status'] = 11  # TODO: will clean up the code later
             df = pd.concat([df, not_classified], ignore_index=True)
         return self._clean_df(df)
-    
+
     def _clean_df(self, df: pd.DataFrame) -> pd.DataFrame:
         # Rename cols.
         del df['NAT']
@@ -206,15 +206,28 @@ class ClassificationParser:
         df.finishing_position = df.temp.astype(int)
         del df['temp']
 
-        # TODO: do we want to combine fastest lap info. here?
-
         df.driver_no = df.driver_no.astype(int)
         df.laps_completed = df.laps_completed.astype(int)
-        df.time = df.time.apply(parse_duration)
+        df.time = df.time.apply(duration_to_millisecond)
         # TODO: gap to the leader is to be cleaned later, so we can use it for cross validation
-        # TODO: the fastest lap data is to be cleaned
-        # df.fastest_lap_time = pd.to_timedelta(df.fastest_lap_time)  # TODO: this can be missing?
-        # df.fastest_lap_no = df.fastest_lap_no.astype(int)  # TODO: this can be missing?
+
+        # Rank fastest laps
+        """
+        TODO: these need some serious cleaning.
+        
+        1. handling missing values, e.g. crash on/before finishing lap 1, so there is no fastest
+           lap time to begin with
+        2. proper ranking: currently we rank by lap time. If same, then rank by lap No. What if
+           multiple drivers all set a same fastest lap time on the same lap? Need to combine the
+           precise lap finishing calendar time (from other PDFs) with the lap time to rank them
+           properly
+        """
+        # df.fastest_lap_time = pd.to_timedelta(df.fastest_lap_time)
+        df.fastest_lap_no = df.fastest_lap_no.astype(int)
+        df['fastest_lap_rank'] = df \
+            .sort_values(by=['fastest_lap_time', 'fastest_lap_no'], ascending=[True, True]) \
+            .groupby('driver_no', sort=False) \
+            .ngroup() + 1
 
         # Fill in some default values
         df.fillna({
@@ -225,15 +238,19 @@ class ClassificationParser:
         df.finishing_status = df.finishing_status.astype(int)
         return df
 
+    def _cross_validate(self) -> bool:
+        """Cross validate against other PDFs or fastf1?"""
+        raise NotImplementedError
+
     def to_pkl(self, filename: str | os.PathLike) -> None:
-        df = self.df
+        df = self.df.copy()  # TODO: not the best practice?
         df['classification'] = df.apply(
             lambda x: ClassificationData(
                 foreign_keys=SessionEntry(
                     year=self.year,
                     round=self.round_no,
                     session=self.session,
-                    car_number=x['driver_no']
+                    car_number=x.driver_no
                 ),
                 objects=[
                     Classification(
@@ -242,6 +259,8 @@ class ClassificationParser:
                         status=x.finishing_status,
                         points=x.points,
                         time=x.time,
+                        fastest_lap=x.fastest_lap_no,
+                        fastest_lap_rank=x.fastest_lap_rank,
                         laps_completed=x.laps_completed
                     )
                 ]
