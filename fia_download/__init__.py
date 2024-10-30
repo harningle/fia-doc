@@ -2,9 +2,12 @@ import hashlib
 import json
 import os
 import re
+import warnings
 from typing import Optional
 
 import requests
+
+from rapidfuzz import fuzz
 
 # TODO: switch to absolute imports once this is a package
 from .base import (
@@ -30,7 +33,8 @@ class FIADocumentsInterface:
             name: str,
             season: int,
             event: str,
-            session: Optional[str] = None
+            session: Optional[str] = None,
+            allow_fuzzy: bool = False
     ) -> bool:
         """Check if the given document has been updated on the server since
         the last time it was loaded.
@@ -41,12 +45,14 @@ class FIADocumentsInterface:
             event: The name of the event.
             session: The session name. If None, a decision document is assumed.
                 Else, a timing document is assumed.
+            allow_fuzzy: Whether to allow fuzzy matching of the document name.
 
         Returns:
             True if the document has been updated on the server,
             False otherwise.
         """
-        document = self._get_document_metadata(name, season, event, session)
+        document = self._get_document_metadata(name, season, event, session,
+                                               allow_fuzzy=allow_fuzzy)
         return self._backend.was_updated(document)
 
     def get(
@@ -54,7 +60,8 @@ class FIADocumentsInterface:
             name: str,
             season: int,
             event: str,
-            session: Optional[str] = None
+            session: Optional[str] = None,
+            allow_fuzzy: bool = False
     ) -> Document:
         """Load and return the given document.
 
@@ -64,11 +71,13 @@ class FIADocumentsInterface:
             event: The name of the event.
             session: The session name. If None, a decision document is assumed.
                 Else, a timing document is assumed.
+            allow_fuzzy: Whether to allow fuzzy matching of the document name.
 
         Returns:
             The loaded document.
         """
-        document = self._get_document_metadata(name, season, event, session)
+        document = self._get_document_metadata(name, season, event, session,
+                                               allow_fuzzy=allow_fuzzy)
         self._backend.load_document(document)
         return document
 
@@ -77,7 +86,8 @@ class FIADocumentsInterface:
             name: str,
             season: int,
             event: str,
-            session: Optional[str] = None
+            session: Optional[str] = None,
+            allow_fuzzy: bool = False
     ) -> Document | None:
         """Load and return the given document if it has been updated on the
         server since the last time it was loaded.
@@ -88,11 +98,13 @@ class FIADocumentsInterface:
             event: The name of the event.
             session: The session name. If None, a decision
                 document is assumed. Else, a timing document is assumed.
+            allow_fuzzy: Whether to allow fuzzy matching of the document name.
 
         Returns:
             The loaded document if it has been updated, None otherwise.
         """
-        document = self._get_document_metadata(name, season, event, session)
+        document = self._get_document_metadata(name, season, event, session,
+                                               allow_fuzzy=allow_fuzzy)
         if self._backend.was_updated(document):
             self._backend.load_document(document)
             return document
@@ -103,17 +115,43 @@ class FIADocumentsInterface:
             name: str,
             season: int,
             event: str,
-            session: Optional[str] = None
+            session: Optional[str] = None,
+            allow_fuzzy: bool = False
     ) -> Document:
-        # TODO: need to do fuzzy matching or similar to find the correct
-        #  document if the name is not an exact match. Example: "Entry List"
-        #  vs "Entry List (corrected)"
         if session is None:
             documents = load_decision_documents(season, event)
-            return documents[event][name]
+            documents = documents.get(event, [])
 
-        documents = load_timing_documents(season, event, session)
-        return documents[name]
+        else:
+            documents = load_timing_documents(season, event, session)
+
+        # exact match
+        if name in documents:
+            return documents[name]
+
+        # single partial exact match
+        candidates = [doc for doc_name, doc in documents.items()
+                      if name in doc_name]
+        if len(candidates) == 1:
+            return candidates[0]
+
+        # fuzzy match
+        if allow_fuzzy:
+            ratios = []
+            for doc_name in documents:
+                ratios.append((fuzz.ratio(name, doc_name), doc_name))
+            ratios.sort(key=lambda x: x[0], reverse=True)  # sort by ratio
+
+            if (ratios[0][0] > 75) and (ratios[0][0] - ratios[1][0] > 25):
+                return documents[ratios[0][1]]
+
+        # no match but we had multiple partial matches, warn the user
+        if len(candidates) > 1:
+            warnings.warn(f"Multiple documents with partial match found for "
+                          f"name '{name}': "
+                          f"{', '.join(f"'{c.name}'" for c in candidates)}. ")
+
+        raise ValueError(f"Document {name} not found in the database.")
 
 
 class FileSystemDocumentBackend:

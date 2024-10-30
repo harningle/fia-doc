@@ -3,4 +3,5 @@ fastf1
 pandas>=2
 pydantic>=2
 pymupdf
+rapidfuzz
 tqdm
