@@ -50,11 +50,26 @@ def load_timing_documents(
 
     event_slug = event.lower().replace(" ", "-")
 
-    url = get_url(
-        f"events/fia-formula-one-world-championship/"
-        f"season-{season}/{event_slug}/eventtiming-information"
-    )
-    response = requests.get(url)
+    # timing urls are inconsistent, try multiple candidates
+    url_candidates = [
+        get_url(
+            f"events/fia-formula-one-world-championship/"
+            f"season-{season}/{event_slug}/eventtiming-information"
+        ),
+        get_url(
+            f"events/fia-formula-one-world-championship/"
+            f"season-{season}/{event_slug}/eventtiming"
+        ),
+    ]
+
+    for url in url_candidates:
+        response = requests.get(url)
+        if response.status_code == 200:
+            break
+    else:
+        raise ValueError(f"Could not find timing documents for {event} "
+                         f"({season})")
+
     soup = bs4.BeautifulSoup(response.text, "html.parser")
 
     current_session = None

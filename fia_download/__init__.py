@@ -155,6 +155,20 @@ class FIADocumentsInterface:
 
         raise ValueError(f"Document '{name}' not found.")
 
+    @staticmethod
+    def list_events(season: int) -> list[str]:
+        """List all events for a given season.
+
+        More recent events are listed first.
+
+        Args:
+            season: The season year.
+
+        Returns:
+            A list of event names.
+        """
+        return list(load_decision_documents(season).keys())
+
 
 class FileSystemDocumentBackend:
     """

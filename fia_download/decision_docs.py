@@ -109,7 +109,7 @@ def load_decision_documents(
         docs[event_name] = event_docs
 
     # if a specific event was requested, check if it was found
-    if event not in docs:
+    if (event is not None) and (event not in docs):
         raise ValueError(f"Event '{event}' not found in season {season}")
 
     return docs
