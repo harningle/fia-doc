@@ -1,4 +1,5 @@
 import datetime
+import functools
 import re
 import zoneinfo
 
@@ -44,6 +45,7 @@ def get_season_ids() -> dict[int, int]:
     return season_ids
 
 
+@functools.cache
 def load_decision_documents(
         season: int,
         event: Optional[str] = None
@@ -102,7 +104,7 @@ def load_decision_documents(
                 # a newer version of the document already exists
                 continue
 
-            event_docs[document.name] = document
+            event_docs[document.name.casefold()] = document
 
         docs[event_name] = event_docs
 

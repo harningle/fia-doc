@@ -1,6 +1,8 @@
-import requests
+import functools
 
 import bs4
+import requests
+
 
 # TODO: switch to absolute imports once this is a package
 from .base import BASE_URL, Document, get_url
@@ -25,6 +27,7 @@ _SESSIONS = {
 }
 
 
+@functools.cache
 def load_timing_documents(
         season: int,
         event: str,
@@ -74,6 +77,7 @@ def load_timing_documents(
         elif (current_session == session) and (tag.name == 'div'):
             url = tag.find('a')['href'].replace(BASE_URL, "")
             title = tag.find('a').find(class_='title').text
-            session_docs[title] = Document(title, url, season, event, session)
+            session_docs[title.casefold()] \
+                = Document(title, url, season, event, session)
 
     return session_docs

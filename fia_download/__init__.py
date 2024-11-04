@@ -118,6 +118,8 @@ class FIADocumentsInterface:
             session: Optional[str] = None,
             allow_fuzzy: bool = False
     ) -> Document:
+        name = name.casefold()
+
         if session is None:
             documents = load_decision_documents(season, event)
             documents = documents.get(event, [])
@@ -151,7 +153,7 @@ class FIADocumentsInterface:
                           f"name '{name}': "
                           f"{', '.join(f"'{c.name}'" for c in candidates)}. ")
 
-        raise ValueError(f"Document {name} not found in the database.")
+        raise ValueError(f"Document '{name}' not found.")
 
 
 class FileSystemDocumentBackend:
