@@ -24,8 +24,13 @@ In case of sprint weekend, sprint quali./shootout can be parsed as if it's a usu
 ## Use
 
 ```python
-from fiadoc.parser import ClassificationParser
+from fiadoc.parser import RaceParser
 
-parser = ClassificationParser('data/pdf/2023_18_race_final_classification.pdf', 2023, 18, 'race')
-parser.to_pkl('race_final_classification.pdf')
+parser = RaceParser('data/pdf/2023_18_race_final_classification.pdf',
+                    'data/pdf/2023_18_race_history_chart.pdf',
+                    2023,
+                    18,
+                    'race')
+parser.classification_df.to_pkl('data/race_final_classification.pkl')
+parser.lap_times_df.to_pkl('data/race_lap_times.pkl')
 ```
