@@ -2,20 +2,19 @@
 """Driver entry models"""
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
-from .foreign_key import Round
+from .foreign_key import RoundEntry
 
 
 class Driver(BaseModel):
     car_number: PositiveInt
-    name: str
-    team: str
 
     model_config = ConfigDict(extra='forbid')
 
 
-class RoundEntry(BaseModel):
-    object_type: str = 'driver'
-    foreign_keys: Round
+class DriverData(BaseModel):
+    object_type: str = 'RoundEntry'
+    foreign_keys: RoundEntry
+
     objects: list[Driver]
 
     model_config = ConfigDict(extra='forbid')

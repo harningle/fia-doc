@@ -9,16 +9,140 @@ import numpy as np
 import pandas as pd
 import pymupdf
 
-from .models.foreign_key import SessionEntry
 from .models.classification import(
     Classification,
     ClassificationData,
     QualiClassification,
     QualiClassificationData
 )
+from .models.driver import Driver, DriverData
+from .models.foreign_key import RoundEntry, SessionEntry
 from .models.lap import Lap, LapData, QualiLap
 from .models.pit_stop import PitStop, PitStopData
 from .utils import duration_to_millisecond, time_to_timedelta
+
+
+class EntryListParser:
+    def __init__(
+            self,
+            file: str | os.PathLike,
+            year: int,
+            round_no: int
+    ):
+        self.file = file
+        self.year = year
+        self.round_no = round_no
+        self.df = self._parse()
+
+    def _parse(self) -> pd.DataFrame:
+        """
+        :return: Df. with cols. of ["car_no", "driver", "nat", "team", "constructor"]
+        """
+        # Go to the page with "No.", "Driver", "Nat", "Team", and "Constructor"
+        doc = pymupdf.open(self.file)
+        found = False
+        for page in doc:
+            text = page.get_text('text')
+            if 'No.' in text and 'Driver' in text and 'Nat' in text and 'Team' in text and \
+                    'Constructor' in text:
+                found = True
+                break
+        if not found:
+            raise ValueError(f'Could not find any page containing entry list table in {self.file}')
+
+        # The top y-coord. of the table is below "Driver"
+        driver = page.search_for('Driver')
+        assert len(driver) == 1, f'Expected one "Driver", got {len(driver)} in {self.file}'
+        driver = driver[0]
+        t = driver.y1
+
+        # Table headers
+        headers = {}
+        for col in ['No.', 'Driver', 'Nat', 'Team', 'Constructor']:
+            temp = page.search_for(col, clip=(0, driver.y0, page.bound()[2], driver.y1))
+            assert len(temp) == 1, f'Expected one "{col}", got {len(temp)} in {self.file}'
+            headers[col.lower().strip('.')] = temp[0]
+
+        # The leftmost x-coord. of the table is the leftof "No."
+        l = headers['no'].x0
+
+        # Right is simply the page's right boundary
+        r = page.bound()[2]
+
+        # Bottom of the table
+        """
+        It's slightly more difficult to determine the bottom of the table, as there is no line. And
+        below the table, we have stewards' name, so we can't use the bottom of the page as the
+        bottom of the table. So instead, we search for digits below "No.". The last car No.'s
+        position is the the bottom of the table
+        """
+        car_nos = page.get_text(
+            'words',
+            clip=(headers['no'].x0, headers['no'].y1, headers['no'].x1, page.bound()[3])
+        )
+        car_nos = [i for i in car_nos if i[4].isdigit()]
+        for i in car_nos:
+            assert np.isclose(i[0], l, atol=1), \
+                f'Car No. {i[4]} is not vertically aligned with "No." in {self.file}'
+            assert i[2] < driver.x0, \
+                f'Car No. {i[4]} is not to the left of "Driver" in {self.file}'
+        b = car_nos[-1][3]
+
+        # Lines separating the columns
+        aux_vlines = [
+            l,
+            headers['driver'].x0,
+            headers['nat'].x0,
+            headers['team'].x0,
+            headers['constructor'].x0,
+            r
+        ]
+
+        # Lines separating the rows, which are the midpoints of the car No. texts
+        aux_hlines = [(car_nos[i][3] + car_nos[i + 1][1]) / 2 for i in range(len(car_nos) - 1)]
+        # Line vertically between "No." and the first car No.
+        aux_hlines.insert(0, (headers['no'].y1 + car_nos[0][1]) / 2)
+        # Line below the last car, which is last line + line gap (= last - 2nd last)
+        aux_hlines.append(2 * aux_hlines[-1] - aux_hlines[-2])
+
+        # Get the table
+        df = page.find_tables(
+            clip=(l, t, r, b),
+            strategy='lines',
+            vertical_lines=aux_vlines,
+            horizontal_lines=aux_hlines
+        )
+        assert len(df.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
+        df = df[0].to_pandas()
+        assert df.shape[1] == 5, f'Expected 5 columns, got {df.shape[1]} in {self.file}'
+        df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
+        df.car_no = df.car_no.astype(int)
+
+        def to_json() -> list[dict]:
+            return [
+                DriverData(
+                    foreign_keys=RoundEntry(
+                        year=self.year,
+                        round=self.round_no,
+                        team_name=x.constructor,
+                        driver_name=x.driver
+                    ),
+                    objects=[
+                        Driver(
+                            car_number=x.car_no
+                        )
+                    ]
+                ).model_dump()
+                for x in df.itertuples()
+            ]
+
+        def to_pkl(filename: str | os.PathLike) -> None:
+            with open(filename, 'wb') as f:
+                pickle.dump(df.to_json(), f)
+
+        df.to_json = to_json
+        df.to_pkl = to_pkl
+        return df
 
 
 class RaceParser:

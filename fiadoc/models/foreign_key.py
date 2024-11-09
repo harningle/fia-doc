@@ -28,8 +28,10 @@ class SessionEntry(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
-class Round(BaseModel):
+class RoundEntry(BaseModel):
     year: PositiveInt
     round: PositiveInt
+    driver_name: str
+    team_name: str
 
     model_config = ConfigDict(extra='forbid')
