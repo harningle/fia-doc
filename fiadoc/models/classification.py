@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from typing import Optional
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -16,9 +18,9 @@ class Classification(BaseModel):
     is_classified: bool
     status: NonNegativeInt
     points: NonNegativeFloat
-    time: dict[str, str | int]
+    time: dict[str, str | int] | None
     laps_completed: NonNegativeInt  # TODO: or positive int? What if retire in lap 1?
-    fastest_lap_rank: PositiveInt   # TODO: what if DNS or retire in lap 1?
+    fastest_lap_rank: PositiveInt | None
 
     model_config = ConfigDict(extra='forbid')
 

@@ -21,6 +21,8 @@ from .models.lap import Lap, LapData, QualiLap
 from .models.pit_stop import PitStop, PitStopData
 from .utils import duration_to_millisecond, time_to_timedelta
 
+pd.set_option('future.no_silent_downcasting', True)
+
 
 class EntryListParser:
     def __init__(
@@ -191,7 +193,8 @@ class RaceParser:
                 break
         if not found:
             doc.close()
-            raise ValueError(f'"Final Classification" not found on any page in {self.file}')
+            raise ValueError(f'"Final Classification" not found on any page in '
+                             f'{self.classification_file}')
 
         # Page width. This is the rightmost x-coord. of the table
         w = page.bound()[2]
@@ -208,7 +211,8 @@ class RaceParser:
         else:
             bottom = page.search_for('FASTEST LAP')
         if not bottom:
-            raise ValueError(f'Could not find "NOT CLASSIFIED" or "FASTEST LAP" in {self.file}')
+            raise ValueError(f'Could not find "NOT CLASSIFIED" or "FASTEST LAP" in '
+                             f'{self.classification_file}')
         b = bottom[0].y0
 
         # Table bounding box
@@ -251,10 +255,12 @@ class RaceParser:
             vertical_lines=aux_lines,
             snap_x_tolerance=pos['ON']['left'] - pos['FASTEST']['right']
         )
-        assert len(df.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
+        assert len(df.tables) == 1, \
+            f'Expected one table, got {len(df.tables)} in {self.classification_file}'
         df = df[0].to_pandas()
         df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
-        assert df.shape[1] == 13, f'Expected 13 columns, got {df.shape[1]} in {self.file}'
+        assert df.shape[1] == 13, \
+            f'Expected 13 columns, got {df.shape[1]} in {self.classification_file}'
 
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
@@ -268,7 +274,7 @@ class RaceParser:
             )
             assert len(not_classified.tables) == 1, \
                 f'Expected one table for "NOT CLASSIFIED", got {len(not_classified.tables)} ' \
-                f'in {self.file}'
+                f'in {self.classification_file}'
             not_classified = not_classified[0].to_pandas()
 
             # The table header is actually the first row of the "NOT CLASSIFIED" table
@@ -276,11 +282,12 @@ class RaceParser:
             not_classified.sort_index(inplace=True)
             not_classified.reset_index(drop=True, inplace=True)
             assert not_classified.shape[1] == 13, \
-                f'Expected 13 columns for "NOT CLASSIFIED"table , got {not_classified.shape[1]} ' \
-                f'in {self.file}'
+                f'Expected 13 columns for "NOT CLASSIFIED" table , got ' \
+                f'{not_classified.shape[1]} in {self.classification_file}'
             not_classified.columns = df.columns
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
+            not_classified['is_classified'] = False
             df = pd.concat([df, not_classified], ignore_index=True)
 
         # Set col. names
@@ -306,8 +313,10 @@ class RaceParser:
 
         # Clean up finishing status, e.g. is lapped? Is DSQ?
         df.loc[df.gap.fillna('').str.contains('LAP', regex=False), 'finishing_status'] = 1
-        df['is_classified'] = (df.finishing_position != 'DQ')
-        df.loc[df.finishing_position == 'DQ', 'finishing_status'] = 20  # TODO: clean up the coding
+        df.loc[(df.finishing_position == 'DQ') | (df.gap == 'DQ'), 'finishing_status'] = 20
+        df.loc[(df.finishing_position == 'DNS') | (df.gap == 'DNS'), 'finishing_status'] = 30
+        # TODO: clean up the coding
+        # TODO: check how the PDF labels DQ? In the position col. or in the GAP col.? 2023 vs 2024
 
         # Add finishing position for DNF and DSQ drivers
         """
@@ -327,9 +336,10 @@ class RaceParser:
         del df['temp']
 
         df.car_no = df.car_no.astype(int)
-        df.laps_completed = df.laps_completed.astype(int)
+        df.laps_completed = df.laps_completed.fillna(0).astype(int)
         df.time = df.time.apply(duration_to_millisecond)
         # TODO: gap to the leader is to be cleaned later, so we can use it for cross validation
+        # TODO: is the `.fillna(0)` safe? See 2024 Brazil race Hulkenberg
 
         # Rank fastest laps
         """
@@ -343,7 +353,7 @@ class RaceParser:
            properly
         """
         # df.fastest_lap_time = pd.to_timedelta(df.fastest_lap_time)
-        df.fastest_lap_no = df.fastest_lap_no.astype(int)
+        df.fastest_lap_no = df.fastest_lap_no.astype(float)
         df['fastest_lap_rank'] = df \
             .sort_values(by=['fastest_lap_time', 'fastest_lap_no'], ascending=[True, True]) \
             .groupby('car_no', sort=False) \
@@ -374,10 +384,11 @@ class RaceParser:
                             points=x.points,
                             time=x.time,
                             laps_completed=x.laps_completed,
-                            fastest_lap_rank=x.fastest_lap_rank,
+                            fastest_lap_rank=x.fastest_lap_rank if x.fastest_lap_time else None
+                            # TODO: replace the rank with missing or -1 in self.classification_df
                         )
                     ]
-                ).model_dump(),
+                ).model_dump(exclude_none=True),
                 axis=1
             ).tolist()
 
@@ -395,9 +406,9 @@ class RaceParser:
         df = []
         for page in doc:
             # Each page can have multiple tables, all of which begins from the same top y-position.
-            # Their table headers are vertically bounded between "Race History Chart" and "TIME".
-            # Find all of the headers
-            t = page.search_for('Race History Chart')[0].y1
+            # Their table headers are vertically bounded between "History Chart" and "TIME". Find
+            # all of the headers
+            t = page.search_for('History Chart')[0].y1
             b = page.search_for('TIME')[0].y1
             w = page.bound()[2]
             headers = page.search_for('Lap', clip=(0, t, w, b))
@@ -425,7 +436,7 @@ class RaceParser:
                                         add_lines=[((left_boundary, 0), (left_boundary, h))])
                 assert len(temp.tables) == 1, \
                     f'Expected one table per lap, got {len(temp.tables)} on p.{page.number} in ' \
-                    f'{self.file}'
+                    f'{self.lap_times_file}'
                 temp = temp[0].to_pandas()
 
                 # Three columns: "LAP x", "GAP", "TIME". "LAP x" is the column for driver No. So
@@ -572,8 +583,7 @@ class QualifyingParser:
         if self.session not in ['quali', 'sprint_quali']:
             raise ValueError(f'Invalid session: {self.session}. Valid sessions are: "quali" and '
                              f'"sprint_quali""')
-        if self.session == 'sprint_quali':
-            raise NotImplementedError('See 2023 US sprint shootout. No POLE LAP???')
+        # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
         return
 
     def _parse_classification(self):
@@ -590,7 +600,8 @@ class QualifyingParser:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
         if not found:
-            raise ValueError(f'"Final Classification" not found on any page in {self.file}')
+            raise ValueError(f'"Final Classification" not found on any page in '
+                             f'{self.classification_file}')
 
         # Page width. This is the rightmost x-coord. of the table
         w = page.bound()[2]
@@ -608,7 +619,7 @@ class QualifyingParser:
             bottom = page.search_for('POLE POSITION LAP')
         if not bottom:
             raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" in '
-                             f'{self.file}')
+                             f'{self.classification_file}')
         b = bottom[0].y0
 
         # Table bounding box
@@ -621,24 +632,31 @@ class QualifyingParser:
 
         # Get the table
         df = page.find_tables(clip=bbox, snap_x_tolerance=snap_x_tolerance)
-        assert len(df.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
+        assert len(df.tables) == 1, \
+            f'Expected one table, got {len(df.tables)} in {self.classification_file}'
         aux_lines = sorted(set([round(i[0], 2) for i in df[0].cells]))  # For unclassified table
         df = df[0].to_pandas()
-        assert df.shape[1] == 15, f'Expected 15 columns, got {df.shape[1]} in {self.file}'
+        # TODO: check 2023 vs 2024 PDF. Do we have a "%" col.? 15 or 14 col. in total?
+        assert df.shape[1] == 14, \
+            f'Expected 15 columns, got {df.shape[1]} in {self.classification_file}'
 
         # Clean up column name: the first row is mistakenly taken as column names
         """
         TODO: need to check if the first row is correctly treated as the table content, or
         mistakenly treated as col. header. Can be checked by the top y-position of `tableheader`
         from `page.find_tables()`. If the y-position exceeds the `y`, then it's a mistake.`
+        
+        Also, we name the sessions as "Q1", "Q2", and "Q3", regardless of whether it's a normal
+        qualifying or a sprint qualifying. This makes the code simpler, and we should always use
+        `self.session` to determine what session it is.
         """
         cols = df.columns.tolist()
         for i in range(len(df.columns)):
             cols[i] = df.columns[i].removeprefix(f'{i}-')
         df = pd.DataFrame(
             np.vstack([cols, df]),
-            columns=['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS', 'Q1_%',
-                     'Q1_TIME', 'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
+            columns=['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS', 'Q1_TIME',
+                     'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
         )
         df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
         df['finishing_status'] = 0

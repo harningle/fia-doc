@@ -13,6 +13,9 @@ def duration_to_millisecond(s: str) -> dict[str, str | int]:
     >>> duration_to_millisecond('12.345')
     12345
     """
+    if s is None:
+        return None
+
     match s.count(':'):
         case 0:  # 12.345
             assert re.match(r'\d+\.\d+', s), f'{s} is not a valid time duration'
