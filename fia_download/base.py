@@ -34,6 +34,11 @@ class Document:
         """Returns True if the document is a timing document."""
         return self.session is not None
 
+    @property
+    def is_provisional(self) -> bool:
+        """Returns True if the document is a provisional document."""
+        return "provisional".casefold() in self.name.casefold()
+
     def open_in_browser(self):
         """Open the document in the default web browser."""
         # ### doesn't work because data URI is too long (on windows?)

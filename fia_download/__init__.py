@@ -78,6 +78,10 @@ class FIADocumentsInterface:
         """
         document = self._get_document_metadata(name, season, event, session,
                                                allow_fuzzy=allow_fuzzy)
+
+        if document.is_provisional:
+            warnings.warn(f"Document '{name}' is provisional!")
+
         self._backend.load_document(document)
         return document
 
@@ -105,6 +109,10 @@ class FIADocumentsInterface:
         """
         document = self._get_document_metadata(name, season, event, session,
                                                allow_fuzzy=allow_fuzzy)
+
+        if document.is_provisional:
+            warnings.warn(f"Document '{name}' is provisional!")
+
         if self._backend.was_updated(document):
             self._backend.load_document(document)
             return document
