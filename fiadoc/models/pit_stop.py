@@ -23,17 +23,21 @@ from datetime import timedelta
 
 from pydantic import BaseModel, PositiveInt
 
-from models.foreign_key import SessionEntry
+from .foreign_key import SessionEntry
 
 
 class PitStop(BaseModel):
     lap: PositiveInt     # Lap No.
     number: PositiveInt  # Car No.
-    duration: timedelta
+    duration: dict[str, str | int]
     local_timestamp: str
+
+    model_config = {'extra': 'forbid'}
 
 
 class PitStopData(BaseModel):  # TODO: all xxxData can be combined into one class?
     object_type: str = 'pit_stop'
     foreign_keys: SessionEntry
     objects: list[PitStop]
+
+    model_config = {'extra': 'forbid'}
