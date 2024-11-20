@@ -160,8 +160,5 @@ cython_debug/
 .idea/
 
 # Data files
-data/**/*.csv
+data
 *.pkl
-
-# Jess's package
-jolpica-f1/

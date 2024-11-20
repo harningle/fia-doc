@@ -1,6 +1,9 @@
+import io
+import os
 import re
 
 import pandas as pd
+import requests
 
 
 def duration_to_millisecond(s: str) -> dict[str, str | int]:
@@ -75,3 +78,14 @@ def time_to_timedelta(d: str) -> pd.Timedelta:
         return pd.Timedelta(minutes=int(m), seconds=int(s), milliseconds=int(ms))
     else:
         raise ValueError(f'unknown date format: {d}')
+
+
+def download_pdf(url: str, out_path: str | os.PathLike) -> None:
+    """
+    Download a PDF file from the given URL. This downloads PDFs for testing. This is a temporary
+    solution. Will be deleted when Philipp's package is ready
+    """
+    resp = requests.get(url)
+    with open(out_path, 'wb') as f:
+        f.write(resp.content)
+    return

@@ -1,0 +1,7 @@
+camelot-py[base]
+fastf1
+pandas>=2
+pydantic>=2
+pymupdf
+pytest>=6
+tqdm
