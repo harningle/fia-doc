@@ -36,6 +36,111 @@ class EntryListParser:
         self.round_no = round_no
         self.df = self._parse()
 
+    def _parse_table_by_grid(self, page: pymupdf.Page, vlines: list[float], hlines: list[float]) \
+            -> pd.DataFrame:
+        """Manually parse the table cell by cell, defined by lines separating the columns and rows
+
+        The reason why we parse this table manually rather than using `page.find_tables` is that
+        when we have the reserve driver table, car No. may have superscript, which can not be
+        handled otherwise. The superscript indicates which reserve driver is driving whose case.
+        E.g., Antonelli is driving Hamilton's car, then driver No. 44 and driver No. 12 will have
+        the same superscript.
+
+        :param vlines: x-coords. of vertical lines separating the cols.
+        :param hlines: y-coords. of horizontal lines separating the rows
+        :return:
+        """
+        cells = []
+        vgap = vlines[1] - vlines[0]  # Usual gap between two vertical lines
+        for i in range(len(hlines) - 1):
+            row = []
+            has_superscript = False
+            for j in range(len(vlines) - 1):
+
+                # Check if there is an unusual gap between two horizontal lines. If so, then we are
+                # now at the gap between the main table and the reserve driver table
+                if hlines[i + 1] - hlines[i] < vgap + 5:
+                    t = hlines[i]
+                    b = hlines[i + 1]
+                else:
+                    if i >= 1:  # The zero-th row is always fine
+                        if hlines[i] - hlines[i - 1] < vgap + 5:  # The unusual big gap is below,
+                            t = hlines[i]                         # so we are at the main table
+                            b = hlines[i] + vgap + 2
+                        else:  # The unusual big gap is above, so now at the reserve driver table
+                            t = hlines[i + 1] - vgap - 2
+                            b = hlines[i + 1]
+
+                # Get text in the cell
+                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
+                cell = page.get_text(
+                    'dict',
+                    clip=(vlines[j], t, vlines[j + 1], b)
+                )
+                spans = []
+                for block in cell['blocks']:
+                    for line in block['lines']:
+                        for span in line['spans']:
+                            if span['text'].strip():
+                                bbox = span['bbox']
+                                # Need to check if the found text is indeed in the cell's bbox.
+                                # PyMuPDF is notoriously bad for respecting `clip` parameter. We
+                                # give one pixel tolerance
+                                if bbox[0] >= vlines[j] - 2 \
+                                        and bbox[2] <= vlines[j + 1] + 2 \
+                                        and bbox[1] >= t - 2 \
+                                        and bbox[3] <= b + 2:
+                                    spans.append(span)
+
+                # Check if any superscript
+                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-
+                # font-characteristics for font flags
+                match len(spans):
+                    case 1:
+                        row.append(spans[0]['text'].strip())
+                    case 2:
+                        for span in spans:
+                            match span['flags']:
+                                case 0:
+                                    row.append(span['text'].strip())
+                                case 1:
+                                    has_superscript = True
+                                    superscript = span['text'].strip()
+                                case _:
+                                    raise ValueError(f'Unknown error when parsing row {i}, col '
+                                                     f'{j} in {self.file}')
+                    case _:
+                        raise ValueError(f'Unknown error when parsing row {i}, col {j} in '
+                                         f'{self.file}')
+            if has_superscript:
+                row.append(superscript)
+            cells.append(row)
+
+        # Convert to df.
+        df = pd.DataFrame(cells)
+        if df.shape[1] == 5:
+            df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
+        elif df.shape[1] == 6:
+            df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor', 'reserve']
+        else:
+            raise ValueError(f'Expected 5 or 6 columns, got {df.shape[1]} in {self.file}')
+        df.car_no = df.car_no.astype(int)
+        assert df.car_no.is_unique, f'Car No. is not unique in {self.file}'
+
+        # Clean up the reserve driver relationship
+        if 'reserve' not in df.columns:
+            df['reserve'] = False
+            return df
+        df['reserve_for'] = None
+        for i in df.reserve.dropna().unique():
+            temp = df[df.reserve == i]
+            assert len(temp) == 2, f'Expected 2 rows for superscript {i}, got {len(temp)}'
+            assert temp.car_no.nunique() == 2, \
+                f'Expected 2 different drivers for superscript {i}, got {temp.car_no.nunique()}'
+            df.loc[df[df.reserve == i].index[1], 'reserve_for'] = temp['driver'].iloc[0]
+        df.reserve = df['reserve_for'].notnull()
+        return df
+
     def _parse(self) -> pd.DataFrame:
         """
         :return: Df. with cols. of ["car_no", "driver", "nat", "team", "constructor"]
@@ -53,10 +158,18 @@ class EntryListParser:
             raise ValueError(f'Could not find any page containing entry list table in {self.file}')
 
         # The top y-coord. of the table is below "Driver"
+        """
+        1. locate the positions of "Driver"'s. One page may have multiple "Driver"'s, e.g. 2024
+           Mexican. We only pick the topmost one
+        2. make sure the found "Driver" is indeed the table header. That is, in the same height,
+           we should find "No.", "Nat", "Team", and "Constructor" as well
+        """
         driver = page.search_for('Driver')
-        assert len(driver) == 1, f'Expected one "Driver", got {len(driver)} in {self.file}'
+        driver.sort(key=lambda x: x.y0)
         driver = driver[0]
-        t = driver.y1
+        for col in ['No.', 'Nat', 'Team', 'Constructor']:
+            temp = page.search_for(col, clip=(0, driver.y0, page.bound()[2], driver.y1))
+            assert len(temp) == 1, f'Cannot locate "Driver" in {self.file}'
 
         # Table headers
         headers = {}
@@ -73,10 +186,15 @@ class EntryListParser:
 
         # Bottom of the table
         """
-        It's slightly more difficult to determine the bottom of the table, as there is no line. And
-        below the table, we have stewards' name, so we can't use the bottom of the page as the
-        bottom of the table. So instead, we search for digits below "No.". The last car No.'s
-        position is the the bottom of the table
+        It's slightly more difficult to determine the bottom of the table, as there is no line
+        delineating the bottom of the table. Below the table, we have stewards' name, so we can't
+        use the bottom of the page as the bottom of the table either. So instead, we search for
+        digits below "No.". The last car No.'s position is the the bottom of the table.
+        
+        When we say "the table", there can actually be two tables: the usual table for drivers, and
+        the reserve driver table. Regardless of the existence of the reserve driver table, the
+        above method always identifies the bottom correctly. `self._parse_table_by_grid()` will
+        handle the reserve driver table properly by looking at the superscripts.
         """
         car_nos = page.get_text(
             'words',
@@ -88,7 +206,6 @@ class EntryListParser:
                 f'Car No. {i[4]} is not vertically aligned with "No." in {self.file}'
             assert i[2] < driver.x0, \
                 f'Car No. {i[4]} is not to the left of "Driver" in {self.file}'
-        b = car_nos[-1][3]
 
         # Lines separating the columns
         aux_vlines = [
@@ -108,17 +225,7 @@ class EntryListParser:
         aux_hlines.append(2 * aux_hlines[-1] - aux_hlines[-2])
 
         # Get the table
-        df = page.find_tables(
-            clip=(l, t, r, b),
-            strategy='lines',
-            vertical_lines=aux_vlines,
-            horizontal_lines=aux_hlines
-        )
-        assert len(df.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
-        df = df[0].to_pandas()
-        assert df.shape[1] == 5, f'Expected 5 columns, got {df.shape[1]} in {self.file}'
-        df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
-        df.car_no = df.car_no.astype(int)
+        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines)
 
         def to_json() -> list[dict]:
             return [
@@ -151,13 +258,13 @@ class RaceParser:
     def __init__(
             self,
             classification_file: str | os.PathLike,
-            lap_times_file: str | os.PathLike,
+            history_chart_file: str | os.PathLike,
             year: int,
             round_no: int,
             session: Literal['race', 'sprint_race']
     ):
         self.classification_file = classification_file
-        self.lap_times_file = lap_times_file
+        self.history_chart_file = history_chart_file
         self.session = session
         self.year = year
         self.round_no = round_no
@@ -402,7 +509,7 @@ class RaceParser:
         return df
 
     def _parse_lap_times(self) -> pd.DataFrame:
-        doc = pymupdf.open(self.lap_times_file)
+        doc = pymupdf.open(self.history_chart_file)
         df = []
         for page in doc:
             # Each page can have multiple tables, all of which begins from the same top y-position.
@@ -436,7 +543,7 @@ class RaceParser:
                                         add_lines=[((left_boundary, 0), (left_boundary, h))])
                 assert len(temp.tables) == 1, \
                     f'Expected one table per lap, got {len(temp.tables)} on p.{page.number} in ' \
-                    f'{self.lap_times_file}'
+                    f'{self.history_chart_file}'
                 temp = temp[0].to_pandas()
 
                 # Three columns: "LAP x", "GAP", "TIME". "LAP x" is the column for driver No. So

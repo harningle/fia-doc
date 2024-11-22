@@ -17,8 +17,16 @@ race_list = [
         2024,
         14,
         '2024_14_entry_list.json'
+    ),
+    (
+        '2024%20Mexico%20City%20Grand%20Prix%20-%20Entry%20List.pdf',
+        2024,
+        20,
+        '2024_20_entry_list.json'
     )
 ]
+# Not going to test year 2023 for entry list, as the PDF format changed, and we are not interested
+# in retrospectively parsing old entry list PDFs
 
 
 @pytest.fixture(params=race_list)
@@ -31,7 +39,7 @@ def prepare_entry_list_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
 
     # Sort by car No. for both json for easier comparison
     data = parser.df.to_json()
-    with open('fiadoc/tests/fixtures/' + expected) as f:
+    with open('fiadoc/tests/fixtures/' + expected, encoding='utf-8') as f:
         expected_data = json.load(f)
     data.sort(key=lambda x: x['objects'][0]['car_number'])
     expected_data.sort(key=lambda x: x['objects'][0]['car_number'])
