@@ -19,7 +19,7 @@ from .models.driver import Driver, DriverData
 from .models.foreign_key import RoundEntry, SessionEntry
 from .models.lap import Lap, LapData, QualiLap
 from .models.pit_stop import PitStop, PitStopData
-from .utils import duration_to_millisecond, time_to_timedelta
+from .utils import Page, duration_to_millisecond, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -42,7 +42,7 @@ class EntryListParser:
 
         The reason why we parse this table manually rather than using `page.find_tables` is that
         when we have the reserve driver table, car No. may have superscript, which can not be
-        handled otherwise. The superscript indicates which reserve driver is driving whose case.
+        handled otherwise. The superscript indicates which reserve driver is driving whose car.
         E.g., Antonelli is driving Hamilton's car, then driver No. 44 and driver No. 12 will have
         the same superscript.
 
@@ -84,8 +84,8 @@ class EntryListParser:
                             if span['text'].strip():
                                 bbox = span['bbox']
                                 # Need to check if the found text is indeed in the cell's bbox.
-                                # PyMuPDF is notoriously bad for respecting `clip` parameter. We
-                                # give one pixel tolerance
+                                # PyMuPDF is notoriously bad for not respecting `clip` parameter.
+                                # We give two pixels tolerance
                                 if bbox[0] >= vlines[j] - 2 \
                                         and bbox[2] <= vlines[j + 1] + 2 \
                                         and bbox[1] >= t - 2 \
@@ -811,7 +811,9 @@ class QualifyingParser:
         def to_json() -> list[dict]:
             data = []
             for q in [1, 2, 3]:
-                temp = df[df[f'Q{q}_TIME'].notnull()][['position', 'NO', f'Q{q}_TIME']].copy()
+                temp = df[df[f'Q{q}_TIME'].notnull()][['NO', f'Q{q}']].copy()
+                temp.sort_values(by=f'Q{q}', inplace=True)
+                temp['position'] = range(1, len(temp) + 1)
                 temp['classification'] = temp.apply(
                     lambda x: QualiClassificationData(
                         foreign_keys=SessionEntry(
@@ -839,36 +841,6 @@ class QualifyingParser:
         df.to_json = to_json
         df.to_pkl = to_pkl
         return df
-
-    @staticmethod
-    def get_strikeout_text(page: pymupdf.Page) -> list[tuple[pymupdf.Rect, str]]:
-        """Get all strikeout texts and their locations in the page
-
-        See https://stackoverflow.com/a/74582342/12867291.
-
-        :param page: fitz.Page object
-        :return: A list of tuples, where each tuple is the bbox and text of a strikeout text
-        """
-        # Get all strikeout lines
-        lines = []
-        paths = page.get_drawings()  # Strikeout lines are in fact vector graphics. To be more
-        for path in paths:           # precise, they are short rectangles with very small height
-            for item in path['items']:
-                if item[0] == 're':  # If a graphic is a rect., check its height: absolute height
-                    rect = item[1]   # should < 1px, and have some sizable width relative to height
-                    if (rect.width > 2 * rect.height) and (rect.height < 1):
-                        lines.append(rect)
-
-        # Get all texts on this page
-        # TODO: the O(n^2) here can probably be optimised later
-        words = page.get_text('words')
-        strikeout = []
-        for rect in lines:
-            for w in words:  # `w` is a iterable `(x0, y0, x1, y1, text)`
-                text_rect = pymupdf.Rect(w[:4])     # Location/bbox of the word
-                if text_rect.intersects(rect):      # If the word's location intersects with a
-                    strikeout.append((rect, w[4]))  # strikeout line, it's a strikeout text
-        return strikeout
 
     @staticmethod
     def _assign_session_to_lap(classification: pd.DataFrame, lap_times: pd.DataFrame) \
@@ -953,14 +925,12 @@ class QualifyingParser:
         return lap_times
 
     def _parse_lap_times(self) -> pd.DataFrame:
-        """Parse "Qualifying/Sprint Quali./Shootout Session Lap Times" PDF
-
-        This is the most complicated parsing. See `notebook/demo.ipynb` for more details.
-        """
+        """Parse "Qualifying/Sprint Quali./Shootout Session Lap Times" PDF"""
         doc = pymupdf.open(self.lap_times_file)
         df = []
         for page in doc:
-            # Page width. All tables are horizontally bounded in [0, `w`]
+            # Page width
+            page = Page(page)
             w = page.bound()[2]
 
             # Positions of "NO" and "TIME". They are the top of each table. One driver may have
@@ -969,16 +939,16 @@ class QualifyingParser:
             assert len(no_time_pos) >= 1, \
                 f'Expected at least one "NO TIME", got {len(no_time_pos)} in {self.lap_times_file}'
             ys = [i.y1 for i in no_time_pos]
-            ys.sort()                      # Sort these "NO"'s from top to bottom
-            top_pos = [ys[0] - 1]          # -1 to give a little buffer at the top
+            ys.sort()  # Sort these "NO"'s from top to bottom
+            top_pos = [ys[0]]
             for y in ys[1:]:
                 # Many "NO"'s are roughly at the same height (usually three drivers share the full
                 # width of the page, and each of them have two tables side by side, so six tables
                 # and six "NO"'s are vertically at the same y-position). We only need those at
-                # different y-positions. If there is a 10+ px vertical gap, we take it as a "NO" at
-                # a lower y-position
+                # different/unique y-positions. If there is a 10+ px vertical gap, we take it as a
+                # "NO" at a lower y-position
                 if y - top_pos[-1] > 10:
-                    top_pos.append(y - 1)  # Again, -1 to allow a little buffer at the top
+                    top_pos.append(y)
 
             # Bottom of the table is the next "NO TIME", or the bottom of the page
             ys = [i.y0 for i in no_time_pos]
@@ -989,16 +959,18 @@ class QualifyingParser:
                     bottom_pos.append(y)
             b = page.bound()[3]
             bottom_pos.append(b)
-            bottom_pos = bottom_pos[1:]    # The first "NO TIME" is not the bottom of any table
+            bottom_pos = bottom_pos[1:]  # The first "NO TIME" is not the bottom of any table
 
             # Find the tables located between each `top_pos` and `bottom_pos`
             for row in range(len(top_pos)):
-                for col in range(3):            # Three drivers in one row
+                # Each row usually has three drivers. Iterate over each driver
+                for col in range(3):
+
                     # Find the driver name, which is located immediately above the table
                     driver = page.get_text(
                         'block',
                         clip=(
-                            col * w / 3,        # Each driver occupies 1/3 of the page width
+                            col * w / 3,        # Each driver occupies ~1/3 of the page width
                             top_pos[row] - 30,  # Driver name is usually 20-30 px above the table
                             (col + 1) * w / 3,
                             top_pos[row] - 10
@@ -1007,49 +979,128 @@ class QualifyingParser:
                     if not driver:  # In the very last row may not have all three drivers. E.g., 20
                         continue    # drivers, 3 per row, so the last row only has 2 drivers
                                     # TODO: may want a test here. Every row above should have
-                                    # precisely 3 drivers
+                                    #       precisely three drivers
                     car_no, driver = driver.split(maxsplit=1)
 
-                    # Find tables in the bounding box of driver i's table
-                    tabs = page.find_tables(
-                        clip=(
-                            col * w / 3,
-                            top_pos[row],
-                            (col + 1) * w / 3,
-                            bottom_pos[row]
-                        ),
-                        strategy='lines'
-                    )  # TODO: I think this may fail if a driver only has one lap and crashes...
+                    # Find the horizontal line(s) below "NO" and "TIME". This is the top of the
+                    # table(s)
+                    bbox = (col * w / 3, top_pos[row], (col + 1) * w / 3, bottom_pos[row])
+                    lines = [i for i in page.get_drawings_in_bbox(bbox)
+                             if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
+                             and i['fill'] is None]
+                    """
+                    The horizontal lines inside the table area may not always be the line below its
+                    header. When we have lap time deleted, we will have additional lines with grey
+                    colour. The `i['fill'] is None` filters out these lap time deleted lines
+                    """
+                    assert len(lines) >= 1, f'Expected at least one horizontal line for ' \
+                        f'table(s) in row {row}, col {col} in page {page.number} in ' \
+                        f'{self.lap_times_file}. Found none'
+                    assert np.allclose(
+                        [i['rect'].y0 for i in lines],
+                        lines[0]['rect'].y0,
+                        atol=1
+                    ), \
+                        f'Horizontal lines for table(s) in row {row}, col {col} in page ' \
+                        f'{page.number} in {self.lap_times_file} are not at the same y-position'
 
-                    # Check if any lap times is strikeout
-                    # TODO: the O(n^2) here should be optimised later. We are processing the same
-                    #       page multiple times
-                    strikeout_texts = self.get_strikeout_text(page)
+                    # Concat lines.
+                    """
+                    The lines above are can be segmented. E.g., one line is from x = 0 to x = 100,
+                    and another is from x = 101 to x = 200. The two lines are basically one line,
+                    so we want to horizontally concatenate them
+                    """
+                    lines.sort(key=lambda x: x['rect'].x0)
+                    rect = lines[0]['rect']
+                    top_lines = [(rect.x0, rect.y0, rect.x1, rect.y1)]
+                    for line in lines[1:]:
+                        rect = line['rect']
+                        prev_line = top_lines[-1]
+                        # If one line ends where the other starts, they are the same line
+                        if np.isclose(rect.x0, prev_line[2], atol=1):
+                            top_lines[-1] = (prev_line[0], prev_line[1], rect.x1, prev_line[3])
+                        # If one line starts where the other ends, they are the same line
+                        elif np.isclose(rect.x1, prev_line[0], atol=1):
+                            top_lines[-1] = (rect.x0, prev_line[1], prev_line[2], prev_line[3])
+                        # Otherwise, it's a new line
+                        else:
+                            top_lines.append((rect.x0, rect.y0, rect.x1, rect.y1))
+                    assert len(top_lines) in [1, 2], \
+                        f'Expected at most two horizontal lines for table(s) in row {row}, ' \
+                        f'col {col} in page {page.number} in {self.lap_times_file}. Found ' \
+                        f'{len(top_lines)}'
+
+                    # Find the column separators
+                    """
+                    The left and right boundary of each table is simply the left and right end of
+                    the top line. The right of column 0, which is "NO", is the right boundary of
+                    the text "NO". We don't really know the right boundary for the pit column, but
+                    that's roughly at the mid point of top line. Then from the mid point to the
+                    right end is the "TIME" column. In practice, we use mid point - 5 as the right
+                    boundary for the pit column.
+                    
+                    Below, `col_seps` is a list of column separators for each table. That is,
+                    `col_seps[1]` gives the column separators for the second table in this row.
+                    """
+                    col_seps = []
+                    for line in top_lines:
+                        no = page.search_for('NO',clip=(line[0], line[1] - 15, line[2], line[3]))
+                        assert len(no) == 1, f'Expected eaxctly one "NO" above the top line at ' \
+                            f'({line[0], line[1], line[2], line[3]}) in page {page.number} in ' \
+                            f'{self.lap_times_file}. Found {len(no)}'
+                        col_seps.append([
+                            (line[0], no[0].x1),
+                            (no[0].x1, (line[0] + line[2]) / 2 - 5),
+                            ((line[0] + line[2]) / 2 - 5, line[2])
+                        ])
+
+                    # Find the white and grey rectangles under the top lines. Each row is either
+                    # coloured/filled in white or grey, so we can get the row's top and bottom
+                    # y-positions from these rectangles
+                    rects = [i for i in page.get_drawings_in_bbox(bbox)
+                             if i['rect'].y1 - i['rect'].y0 > 10]
+                    ys = [j for i in rects for j in [i['rect'].y0, i['rect'].y1]]
+                    ys.sort()
+                    row_seps = [ys[0]]
+                    for y in ys[1:]:
+                        if y - row_seps[-1] > 10:
+                            row_seps.append(y)
+                    row_seps = [(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
+
+                    # Finally we are good to parse the tables using these separators
                     temp = []
-                    lap_time_deleted = []
-                    for tab in tabs:
-                        for r in tab.rows:
-                            assert len(r.cells) == 3  # Should have lap, if pit, and lap time col.
-                            cell = r.cells[2]         # Only lap time cell (the last cell) can be
-                            is_strikeout = False      # strikeout and needs to be checked
-                            bbox = pymupdf.Rect(cell)
-                            for rect, text in strikeout_texts:
-                                if bbox.intersects(rect):
-                                    is_strikeout = True
-                                    break
-                            lap_time_deleted.append(is_strikeout)
-                        temp.append(tab.to_pandas())
+                    for cols in col_seps:
+                        tab, superscript, cross_out = page.parse_table_by_grid(
+                            vlines=cols, hlines=row_seps
+                        )
+                        assert len(superscript) == 0, \
+                            f'Some superscript(s) found in table at ({cols[0][0]:.1f}, ' \
+                            f'{row_seps[0][0]:.1f}, {cols[2][1]:.1f}, {row_seps[-1][1]:.1f}) in ' \
+                            f'page {page.number} in {self.lap_times_file}. But we expect none'
+                        for i, _, _ in cross_out:
+                            tab.loc[i, 'lap_time_deleted'] = True
+                        # Drop empty row
+                        """
+                        This is because the two side-by-side tables may not have the same amount of
+                        rows. E.g., there are 11 laps, and the left table will have 6 and the right
+                        table has 5 rows. The right table will have an empty row at the bottom, so
+                        drop it here
+                        """
+                        tab = tab[tab[0] != '']
+                        temp.append(tab)
 
                     # One driver may have multiple tables. Concatenate them
                     temp = pd.concat(temp, ignore_index=True)
-                    temp.columns = ['lap_no', 'pit', 'lap_time']
                     temp['car_no'] = car_no
                     temp['driver'] = driver
-                    temp['lap_time_deleted'] = lap_time_deleted
                     df.append(temp)
 
         # Clean up
         df = pd.concat(df, ignore_index=True)
+        if 'lap_time_deleted' not in df.columns:
+            df['lap_time_deleted'] = False
+        df.fillna({'lap_time_deleted': False}, inplace=True)
+        df.rename(columns={0: 'lap_no', 1: 'pit', 2: 'lap_time'}, inplace=True)
         df.lap_no = df.lap_no.astype(int)
         df.car_no = df.car_no.astype(int)
         df.replace('', None, inplace=True)
