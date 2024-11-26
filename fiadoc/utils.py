@@ -1,12 +1,13 @@
 import os
 import re
+from typing import Optional
 
 import pandas as pd
 import pymupdf
 import requests
 
 
-def duration_to_millisecond(s: str) -> dict[str, str | int]:
+def duration_to_millisecond(s: str) -> Optional[dict[str, str | int]]:
     """Convert a time duration string to milliseconds
 
     >>> duration_to_millisecond('1:36:48.076')

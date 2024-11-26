@@ -1177,19 +1177,22 @@ class PitStopParser:
 
     def _parse(self) -> pd.DataFrame:
         doc = pymupdf.open(self.file)
-        page = doc[0]
-        # TODO: have PDFs containing multiple pages?
+        df = []
+        # TODO: would be nice to add a test for page numbers: if more than one page, we should have
+        #       "page x of xx" at the bottom right of each page
+        for page in doc:  # Can have multiple pages, though usually only one. E.g., 2023 Dutch
 
-        # Get the position of the table
-        t = page.search_for('DRIVER')[0].y0      # "DRIVER" gives the top of the table
-        w, h = page.bound()[2], page.bound()[3]  # Page right and bottom boundaries are the table's
-                                                 # as well
-        # Parse
-        df = page.find_tables(clip=(0, t, w, h), strategy='lines')
-        assert len(df.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
-        df = df[0].to_pandas()
+            # Get the position of the table
+            t = page.search_for('DRIVER')[0].y0      # "DRIVER" gives the top of the table
+            w, h = page.bound()[2], page.bound()[3]  # Page right and bottom boundaries are the
+                                                     # table's as well
+            # Parse
+            tab = page.find_tables(clip=(0, t, w, h), strategy='lines')
+            assert len(tab.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
+            df.append(tab[0].to_pandas())
 
         # Clean up the table
+        df = pd.concat(df, ignore_index=True)
         df.dropna(subset=['NO'], inplace=True)  # Drop empty rows, if any
         df = df[df.NO != '']
         df = df[['NO', 'LAP', 'TIME OF DAY', 'STOP', 'DURATION']].reset_index(drop=True)

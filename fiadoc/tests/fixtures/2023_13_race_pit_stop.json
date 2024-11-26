@@ -1,0 +1,1120 @@
+[
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 11
+        },
+        "objects": [
+            {
+                "lap": 1,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 22666
+                },
+                "local_timestamp": "15:04:43"
+            },
+            {
+                "lap": 12,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19460
+                },
+                "local_timestamp": "15:20:46"
+            },
+            {
+                "lap": 45,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 18789
+                },
+                "local_timestamp": "16:06:58"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 27596
+                },
+                "local_timestamp": "16:26:00"
+            },
+            {
+                "lap": 63,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2461612
+                },
+                "local_timestamp": "16:31:04"
+            },
+            {
+                "lap": 64,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 35592
+                },
+                "local_timestamp": "17:13:46"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 16
+        },
+        "objects": [
+            {
+                "lap": 1,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 32686
+                },
+                "local_timestamp": "15:04:46"
+            },
+            {
+                "lap": 11,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 27202
+                },
+                "local_timestamp": "15:19:46"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 10
+        },
+        "objects": [
+            {
+                "lap": 1,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 28469
+                },
+                "local_timestamp": "15:04:47"
+            },
+            {
+                "lap": 11,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19518
+                },
+                "local_timestamp": "15:19:34"
+            },
+            {
+                "lap": 46,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 25404
+                },
+                "local_timestamp": "16:08:21"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20417
+                },
+                "local_timestamp": "16:26:21"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2443169
+                },
+                "local_timestamp": "16:33:40"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 24
+        },
+        "objects": [
+            {
+                "lap": 1,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 23088
+                },
+                "local_timestamp": "15:04:49"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20231
+                },
+                "local_timestamp": "15:18:09"
+            },
+            {
+                "lap": 37,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20469
+                },
+                "local_timestamp": "15:57:19"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 21439
+                },
+                "local_timestamp": "16:26:53"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 22
+        },
+        "objects": [
+            {
+                "lap": 1,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 32321
+                },
+                "local_timestamp": "15:04:50"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 18904
+                },
+                "local_timestamp": "15:18:24"
+            },
+            {
+                "lap": 60,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20602
+                },
+                "local_timestamp": "16:26:50"
+            },
+            {
+                "lap": 63,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2414895
+                },
+                "local_timestamp": "16:32:13"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 34901
+                },
+                "local_timestamp": "17:14:14"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 40
+        },
+        "objects": [
+            {
+                "lap": 1,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 42641
+                },
+                "local_timestamp": "15:04:53"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 30836
+                },
+                "local_timestamp": "15:18:37"
+            },
+            {
+                "lap": 17,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19600
+                },
+                "local_timestamp": "15:29:22"
+            },
+            {
+                "lap": 46,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19192
+                },
+                "local_timestamp": "16:09:09"
+            },
+            {
+                "lap": 59,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19307
+                },
+                "local_timestamp": "16:25:48"
+            },
+            {
+                "lap": 63,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2396340
+                },
+                "local_timestamp": "16:32:43"
+            },
+            {
+                "lap": 64,
+                "number": 7,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 31306
+                },
+                "local_timestamp": "17:14:27"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 20
+        },
+        "objects": [
+            {
+                "lap": 1,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 31341
+                },
+                "local_timestamp": "15:04:55"
+            },
+            {
+                "lap": 9,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20137
+                },
+                "local_timestamp": "15:16:59"
+            },
+            {
+                "lap": 35,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20510
+                },
+                "local_timestamp": "15:54:48"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 23584
+                },
+                "local_timestamp": "16:27:09"
+            },
+            {
+                "lap": 63,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2394733
+                },
+                "local_timestamp": "16:32:48"
+            },
+            {
+                "lap": 64,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 30628
+                },
+                "local_timestamp": "17:14:31"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 1
+        },
+        "objects": [
+            {
+                "lap": 2,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20379
+                },
+                "local_timestamp": "15:06:25"
+            },
+            {
+                "lap": 11,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19289
+                },
+                "local_timestamp": "15:19:24"
+            },
+            {
+                "lap": 49,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 18706
+                },
+                "local_timestamp": "16:11:52"
+            },
+            {
+                "lap": 61,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19429
+                },
+                "local_timestamp": "16:27:10"
+            },
+            {
+                "lap": 63,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20402
+                },
+                "local_timestamp": "16:30:26"
+            },
+            {
+                "lap": 64,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2483382
+                },
+                "local_timestamp": "16:32:50"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 14
+        },
+        "objects": [
+            {
+                "lap": 2,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20647
+                },
+                "local_timestamp": "15:06:26"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20109
+                },
+                "local_timestamp": "15:18:10"
+            },
+            {
+                "lap": 48,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 25147
+                },
+                "local_timestamp": "16:10:51"
+            },
+            {
+                "lap": 61,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20655
+                },
+                "local_timestamp": "16:27:35"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2455302
+                },
+                "local_timestamp": "16:33:22"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 55
+        },
+        "objects": [
+            {
+                "lap": 2,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20973
+                },
+                "local_timestamp": "15:06:31"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19511
+                },
+                "local_timestamp": "15:18:16"
+            },
+            {
+                "lap": 41,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19398
+                },
+                "local_timestamp": "16:02:07"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19838
+                },
+                "local_timestamp": "16:26:22"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2443147
+                },
+                "local_timestamp": "16:33:44"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 31
+        },
+        "objects": [
+            {
+                "lap": 2,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 22534
+                },
+                "local_timestamp": "15:06:39"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19795
+                },
+                "local_timestamp": "15:18:26"
+            },
+            {
+                "lap": 43,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19024
+                },
+                "local_timestamp": "16:04:50"
+            },
+            {
+                "lap": 61,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 22096
+                },
+                "local_timestamp": "16:28:03"
+            },
+            {
+                "lap": 63,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2432201
+                },
+                "local_timestamp": "16:31:53"
+            },
+            {
+                "lap": 64,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 37037
+                },
+                "local_timestamp": "17:14:09"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 4
+        },
+        "objects": [
+            {
+                "lap": 3,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20170
+                },
+                "local_timestamp": "15:08:18"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20395
+                },
+                "local_timestamp": "15:18:33"
+            },
+            {
+                "lap": 42,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 18878
+                },
+                "local_timestamp": "16:03:37"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19871
+                },
+                "local_timestamp": "16:26:35"
+            },
+            {
+                "lap": 63,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2443212
+                },
+                "local_timestamp": "16:31:28"
+            },
+            {
+                "lap": 64,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 44272
+                },
+                "local_timestamp": "17:13:49"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 44
+        },
+        "objects": [
+            {
+                "lap": 3,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20266
+                },
+                "local_timestamp": "15:08:35"
+            },
+            {
+                "lap": 9,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19970
+                },
+                "local_timestamp": "15:17:26"
+            },
+            {
+                "lap": 45,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19327
+                },
+                "local_timestamp": "16:07:26"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20779
+                },
+                "local_timestamp": "16:26:30"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2431108
+                },
+                "local_timestamp": "16:33:59"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 63
+        },
+        "objects": [
+            {
+                "lap": 4,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 21201
+                },
+                "local_timestamp": "15:10:00"
+            },
+            {
+                "lap": 10,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20148
+                },
+                "local_timestamp": "15:18:55"
+            },
+            {
+                "lap": 16,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19607
+                },
+                "local_timestamp": "15:27:30"
+            },
+            {
+                "lap": 60,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 24019
+                },
+                "local_timestamp": "16:26:34"
+            },
+            {
+                "lap": 63,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2446251
+                },
+                "local_timestamp": "16:31:31"
+            },
+            {
+                "lap": 64,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 39845
+                },
+                "local_timestamp": "17:13:59"
+            },
+            {
+                "lap": 67,
+                "number": 7,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 22379
+                },
+                "local_timestamp": "17:20:51"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 18
+        },
+        "objects": [
+            {
+                "lap": 4,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20036
+                },
+                "local_timestamp": "15:10:16"
+            },
+            {
+                "lap": 9,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20208
+                },
+                "local_timestamp": "15:17:44"
+            },
+            {
+                "lap": 16,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19653
+                },
+                "local_timestamp": "15:27:53"
+            },
+            {
+                "lap": 34,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19923
+                },
+                "local_timestamp": "15:53:38"
+            },
+            {
+                "lap": 60,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 21532
+                },
+                "local_timestamp": "16:26:58"
+            },
+            {
+                "lap": 63,
+                "number": 6,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2410734
+                },
+                "local_timestamp": "16:32:20"
+            },
+            {
+                "lap": 64,
+                "number": 7,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 33553
+                },
+                "local_timestamp": "17:14:17"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 81
+        },
+        "objects": [
+            {
+                "lap": 15,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 18979
+                },
+                "local_timestamp": "15:25:18"
+            },
+            {
+                "lap": 46,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19120
+                },
+                "local_timestamp": "16:08:46"
+            },
+            {
+                "lap": 60,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 22376
+                },
+                "local_timestamp": "16:26:40"
+            },
+            {
+                "lap": 63,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2434653
+                },
+                "local_timestamp": "16:31:49"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 38453
+                },
+                "local_timestamp": "17:14:06"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 77
+        },
+        "objects": [
+            {
+                "lap": 16,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20187
+                },
+                "local_timestamp": "15:27:09"
+            },
+            {
+                "lap": 47,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20213
+                },
+                "local_timestamp": "16:10:17"
+            },
+            {
+                "lap": 59,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19735
+                },
+                "local_timestamp": "16:25:45"
+            },
+            {
+                "lap": 63,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2405113
+                },
+                "local_timestamp": "16:32:29"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 32518
+                },
+                "local_timestamp": "17:14:22"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 27
+        },
+        "objects": [
+            {
+                "lap": 16,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 20438
+                },
+                "local_timestamp": "15:27:10"
+            },
+            {
+                "lap": 48,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19713
+                },
+                "local_timestamp": "16:11:31"
+            },
+            {
+                "lap": 60,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 23582
+                },
+                "local_timestamp": "16:26:58"
+            },
+            {
+                "lap": 63,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2410704
+                },
+                "local_timestamp": "16:32:22"
+            },
+            {
+                "lap": 64,
+                "number": 5,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 32884
+                },
+                "local_timestamp": "17:14:19"
+            }
+        ]
+    },
+    {
+        "object_type": "pit_stop",
+        "foreign_keys": {
+            "year": 2023,
+            "round": 13,
+            "session": "R",
+            "car_number": 23
+        },
+        "objects": [
+            {
+                "lap": 44,
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 19667
+                },
+                "local_timestamp": "16:06:01"
+            },
+            {
+                "lap": 61,
+                "number": 2,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 21300
+                },
+                "local_timestamp": "16:27:57"
+            },
+            {
+                "lap": 63,
+                "number": 3,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 2443475
+                },
+                "local_timestamp": "16:31:37"
+            },
+            {
+                "lap": 64,
+                "number": 4,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 39234
+                },
+                "local_timestamp": "17:14:02"
+            }
+        ]
+    }
+]
