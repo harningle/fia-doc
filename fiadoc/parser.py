@@ -1127,7 +1127,8 @@ class QualifyingParser:
         y = found[0].y1
 
         # y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first. This
-        # is the bottom of the classification table
+        # is the bottom of the classification table. Some PDFs may not have these texts. In these
+        # cases, we use the long black thick horizontal line to determine the bottom of the table
         has_not_classified = False
         bottom = page.search_for('NOT CLASSIFIED - ')
         if bottom:
@@ -1135,8 +1136,17 @@ class QualifyingParser:
         else:
             bottom = page.search_for('POLE POSITION LAP')
         if not bottom:
-            raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" in '
-                             f'{self.classification_file}')
+            page = Page(page)
+            lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
+            lines = [i for i in lines
+                     if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
+                     and np.isclose(i['width'], 1, rtol=0.1)
+                     and i['rect'].x1 - i['rect'].x0 > 0.9 * w]
+            if not lines:
+                raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a'
+                                 f'thick horizontal line in {self.classification_file}')
+            lines.sort(key=lambda x: x['rect'].y0)
+            bottom = [lines[0]['rect']]
         b = bottom[0].y0
 
         # Table bounding box
@@ -1464,8 +1474,8 @@ class QualifyingParser:
                     col_seps = []
                     for line in top_lines:
                         no = page.search_for('NO',clip=(line[0], line[1] - 15, line[2], line[3]))
-                        assert len(no) == 1, f'Expected eaxctly one "NO" above the top line at ' \
-                            f'({line[0], line[1], line[2], line[3]}) in page {page.number} in ' \
+                        assert len(no) == 1, f'Expected exactly one "NO" above the top line at ' \
+                            f'({line[0], line[1], line[2], line[3]}) on p.{page.number} in ' \
                             f'{self.lap_times_file}. Found {len(no)}'
                         col_seps.append([
                             (line[0], no[0].x1),
