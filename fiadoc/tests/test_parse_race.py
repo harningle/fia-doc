@@ -2,40 +2,51 @@ import json
 
 import pytest
 
-from fiadoc.parser import QualifyingParser
+from fiadoc.parser import RaceParser
 from fiadoc.utils import download_pdf
 
 race_list = [
     (
-        '2024_22_usa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
-        '2024_22_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
-        2024,
-        22,
-        '2024_22_quali_provisional_classification.json',
-        '2024_22_quali_lap_times.json'
-    ),
-    (
-        'doc_20_-_2023_united_states_grand_prix_-_final_qualifying_classification.pdf',
-        '2023_19_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        'doc_66_-_2023_united_states_grand_prix_-_final_race_classification.pdf',
+        '2023_19_usa_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2023_19_usa_f1_r0_timing_racehistorychart_v01.pdf',
+        '2023_19_usa_f1_r0_timing_racelapchart_v01.pdf',
         2023,
         18,
-        '2023_18_quali_classification.json',
-        '2023_18_quali_lap_times.json'
+        'race',
+        '2023_18_race_classification.json',
+        '2023_18_race_lap_times.json'
+    ),
+    (
+        'doc_43_-_2023_united_states_grand_prix_-_final_sprint_classification.pdf',
+        '2023_19_usa_f1_s0_timing_sprintlapanalysis_v01.pdf',
+        '2023_19_usa_f1_s0_timing_sprinthistorychart_v01.pdf',
+        '2023_19_usa_f1_s0_timing_sprintlapchart_v01.pdf',
+        2023,
+        18,
+        'sprint_race',
+        '2023_18_sprint_classification.json',
+        '2023_18_sprint_lap_times.json'
     )
 ]
 
 
 @pytest.fixture(params=race_list)
-def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
-    # Download and parse quali. classification and lap times PDF
-    url_classification, url_lap_time, year, round_no, expected_classification, expected_lap_times \
-        = request.param
+def prepare_race_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    # Download and parse race classification and lap times PDFs
+    url_classification, url_lap_analysis, url_history_chart, url_lap_chart, year, round_no, \
+        session, expected_classification, expected_lap_times = request.param
     download_pdf('https://www.fia.com/sites/default/files/' + url_classification,
                  tmp_path / 'classification.pdf')
-    download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
-                 tmp_path / 'lap_times.pdf')
-    parser = QualifyingParser(tmp_path / 'classification.pdf', tmp_path / 'lap_times.pdf',
-                              year, round_no, 'quali')
+    download_pdf('https://www.fia.com/sites/default/files/' + url_lap_analysis,
+                 tmp_path / 'lap_analysis.pdf')
+    download_pdf('https://www.fia.com/sites/default/files/' + url_history_chart,
+                 tmp_path / 'history_chart.pdf')
+    download_pdf('https://www.fia.com/sites/default/files/' + url_lap_chart,
+                 tmp_path / 'lap_chart.pdf')
+    parser = RaceParser(tmp_path / 'classification.pdf', tmp_path / 'lap_analysis.pdf',
+                        tmp_path / 'history_chart.pdf', tmp_path / 'lap_chart.pdf',
+                        year, round_no, session)
 
     classification_data = parser.classification_df.to_json()
     lap_times_data = parser.lap_times_df.to_json()
@@ -45,18 +56,10 @@ def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[
         expected_lap_times = json.load(f)
 
     # Sort data
-    classification_data.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    expected_classification.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    lap_times_data.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    expected_lap_times.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
+    classification_data.sort(key=lambda x: x['foreign_keys']['car_number'])
+    expected_classification.sort(key=lambda x: x['foreign_keys']['car_number'])
+    lap_times_data.sort(key=lambda x: x['foreign_keys']['car_number'])
+    expected_lap_times.sort(key=lambda x: x['foreign_keys']['car_number'])
     for i in lap_times_data:
         i['objects'].sort(key=lambda x: x['number'])
     for i in expected_lap_times:
@@ -69,12 +72,11 @@ def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[
     return classification_data, lap_times_data, expected_classification, expected_lap_times
 
 
-def test_parse_quali(prepare_quali_data):
+def test_parse_race(prepare_race_data):
     classification_data, lap_times_data, expected_classification, expected_lap_times \
-        = prepare_quali_data
+        = prepare_race_data
     assert classification_data == expected_classification
 
-    # TODO: need to test against fastf1 in a better and more readable way
     for i in lap_times_data:
         driver = i['foreign_keys']['car_number']
         session = i['foreign_keys']['session']
@@ -114,3 +116,4 @@ def test_parse_quali(prepare_quali_data):
                         f"Driver {driver}'s lap {expected_lap['number']} in {session} time " \
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
+
