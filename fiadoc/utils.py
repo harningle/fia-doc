@@ -172,12 +172,8 @@ class Page:
         3. a list of tuples for the superscript for a cell (i, j), in the format of
            (i, j, superscript text)
 
-        :param vlines: x-coords. of vertical lines separating the cols. The table left and right
-                       need to be included in this list. The i-th element is the left and right
-                       x-coords. of the i-th column
-        :param hlines: y-coords. of horizontal lines separating the rows. The table top and bottom
-                       need to be included in this list. The i-th element is the top and bottom
-                       y-coords. of the i-th row
+        :param vlines: List of left and right x-coords. of the cols
+        :param hlines: List of top and bottom y-coords. of the rows
         :return: A usual df., a list of superscript cells, a list of crossed out cells
         """
         cells = []
