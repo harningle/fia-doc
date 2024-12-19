@@ -13,6 +13,14 @@ race_list = [
         22,
         '2024_22_quali_provisional_classification.json',
         '2024_22_quali_lap_times.json'
+    ),
+    (
+        'doc_20_-_2023_united_states_grand_prix_-_final_qualifying_classification.pdf',
+        '2023_19_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2023,
+        18,
+        '2023_18_quali_classification.json',
+        '2023_18_quali_lap_times.json'
     )
 ]
 

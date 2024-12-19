@@ -258,13 +258,17 @@ class RaceParser:
     def __init__(
             self,
             classification_file: str | os.PathLike,
+            lap_analysis_file: str | os.PathLike,
             history_chart_file: str | os.PathLike,
+            lap_chart_file: str | os.PathLike,
             year: int,
             round_no: int,
             session: Literal['race', 'sprint_race']
     ):
         self.classification_file = classification_file
+        self.lap_analysis_file = lap_analysis_file
         self.history_chart_file = history_chart_file
+        self.lap_chart_file = lap_chart_file
         self.session = session
         self.year = year
         self.round_no = round_no
@@ -508,13 +512,13 @@ class RaceParser:
         df.to_pkl = to_pkl
         return df
 
-    def _parse_lap_times(self) -> pd.DataFrame:
+    def _parse_history_chart(self) -> pd.DataFrame:
         doc = pymupdf.open(self.history_chart_file)
         df = []
         for page in doc:
             # Each page can have multiple tables, all of which begins from the same top y-position.
             # Their table headers are vertically bounded between "History Chart" and "TIME". Find
-            # all of the headers
+            # all the headers
             t = page.search_for('History Chart')[0].y1
             b = page.search_for('TIME')[0].y1
             w = page.bound()[2]
@@ -554,6 +558,7 @@ class RaceParser:
                 temp = temp[temp.car_no != '']  # Sometimes will get one additional empty row
 
                 # The row order/index is meaningful: it's the order/positions of the cars
+                # Need extra care for lapped cars; see harningle/fia-doc#19
                 # TODO: is this true for all cases? E.g. retirements?
                 temp.reset_index(drop=False, names=['position'], inplace=True)
                 temp['position'] += 1  # 1-indexed
@@ -608,16 +613,253 @@ class RaceParser:
 
         # TODO: Perez "retired and rejoined" in 2023 Japanese... Maybe just mechanically assign lap
         #       No. as 1, 2, 3, ... for each driver?
+        return df
+
+    def _parse_lap_chart(self) -> pd.DataFrame:
+        doc = pymupdf.open(self.lap_chart_file)
+        df = []
+        for page in doc:
+            t = page.search_for('Race Lap Chart')[0].y1  # The table is below "Race Lap Chart"
+            b = page.search_for('page')[0].y0            # The table is above "page x of y"
+
+            # Left boundary is the leftmost "LAP x"
+            l = page.search_for('LAP', clip=(0, t, page.bound()[2], b))[0].x0
+
+            # Top row's leftmost cell is "POS"
+            pos = page.search_for('POS', clip=(l, t, page.bound()[2], b))[0]
+            assert pos.x0 >= l, \
+                f'Expected "POS" to be (slightly) to the right of "LAP x" on page {page.number} ' \
+                f"in {self.lap_chart_file}. But it's found to the left"
+            assert pos.y0 > t, \
+                f'Expected "POS" below "Race Lap Chart" on page {page.number} in ' \
+                f'{self.lap_chart_file}. But it\'s found above'
+
+            # To the right of "POS", we have positions 1, 2, ...
+            positions = page.get_text('dict', clip=(pos.x1, pos.y0, page.bound()[2], pos.y1))
+            assert len(positions['blocks']) == 1, f'Error in parsing positions in top row on ' \
+                                        f'page {page.number} in {self.lap_chart_file}'
+            positions = positions['blocks'][0]['lines']
+            assert positions, \
+                f'Expected some positions to the right of "POS" on page {page.number} in ' \
+                f'{self.lap_chart_file}. Found none'
+
+            # Each position is a col., so we take the midpoints between two positions as the col.
+            # separators
+            col_seps = [l - 5, (pos.x1 + positions[0]['bbox'][0]) / 2]
+            for i in range(len(positions) - 1):
+                col_seps.append((positions[i]['bbox'][2] + positions[i + 1]['bbox'][0]) / 2)
+            col_seps.append(page.bound()[2])
+
+            # Below "POS" we have rows GRID, LAP 1, LAP 2, ...
+            laps = page.get_text('dict', clip=(l - 5, pos.y1, col_seps[1], b))
+            assert len(laps['blocks']) == 1, f'Error in parsing laps in leftmost col. on ' \
+                                             f'page {page.number} in {self.lap_chart_file}'
+            laps = laps['blocks'][0]['lines']
+            assert laps, \
+                f'Expected some laps below "POS" on page {page.number} in ' \
+                f'{self.lap_chart_file}. Found none'
+
+            # Each lap is a row, so we take the midpoints between two laps as the row separators
+            row_seps = [pos.y0 - 1, (pos.y1 + laps[0]['bbox'][1]) / 2]
+            for i in range(len(laps) - 1):
+                row_seps.append((laps[i]['bbox'][3] + laps[i + 1]['bbox'][1]) / 2)
+            row_seps.append(b)
+
+            # Parse the table
+            page = Page(page)
+            tab, superscript, cross_out = page.parse_table_by_grid(
+                vlines=[(col_seps[i], col_seps[i + 1]) for i in range(len(col_seps) - 1)],
+                hlines=[(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
+            )
+            assert (len(superscript) == 0) and len(cross_out) == 0, \
+                f'Some superscript(s) or crossed out text(s) found in table on page ' \
+                f'{page.number} in {self.lap_chart_file}. Expect none'
+            assert (len(superscript) == 0) and len(cross_out) == 0, \
+                f'Some superscript(s) or crossed out text(s) found in table on page ' \
+                f'{page.number} in {self.lap_chart_file}. Expect none'
+
+            # Reshape to long format, where a row is (lap, driver, position)
+            tab.columns = tab.iloc[0]
+            tab = tab[1:]
+            tab.index.name = None
+            tab = tab[tab.POS != 'GRID']  # TODO: should get starting grid here later
+            tab.POS = tab.POS.str.removeprefix('LAP ').astype(int)
+            tab = tab.set_index('POS').stack().reset_index(name='car_no')
+            tab.rename(columns={'POS': 'lap', 0: 'position'}, inplace=True)
+            tab = tab[tab.car_no != '']
+            tab.position = tab.position.astype(int)
+            tab.car_no = tab.car_no.astype(int)
+            df.append(tab)
+        return pd.concat(df, ignore_index=True)
+
+    def _parse_lap_analysis(self) -> pd.DataFrame:
+        doc = pymupdf.open(self.lap_analysis_file)
+        b, r = doc[0].bound()[3], doc[0].bound()[2]
+        df = []
+        for page in doc:
+            # Get the position of "LAP" and "TIME" on the page. Can have multiple of them, all of
+            # which should have approx. the same y-coord. The tables are below these texts
+            h = page.search_for('Race Lap Analysis')[0].y1
+            laps = page.search_for('LAP', clip=(0, h, r, b))
+            times = page.search_for('TIME', clip=(0, h, r, b))
+            assert len(laps) == len(times), \
+                f'#. of "LAP" and #. of "TIME" do not match on p.{page.number} in ' \
+                f'{self.lap_analysis_file}'
+            for i in range(len(laps) - 1):
+                assert np.isclose(laps[i].y1, laps[i + 1].y1, atol=1) and \
+                          np.isclose(times[i].y1, times[i + 1].y1, atol=1), \
+                    f'y-coord. of "LAP" and "TIME" do not match on p.{page.number} in ' \
+                    f'{self.lap_analysis_file}'
+
+            # Horizontally, three drivers share the full width of the page, side by side
+            # See QualifyingParser._parse_lap_times() for detailed explanation
+            w = r / 3
+            for i in range(3):
+                # Driver's name is below "Race Lap Analysis" and above the table
+                l = i * w
+                r = (i + 1) * w
+                t = min([i.y0 for i in laps] + [i.y0 for i in times])
+                driver = page.get_text('block', clip=(l, h, r, t)).strip()
+                if not driver:
+                    continue
+                    # TODO: may want a test here. Every row above should have exactly three drivers
+                car_no, driver = driver.split('\n', 1)
+
+                # Each driver has two tables side by side. We parse the tables by manually
+                # specifying row and col. positions (harningle/fia-doc#17)
+                # TODO: need to check if always have two tables. A good edge case is Spa 2021
+
+                # Find the horizontal lines under which the tables are located
+                page = Page(page)
+                t = max([i.y1 for i in laps] + [i.y1 for i in times])
+                lines = [i for i in page.get_drawings_in_bbox((l, t, r, t + 10))
+                         if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)]
+                assert len(lines) >= 1, f'Expected at least one horizontal line for ' \
+                                        f'table(s) in col. {i} in page {page.number} in ' \
+                                        f'{self.history_chart_file}. Found none'
+                assert np.allclose([i['rect'].y0 for i in lines], lines[0]['rect'].y0, atol=1), \
+                    f'Horizontal lines for table(s) in col. {i} in page {page.number} in ' \
+                    f'{self.history_chart_file} are not at the same y-position'
+
+                # Concat lines.
+                lines.sort(key=lambda x: x['rect'].x0)
+                rect = lines[0]['rect']
+                top_lines = [(rect.x0, rect.y0, rect.x1, rect.y1)]
+                for line in lines[1:]:
+                    rect = line['rect']
+                    prev_line = top_lines[-1]
+                    # If one line ends where the other starts, they are the same line
+                    if np.isclose(rect.x0, prev_line[2], atol=1):
+                        top_lines[-1] = (prev_line[0], prev_line[1], rect.x1, prev_line[3])
+                    # If one line starts where the other ends, they are the same line
+                    elif np.isclose(rect.x1, prev_line[0], atol=1):
+                        top_lines[-1] = (rect.x0, prev_line[1], prev_line[2], prev_line[3])
+                    # Otherwise, it's a new line
+                    else:
+                        top_lines.append((rect.x0, rect.y0, rect.x1, rect.y1))
+                assert len(top_lines) in [1, 2], \
+                    f'Expected at most two horizontal lines for table(s) in col. {i} in page ' \
+                    f'{page.number} in {self.history_chart_file}. Found {len(top_lines)}'
+
+                # Find the column separators
+                col_seps = []
+                for line in top_lines:
+                    no = page.search_for('LAP', clip=(line[0], line[1] - 15, line[2], line[3]))
+                    assert len(no) == 1, \
+                        f'Expected exactly one "LAP" above the top line at ' \
+                        f'({line[0], line[1], line[2], line[3]}) in page {page.number} in ' \
+                        f'{self.history_chart_file}. Found {len(no)}'
+                    col_seps.append([
+                        (line[0], no[0].x1),
+                        (no[0].x1, (line[0] + line[2]) / 2 - 5),
+                        ((line[0] + line[2]) / 2 - 5, line[2])
+                    ])
+
+                # Find the white and grey rectangles under the top lines. Each row is either
+                # coloured/filled in either white or grey, so we can get the row's top and bottom
+                # y-positions from these rectangles
+                rects = [i for i in page.get_drawings_in_bbox((l, t, r, b))
+                         if i['rect'].y1 - i['rect'].y0 > 10]
+                ys = [j for i in rects for j in [i['rect'].y0, i['rect'].y1]]
+                ys.sort()
+                row_seps = [ys[0]]
+                for y in ys[1:]:
+                    if y - row_seps[-1] > 10:
+                        row_seps.append(y)
+                row_seps = [(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
+
+                # Finally we are good to parse the tables using these separators
+                temp = []
+                for cols in col_seps:
+                    tab, superscript, cross_out = page.parse_table_by_grid(
+                        vlines=cols, hlines=row_seps
+                    )
+                    assert (len(superscript) == 0) and len(cross_out) == 0, \
+                        f'Some superscript(s) or crossed out text(s) found in table at ' \
+                        f'({cols[0][0]:.1f}, {row_seps[0][0]:.1f}, {cols[2][1]:.1f}, ' \
+                        f'{row_seps[-1][1]:.1f}) in page {page.number} in ' \
+                        f'{self.history_chart_file}. But we expect none'
+                    assert tab.shape[1] == 3, \
+                        f'Expected three columns (LAP, pit or not, lap time) in table at ' \
+                        f'({cols[0][0]:.1f}, {row_seps[0][0]:.1f}, {cols[2][1]:.1f}, ' \
+                        f'{row_seps[-1][1]:.1f}) in page {page.number} in ' \
+                        f'{self.history_chart_file}. Found {len(tab)}'
+                    tab.columns = ['lap', 'pit', 'lap_time']
+
+                    # Drop empty row
+                    """
+                    This is because the two side-by-side tables may not have the same amount of
+                    rows. E.g., there are 11 laps, and the left table will have 6 and the right
+                    table has 5 rows. The right table will have an empty row at the bottom, so
+                    drop it here
+                    """
+                    tab = tab[tab.lap != '']
+                    temp.append(tab)
+
+                # One driver may have multiple tables. Concatenate them
+                temp = pd.concat(temp, ignore_index=True)
+                temp['car_no'] = car_no
+                temp['driver'] = driver
+                df.append(temp)
+        df = pd.concat(df, ignore_index=True)
+        df.lap = df.lap.astype(int)
+        df.pit = df.pit.apply(lambda x: x == 'P')
+        df.car_no = df.car_no.astype(int)
+        return df
+
+    def _parse_lap_times(self) -> pd.DataFrame:
+        # Get lap times from Race Lap Analysis PDF
+        df = self._parse_lap_analysis()
+
+        # Lap 1's lap times are calendar time in Race Lap Analysis. To get the actual lap time for
+        # lap 2, we parse Race History Chart PDF
+        lap_1 = self._parse_history_chart()
+        lap_1 = lap_1[lap_1.lap == 1][['car_no', 'lap', 'time']]
+        df = df.merge(lap_1, on=['car_no', 'lap'], how='outer', indicator=True, validate='1:1')
+        assert (df[df.lap == 1]['_merge'] == 'both').all(), \
+            f"Lap 1's data do not match in {self.lap_analysis_file} and {self.history_chart_file}"
+        df.loc[df.lap == 1, 'lap_time'] = df.loc[df.lap == 1, 'time']
+        del df['time'], df['_merge'], lap_1
+
+        # Merge in car positions from Race Lap Chart PDF
+        positions = self._parse_lap_chart()
+        df = df.merge(positions, on=['car_no', 'lap'], how='outer', indicator=True, validate='1:1')
+        assert (df._merge == 'both').all(), f'Some laps only found in only one of ' \
+                                            f'{self.lap_analysis_file} and {self.lap_chart_file}'
+        del df['_merge'], positions
 
         # Merge in the fastest lap info. from final classification
         df = df.merge(self.classification_df[['car_no', 'fastest_lap_time', 'fastest_lap_no']],
-                      on='car_no',
-                      how='left')
+                      on='car_no', how='outer', indicator=True, validate='m:1')
+        assert (df._merge == 'both').all(), \
+            f'Some drivers only found in only one of {self.lap_analysis_file} and ' \
+            f'{self.classification_file}'  # TODO: is this always true? Crash before setting a lap?
+        del df['_merge']
         temp = df[df.lap == df.fastest_lap_no]
-        assert (temp.time == temp.fastest_lap_time).all(), \
+        assert (temp.lap_time == temp.fastest_lap_time).all(), \
             'Fastest lap time in lap times does not match the one in final classification'
         df['is_fastest_lap'] = df.lap == df.fastest_lap_no
-        del df['fastest_lap_time']
+        del df['fastest_lap_time'], df['fastest_lap_no']
 
         def to_json() -> list[dict]:
             temp = df.copy()
@@ -625,7 +867,7 @@ class RaceParser:
                 lambda x: Lap(
                     number=x.lap,
                     position=x.position,
-                    time=duration_to_millisecond(x.time),
+                    time=duration_to_millisecond(x.lap_time),
                     is_entry_fastest_lap=x.is_fastest_lap
                 ),
                 axis=1
@@ -744,7 +986,8 @@ class QualifyingParser:
         aux_lines = sorted(set([round(i[0], 2) for i in df[0].cells]))  # For unclassified table
         df = df[0].to_pandas()
         # TODO: check 2023 vs 2024 PDF. Do we have a "%" col.? 15 or 14 col. in total?
-        assert df.shape[1] == 14, \
+        assert ((df.shape[1] == 14) and self.year == 2024) \
+               or ((df.shape[1] == 15) and (self.year == 2023)), \
             f'Expected 15 columns, got {df.shape[1]} in {self.classification_file}'
 
         # Clean up column name: the first row is mistakenly taken as column names
@@ -760,10 +1003,18 @@ class QualifyingParser:
         cols = df.columns.tolist()
         for i in range(len(df.columns)):
             cols[i] = df.columns[i].removeprefix(f'{i}-')
+        match self.year:
+            case 2024:
+                columns = ['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS',
+                           'Q1_TIME', 'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
+            case 2023:
+                columns = ['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS', 'Q1_%',
+                           'Q1_TIME', 'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
+            case _:
+                raise ValueError(f'PDFs from year {self.year} are not supported')
         df = pd.DataFrame(
             np.vstack([cols, df]),
-            columns=['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS', 'Q1_TIME',
-                     'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
+            columns=columns
         )
         df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
         df['finishing_status'] = 0
