@@ -11,6 +11,7 @@ race_list = [
         '2024_22_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
         22,
+        'quali',
         '2024_22_quali_provisional_classification.json',
         '2024_22_quali_lap_times.json'
     ),
@@ -19,8 +20,18 @@ race_list = [
         '2023_19_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2023,
         18,
+        'quali',
         '2023_18_quali_classification.json',
         '2023_18_quali_lap_times.json'
+    ),
+    (
+        'doc_32_-_2023_united_states_grand_prix_-_final_sprint_shootout_classification.pdf',
+        '2023_19_usa_f1_sq0_timing_sprintshootoutsessionlaptimes_v01.pdf',
+        2023,
+        18,
+        'sprint_quali',
+        '2023_18_sprint_quali_classification.json',
+        '2023_18_sprint_quali_lap_times.json'
     )
 ]
 
@@ -28,14 +39,14 @@ race_list = [
 @pytest.fixture(params=race_list)
 def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     # Download and parse quali. classification and lap times PDF
-    url_classification, url_lap_time, year, round_no, expected_classification, expected_lap_times \
-        = request.param
+    url_classification, url_lap_time, year, round_no, session, expected_classification, \
+        expected_lap_times = request.param
     download_pdf('https://www.fia.com/sites/default/files/' + url_classification,
                  tmp_path / 'classification.pdf')
     download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
                  tmp_path / 'lap_times.pdf')
     parser = QualifyingParser(tmp_path / 'classification.pdf', tmp_path / 'lap_times.pdf',
-                              year, round_no, 'quali')
+                              year, round_no, session)
 
     classification_data = parser.classification_df.to_json()
     lap_times_data = parser.lap_times_df.to_json()
