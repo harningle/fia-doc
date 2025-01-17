@@ -27,7 +27,9 @@ In case of sprint weekend, sprint quali./shootout can be parsed as if it's a usu
 from fiadoc.parser import RaceParser
 
 parser = RaceParser('data/pdf/2023_18_race_final_classification.pdf',
+                    'data/pdf/2023_18_race_lap_analysis.pdf',
                     'data/pdf/2023_18_race_history_chart.pdf',
+                    'data/pdf/2023_18_race_lap_chart.pdf',
                     2023,
                     18,
                     'race')
