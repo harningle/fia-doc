@@ -304,8 +304,8 @@ class RaceParser:
                 break
         if not found:
             doc.close()
-            raise ValueError(f'"Final Classification" not found on any page in '
-                             f'{self.classification_file}')
+            raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
+                             f'on any page in {self.classification_file}')
 
         # Page width. This is the rightmost x-coord. of the table
         w = page.bound()[2]
@@ -389,7 +389,13 @@ class RaceParser:
             not_classified = not_classified[0].to_pandas()
 
             # The table header is actually the first row of the "NOT CLASSIFIED" table
-            not_classified.loc[-1] = not_classified.columns
+            """
+            The table header, i.e. col. names, is in the format of "x-yyy". E.g., "1-18",
+            "2-Lance Stroll", "4-Aston Martin Aramco F1 Team", or "7-DNF". So we want to remove the
+            "digit-" part. An example is 2024 Saudi Arabia
+            """
+            # TODO: check
+            not_classified.loc[-1] = [re.sub(r'^\d+-', '', i) for i in not_classified.columns]
             not_classified.sort_index(inplace=True)
             not_classified.reset_index(drop=True, inplace=True)
             assert not_classified.shape[1] == 13, \
@@ -708,8 +714,14 @@ class RaceParser:
             # Get the position of "LAP" and "TIME" on the page. Can have multiple of them. The
             # tables are below these texts
             h = page.search_for('Lap Analysis')[0].y1
-            laps = page.search_for('LAP', clip=(0, h, r, b))
-            times = page.search_for('TIME', clip=(0, h, r, b))
+            laps = page.search_for('LAP ', clip=(0, h, r, b))
+            """
+            "LAP" can have false positive match, if a driver's name contains "LAP", e.g. Colapinto.
+            So we add a whitespace after "LAP" to avoid this. For the same reason, we also add a
+            whitespace after "TIME" below.
+            """
+            # TODO: check
+            times = page.search_for('TIME ', clip=(0, h, r, b))
             assert len(laps) == len(times), \
                 f'#. of "LAP" and #. of "TIME" do not match on p.{page.number} in ' \
                 f'{self.lap_analysis_file}'
@@ -760,6 +772,7 @@ class RaceParser:
                     # Each driver has two tables side by side. We parse the tables by manually
                     # specifying row and col. positions (harningle/fia-doc#17)
                     # TODO: need to check if always have two tables. A good edge case is Spa 2021
+                    #       or Leclerc DNS in 2023 Brazil
 
                     # Find the horizontal lines under which the tables are located
                     page = Page(page)
@@ -852,6 +865,10 @@ class RaceParser:
 
                     # One driver may have multiple tables. Concatenate them
                     temp = pd.concat(temp, ignore_index=True)
+                    if temp.empty:
+                        warnings.warn(f'Driver {driver}, car No. {car_no}, has no lap at all on '
+                                      f'page {page.number} in {self.lap_analysis_file}. Make sure '
+                                      f'this is expected, e.g. DNS')
                     temp['car_no'] = car_no
                     temp['driver'] = driver
                     df.append(temp)
@@ -1017,11 +1034,19 @@ class RaceParser:
         del df['_merge'], positions
 
         # Merge in the fastest lap info. from final classification
-        df = df.merge(self.classification_df[['car_no', 'fastest_lap_time', 'fastest_lap_no']],
-                      on='car_no', how='outer', indicator=True, validate='m:1')
-        assert (df._merge == 'both').all(), \
-            f'Some drivers only found in only one of {self.lap_analysis_file} and ' \
-            f'{self.classification_file}'  # TODO: is this always true? Crash before setting a lap?
+        # TODO: drivers DNS or DNF before end of lap 1 have no lap at all, so drop them. Check
+        temp = self.classification_df[['car_no', 'fastest_lap_time', 'fastest_lap_no',
+                                       'laps_completed']]
+        temp = temp[temp.laps_completed >= 1]
+        df = df.merge(temp, on='car_no', how='outer', indicator=True, validate='m:1')
+        # TODO: I really want the below check but it fails to handle one case: a driver drives
+        #       normally but get DSQ after several laps. He will have lap data in the lap analysis
+        #       PDF but in classification PDF, he is DSQ so has zero lap completed. In such case,
+        #       we will have more drivers in the lap analysis PDF than in the classification PDF,
+        #       and the below check will fail
+        # assert (df._merge == 'both').all(), \
+        #     f'Some drivers only found in only one of {self.lap_analysis_file} and ' \
+        #     f'{self.classification_file}: {df[df._merge != "both"].car_no.unique()}'
         del df['_merge']
         temp = df[df.lap == df.fastest_lap_no]
         assert (temp.lap_time == temp.fastest_lap_time).all(), \
