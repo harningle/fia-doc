@@ -16,7 +16,7 @@ from .models.classification import(
     QualiClassificationData
 )
 from .models.driver import Driver, DriverData
-from .models.foreign_key import RoundEntry, SessionEntry
+from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntry
 from .models.lap import Lap, LapData, QualiLap
 from .models.pit_stop import PitStop, PitStopData
 from .utils import Page, duration_to_millisecond, time_to_timedelta
@@ -1665,26 +1665,25 @@ class PitStopParser:
             pit_stop = df.copy()
             pit_stop['pit_stop'] = pit_stop.apply(
                 lambda x: PitStop(
-                    lap=x.lap,
                     number=x.stop_no,
                     duration=duration_to_millisecond(x.duration),
                     local_timestamp=x.local_time
                 ),
                 axis=1
             )
-            pit_stop = pit_stop.groupby('car_no')[['pit_stop']].agg(list).reset_index()
-            pit_stop['session_entry'] = pit_stop.car_no.map(
-                lambda x: SessionEntry(
+            pit_stop['entry'] = pit_stop.apply(
+                lambda x: PitStopEntry(
                     year=self.year,
                     round=self.round_no,
                     session=self.session if self.session == 'race' else 'SR',
-                    car_number=x
-                )
+                    car_number=x.car_no,
+                    lap=x.lap
+                ), axis=1
             )
             return pit_stop.apply(
                 lambda x: PitStopData(
-                    foreign_keys=x.session_entry,
-                    objects=x.pit_stop
+                    foreign_keys=x.entry,
+                    objects=[x.pit_stop]
                 ).model_dump(),
                 axis=1
             ).tolist()

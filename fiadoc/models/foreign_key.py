@@ -35,3 +35,27 @@ class RoundEntry(BaseModel):
     team_name: str
 
     model_config = ConfigDict(extra='forbid')
+
+
+class PitStopEntry(BaseModel):
+    year: PositiveInt
+    round: PositiveInt
+    session: str = Literal['R', 'SR', 'FP1', 'FP2', 'FP3']
+    car_number: PositiveInt
+    lap: PositiveInt
+
+    @field_validator('session')
+    @classmethod
+    def clean_session(cls, session: str) -> str:
+        match session.lower().strip():
+            case 'r' | 'sr' | 'fp1' | 'fp2' | 'fp3':
+                return session.upper()
+            case 'race':  # Some simple mapping
+                return 'R'
+            case 'sprint' | 'sprint_race' | 'sprint race':
+                return 'SR'
+            case _:
+                raise ValueError(f'Invalid session: {session}. Must be one of: "R", "SR", "FP1", '
+                                 f'"FP2", "FP3"')
+
+    model_config = ConfigDict(extra='forbid')
