@@ -101,7 +101,7 @@ def test_parse_quali(prepare_quali_data):
                             assert lap['time'] == expected_lap['time'], \
                                 f"Driver {driver}'s lap {lap['number']} in {session} time " \
                                 f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
-                                f'{expected_lap['time']['milliseconds']}'
+                                f"{expected_lap['time']['milliseconds']}"
                             break
 
     for i in expected_lap_times:
