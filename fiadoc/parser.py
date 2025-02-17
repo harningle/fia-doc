@@ -372,6 +372,7 @@ class RaceParser:
         df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
         assert df.shape[1] == 13, \
             f'Expected 13 columns, got {df.shape[1]} in {self.classification_file}'
+        df['is_classified'] = True  # Set all drivers from the main table as classified
 
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
@@ -478,7 +479,6 @@ class RaceParser:
 
         # Fill in some default values
         df.fillna({
-            'is_classified': True,
             'points': 0,
             'finishing_status': 0
         }, inplace=True)
