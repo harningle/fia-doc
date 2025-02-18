@@ -27,7 +27,19 @@ race_list = [
         'sprint_race',
         '2023_18_sprint_classification.json',
         '2023_18_sprint_lap_times.json'
-    )
+    ),
+    (
+        # test an event without unclassified drivers
+        '2024_10_esp_f1_r0_timing_raceprovisionalclassification_v01_1.pdf',
+        '2024_10_esp_f1_r0_timing_racelapanalysis_v01_1.pdf',
+        '2024_10_esp_f1_r0_timing_racehistorychart_v01_1.pdf',
+        '2024_10_esp_f1_r0_timing_racelapchart_v01_1.pdf',
+        2024,
+        10,
+        'race',
+        '2024_10_race_classification.json',
+        '2024_10_race_lap_times.json'
+    ),
 ]
 
 
