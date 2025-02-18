@@ -372,7 +372,6 @@ class RaceParser:
         df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
         assert df.shape[1] == 13, \
             f'Expected 13 columns, got {df.shape[1]} in {self.classification_file}'
-        df['is_classified'] = True  # Set all drivers from the main table as classified
 
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
@@ -404,9 +403,17 @@ class RaceParser:
                 f'{not_classified.shape[1]} in {self.classification_file}'
             not_classified.columns = df.columns
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
-            not_classified['finishing_status'] = 11  # TODO: should clean up the code later
-            not_classified['is_classified'] = False
-            df = pd.concat([df, not_classified], ignore_index=True)
+
+        else:
+            # no unclassified drivers
+            not_classified = pd.DataFrame(columns=df.columns)
+
+        df['is_classified'] = True # Set all drivers from the main table as classified
+
+        not_classified['finishing_status'] = 11  # TODO: should clean up the code later
+        not_classified['is_classified'] = False
+
+        df = pd.concat([df, not_classified], ignore_index=True)
 
         # Set col. names
         del df['NAT']
