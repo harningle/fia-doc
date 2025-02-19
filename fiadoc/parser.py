@@ -403,9 +403,17 @@ class RaceParser:
                 f'{not_classified.shape[1]} in {self.classification_file}'
             not_classified.columns = df.columns
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
-            not_classified['finishing_status'] = 11  # TODO: should clean up the code later
-            not_classified['is_classified'] = False
-            df = pd.concat([df, not_classified], ignore_index=True)
+
+        else:
+            # no unclassified drivers
+            not_classified = pd.DataFrame(columns=df.columns)
+
+        df['is_classified'] = True # Set all drivers from the main table as classified
+
+        not_classified['finishing_status'] = 11  # TODO: should clean up the code later
+        not_classified['is_classified'] = False
+
+        df = pd.concat([df, not_classified], ignore_index=True)
 
         # Set col. names
         del df['NAT']
@@ -478,7 +486,6 @@ class RaceParser:
 
         # Fill in some default values
         df.fillna({
-            'is_classified': True,
             'points': 0,
             'finishing_status': 0
         }, inplace=True)
