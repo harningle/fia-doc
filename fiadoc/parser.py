@@ -244,8 +244,8 @@ class EntryListParser:
                     foreign_keys=RoundEntry(
                         year=self.year,
                         round=self.round_no,
-                        team_name=x.constructor,
-                        driver_name=x.driver
+                        team_reference=x.constructor,
+                        driver_reference=x.driver
                     ),
                     objects=[
                         Driver(

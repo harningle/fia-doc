@@ -4,8 +4,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Max Verstappen",
-            "team_name": "Red Bull Racing Honda RBPT"
+            "driver_reference": "max_verstappen",
+            "team_reference": "red_bull"
         },
         "objects": [
             {
@@ -18,8 +18,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Sergio Perez",
-            "team_name": "Red Bull Racing Honda RBPT"
+            "driver_reference": "perez",
+            "team_reference": "red_bull"
         },
         "objects": [
             {
@@ -32,8 +32,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "George Russell",
-            "team_name": "Mercedes"
+            "driver_reference": "russell",
+            "team_reference": "mercedes"
         },
         "objects": [
             {
@@ -46,8 +46,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Lewis Hamilton",
-            "team_name": "Mercedes"
+            "driver_reference": "hamilton",
+            "team_reference": "mercedes"
         },
         "objects": [
             {
@@ -60,8 +60,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Charles Leclerc",
-            "team_name": "Ferrari"
+            "driver_reference": "leclerc",
+            "team_reference": "ferrari"
         },
         "objects": [
             {
@@ -74,8 +74,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Carlos Sainz",
-            "team_name": "Ferrari"
+            "driver_reference": "sainz",
+            "team_reference": "ferrari"
         },
         "objects": [
             {
@@ -88,8 +88,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Oscar Piastri",
-            "team_name": "McLaren Mercedes"
+            "driver_reference": "piastri",
+            "team_reference": "mclaren"
         },
         "objects": [
             {
@@ -102,8 +102,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Lando Norris",
-            "team_name": "McLaren Mercedes"
+            "driver_reference": "norris",
+            "team_reference": "mclaren"
         },
         "objects": [
             {
@@ -116,8 +116,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Lance Stroll",
-            "team_name": "Aston Martin Aramco Mercedes"
+            "driver_reference": "stroll",
+            "team_reference": "aston_martin"
         },
         "objects": [
             {
@@ -130,8 +130,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Fernando Alonso",
-            "team_name": "Aston Martin Aramco Mercedes"
+            "driver_reference": "alonso",
+            "team_reference": "aston_martin"
         },
         "objects": [
             {
@@ -144,8 +144,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Esteban Ocon",
-            "team_name": "Alpine Renault"
+            "driver_reference": "ocon",
+            "team_reference": "alpine"
         },
         "objects": [
             {
@@ -158,8 +158,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Pierre Gasly",
-            "team_name": "Alpine Renault"
+            "driver_reference": "gasly",
+            "team_reference": "alpine"
         },
         "objects": [
             {
@@ -172,8 +172,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Alexander Albon",
-            "team_name": "Williams Mercedes"
+            "driver_reference": "albon",
+            "team_reference": "williams"
         },
         "objects": [
             {
@@ -186,8 +186,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Franco Colapinto",
-            "team_name": "Williams Mercedes"
+            "driver_reference": "colapinto",
+            "team_reference": "williams"
         },
         "objects": [
             {
@@ -200,8 +200,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Liam Lawson",
-            "team_name": "RB Honda RBPT"
+            "driver_reference": "lawson",
+            "team_reference": "rb"
         },
         "objects": [
             {
@@ -214,8 +214,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Yuki Tsunoda",
-            "team_name": "RB Honda RBPT"
+            "driver_reference": "tsunoda",
+            "team_reference": "rb"
         },
         "objects": [
             {
@@ -228,8 +228,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Valtteri Bottas",
-            "team_name": "Kick Sauber Ferrari"
+            "driver_reference": "bottas",
+            "team_reference": "sauber"
         },
         "objects": [
             {
@@ -242,8 +242,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Zhou Guanyu",
-            "team_name": "Kick Sauber Ferrari"
+            "driver_reference": "zhou",
+            "team_reference": "sauber"
         },
         "objects": [
             {
@@ -256,8 +256,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Oliver Bearman",
-            "team_name": "Haas Ferrari"
+            "driver_reference": "bearman",
+            "team_reference": "haas"
         },
         "objects": [
             {
@@ -270,8 +270,8 @@
         "foreign_keys": {
             "year": 2024,
             "round": 21,
-            "driver_name": "Nico Hulkenberg",
-            "team_name": "Haas Ferrari"
+            "driver_reference": "hulkenberg",
+            "team_reference": "haas"
         },
         "objects": [
             {
