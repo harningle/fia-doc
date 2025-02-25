@@ -134,6 +134,17 @@ class EntryListParser:
         df['reserve_for'] = None
         for i in df.reserve.dropna().unique():
             temp = df[df.reserve == i]
+            if len(temp) == 1:
+                # handle the case where a driver is incorrectly indicated as
+                # having a reserve driver, e.g. copy-paste error 2024, round 5
+                df.loc[df.reserve == i, 'reserve'] = None
+                warnings.warn(
+                    f'Driver {temp.driver.iloc[0]} is indicated as being or '
+                    f'having a reserve driver but no associated driver was '
+                    f'found!'
+                )
+                continue
+
             assert len(temp) == 2, f'Expected 2 rows for superscript {i}, got {len(temp)}'
             assert temp.car_no.nunique() == 2, \
                 f'Expected 2 different drivers for superscript {i}, got {temp.car_no.nunique()}'
