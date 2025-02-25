@@ -1160,8 +1160,9 @@ class QualifyingParser:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
         if not found:
-            raise ValueError(f'"Final Classification" not found on any page in '
-                             f'{self.classification_file}')
+            doc.close()  # TODO: check docs. Do we need to manually close it? Memory safe?
+            raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
+                             f'on any page in {self.classification_file}')
 
         # Page width. This is the rightmost x-coord. of the table
         w = page.bound()[2]
@@ -1206,16 +1207,35 @@ class QualifyingParser:
             f'Expected one table, got {len(df.tables)} in {self.classification_file}'
         aux_lines = sorted(set([round(i[0], 2) for i in df[0].cells]))  # For unclassified table
         df = df[0].to_pandas()
-        # TODO: check 2023 vs 2024 PDF. Do we have a "%" col.? 15 or 14 col. in total?
-        assert ((df.shape[1] == 14) and self.year == 2024) \
-               or ((df.shape[1] == 15) and (self.year == 2023)), \
-            f'Expected 15 columns, got {df.shape[1]} in {self.classification_file}'
+
+        # Check if we get the correct cols.
+        """
+        See #21. Basically the quali. classification PDFs don't have the same cols. across races.
+        Even within a same year, different races can have different cols. (e.g., 2024 Spanish and
+        2024 Mexican). Therefore, we need to manually read the col. headers, make sure we get all
+        cols., and name them accordingly.
+        
+        The header is located under "Final Classification" (`y`). The leftmost col. is always car
+        No. "NO". So the header is above the bottom of "NO". We go and read all texts between `y`
+        and the bottom of "NO". They are the col. headers. The first col. is the ranking/finishing
+        position, which does not have a col. name in the header row. Need to add it manually.
+        
+        TODO: we assume the col. header never contains whitespace in the text search below. Need to
+        check later
+        """
+        no = page.search_for('NO', clip=(0, y, w, b))
+        no.sort(key=lambda x: x.y0)  # The topmost "NO" under "Final Classification"
+        no = no[0].y1
+        headers = page.get_text('text', clip=(0, y, w, no + 1)).split()
+        headers.insert(0, 'position')  # The first col. does not have col. name so add it manually
+        assert df.shape[1] == len(headers), \
+            f'Expected {len(headers)} columns, got {df.shape[1]} in {self.classification_file}'
 
         # Clean up column name: the first row is mistakenly taken as column names
         """
         TODO: need to check if the first row is correctly treated as the table content, or
         mistakenly treated as col. header. Can be checked by the top y-position of `tableheader`
-        from `page.find_tables()`. If the y-position exceeds the `y`, then it's a mistake.`
+        from `page.find_tables()`. If the y-position exceeds the `y`, then it's a mistake.
         
         Also, we name the sessions as "Q1", "Q2", and "Q3", regardless of whether it's a normal
         qualifying or a sprint qualifying. This makes the code simpler, and we should always use
@@ -1224,19 +1244,14 @@ class QualifyingParser:
         cols = df.columns.tolist()
         for i in range(len(df.columns)):
             cols[i] = df.columns[i].removeprefix(f'{i}-')
-        match self.year:
-            case 2024:
-                columns = ['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS',
-                           'Q1_TIME', 'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
-            case 2023:
-                columns = ['position', 'NO', 'DRIVER', 'NAT', 'ENTRANT', 'Q1', 'Q1_LAPS', 'Q1_%',
-                           'Q1_TIME', 'Q2', 'Q2_LAPS', 'Q2_TIME', 'Q3', 'Q3_LAPS', 'Q3_TIME']
-            case _:
-                raise ValueError(f'PDFs from year {self.year} are not supported')
-        df = pd.DataFrame(
-            np.vstack([cols, df]),
-            columns=columns
-        )
+        headers = [i.replace('SQ', 'Q') if i.startswith('SQ') else i for i in headers]
+        i = headers.index('Q1') + 1  # TODO: rewrite this. I myself don't understand now...
+        for q in [1, 2, 3]:
+            while i < len(headers) and headers[i] != f'Q{q + 1}':
+                if headers[i] != f'Q{q}':
+                    headers[i] = f'Q{q}_{headers[i]}'  # E.g., "TIME" --> "Q2_TIME"
+                i += 1
+        df = pd.DataFrame(np.vstack([cols, df]), columns=headers)
         df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
         df['finishing_status'] = 0
 
@@ -1259,8 +1274,8 @@ class QualifyingParser:
             not_classified.sort_index(inplace=True)
             not_classified.reset_index(drop=True, inplace=True)
             assert not_classified.shape[1] == 15, \
-                f'Expected 15 columns for "NOT CLASSIFIED"table , got {not_classified.shape[1]} ' \
-                f'in {self.file}'
+                f'Expected 15 columns for "NOT CLASSIFIED" table , got ' \
+                f'{not_classified.shape[1]} in {self.file}'
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
