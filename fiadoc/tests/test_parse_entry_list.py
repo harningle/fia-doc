@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 
 import pytest
 
@@ -10,20 +11,32 @@ race_list = [
         '2024%20S%C3%A3o%20Paulo%20Grand%20Prix%20-%20Revised%20Entry%20List.pdf',
         2024,
         21,
-        '2024_21_entry_list.json'
+        '2024_21_entry_list.json',
+        nullcontext()
     ),
     (
         '2024%20Belgian%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         14,
-        '2024_14_entry_list.json'
+        '2024_14_entry_list.json',
+        nullcontext()
     ),
     (
         '2024%20Mexico%20City%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         20,
-        '2024_20_entry_list.json'
-    )
+        '2024_20_entry_list.json',
+        nullcontext()
+    ),
+    (
+        # RIC incorrectly indicated as having a reserve driver here
+        # (looks like copy-paste error from previous race) -> handle gracefully
+        '2024%20Chinese%20Grand%20Prix%20-%20Entry%20List.pdf',
+        2024,
+        5,
+        '2024_05_entry_list.json',
+        pytest.warns(UserWarning, match='Ricciardo is indicated as')
+    ),
 ]
 # Not going to test year 2023 for entry list, as the PDF format changed, and we are not interested
 # in retrospectively parsing old entry list PDFs
@@ -32,10 +45,13 @@ race_list = [
 @pytest.fixture(params=race_list)
 def prepare_entry_list_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
     # Download and parse entry list PDF
-    url, year, round_no, expected = request.param
+    url, year, round_no, expected, context = request.param
     download_pdf('https://www.fia.com/sites/default/files/decision-document/' + url,
                  tmp_path / 'entry_list.pdf')
-    parser = EntryListParser(tmp_path / 'entry_list.pdf', year, round_no)
+
+    with context:
+        parser = EntryListParser(tmp_path / 'entry_list.pdf', year, round_no)
+
 
     # Sort by car No. for both json for easier comparison
     data = parser.df.to_json()
