@@ -29,6 +29,15 @@ race_list = [
         nullcontext()
     ),
     (
+        # handle gracefully if driver is not found in the driver mapping
+        # (e.g. reserve driver not in the mapping) and warn user
+        '2024%20Japanese%20Grand%20Prix%20-%20Entry%20List.pdf',
+        2024,
+        4,
+        '2024_04_entry_list.json',
+        pytest.warns(UserWarning, match='Error when parsing driver Ayumu')
+    ),
+    (
         # RIC incorrectly indicated as having a reserve driver here
         # (looks like copy-paste error from previous race) -> handle gracefully
         '2024%20Chinese%20Grand%20Prix%20-%20Entry%20List.pdf',
@@ -51,10 +60,9 @@ def prepare_entry_list_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
 
     with context:
         parser = EntryListParser(tmp_path / 'entry_list.pdf', year, round_no)
-
+        data = parser.df.to_json()
 
     # Sort by car No. for both json for easier comparison
-    data = parser.df.to_json()
     with open('fiadoc/tests/fixtures/' + expected, encoding='utf-8') as f:
         expected_data = json.load(f)
     data.sort(key=lambda x: x['objects'][0]['car_number'])
