@@ -48,7 +48,7 @@ class RoundEntry(BaseModel):
                                  f"{self['year']}'s team name mapping. Available teams: "
                                  f"{TEAMS[self['year']].keys()}")
         else:
-            raise ValueError(f'year {self['year']} not found in team name mapping. Available '
+            raise ValueError(f"year {self['year']} not found in team name mapping. Available "
                              f'years: {TEAMS.keys()}')
 
     @model_validator(mode='before')
@@ -62,7 +62,7 @@ class RoundEntry(BaseModel):
                                  f"{self['year']}'s driver name mapping. Available drivers: "
                                  f"{DRIVERS[self['year']].keys()}")
         else:
-            raise ValueError(f'year {self['year']} not found in driver name mapping. Available '
+            raise ValueError(f"year {self['year']} not found in driver name mapping. Available "
                              f'years: {DRIVERS.keys()}')
 
     model_config = ConfigDict(extra='forbid')
