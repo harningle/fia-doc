@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import pymupdf
 
+from pydantic import ValidationError
+
 from .models.classification import(
     Classification,
     ClassificationData,
@@ -239,22 +241,27 @@ class EntryListParser:
         df = self._parse_table_by_grid(page, aux_vlines, aux_hlines)
 
         def to_json() -> list[dict]:
-            return [
-                DriverData(
-                    foreign_keys=RoundEntry(
-                        year=self.year,
-                        round=self.round_no,
-                        team_reference=x.constructor,
-                        driver_reference=x.driver
-                    ),
-                    objects=[
-                        Driver(
-                            car_number=x.car_no
-                        )
-                    ]
-                ).model_dump()
-                for x in df.itertuples()
-            ]
+            drivers = []
+            for x in df.itertuples():
+                try:
+                    drivers.append(DriverData(
+                            foreign_keys=RoundEntry(
+                                year=self.year,
+                                round=self.round_no,
+                                team_reference=x.constructor,
+                                driver_reference=x.driver
+                            ),
+                            objects=[
+                                Driver(
+                                    car_number=x.car_no
+                                )
+                            ]
+                        ).model_dump())
+                except ValidationError as e:
+                    warnings.warn(f'Error when parsing driver {x.driver} in '
+                                  f'{self.file}: {e}', )
+
+            return drivers
 
         def to_pkl(filename: str | os.PathLike) -> None:
             with open(filename, 'wb') as f:
