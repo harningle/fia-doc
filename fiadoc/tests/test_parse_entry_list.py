@@ -26,7 +26,9 @@ race_list = [
         2024,
         20,
         '2024_20_entry_list.json',
-        nullcontext()
+        # multiple reserve drivers that must be skipped on export to json
+        # because they are not in the driver mapping
+        pytest.warns(UserWarning, match='Error when parsing driver')
     ),
     (
         # handle gracefully if driver is not found in the driver mapping

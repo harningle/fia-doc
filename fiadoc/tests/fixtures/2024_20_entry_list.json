@@ -284,20 +284,6 @@
         "foreign_keys": {
             "year": 2024,
             "round": 20,
-            "driver_reference": "oward",
-            "team_reference": "mclaren"
-        },
-        "objects": [
-            {
-                "car_number": 29
-            }
-        ]
-    },
-    {
-        "object_type": "RoundEntry",
-        "foreign_keys": {
-            "year": 2024,
-            "round": 20,
             "driver_reference": "antonelli",
             "team_reference": "mercedes"
         },
@@ -312,40 +298,12 @@
         "foreign_keys": {
             "year": 2024,
             "round": 20,
-            "driver_reference": "drugovich",
-            "team_reference": "aston_martin"
-        },
-        "objects": [
-            {
-                "car_number": 34
-            }
-        ]
-    },
-    {
-        "object_type": "RoundEntry",
-        "foreign_keys": {
-            "year": 2024,
-            "round": 20,
             "driver_reference": "bearman",
             "team_reference": "ferrari"
         },
         "objects": [
             {
                 "car_number": 38
-            }
-        ]
-    },
-    {
-        "object_type": "RoundEntry",
-        "foreign_keys": {
-            "year": 2024,
-            "round": 20,
-            "driver_reference": "shwartzman",
-            "team_reference": "sauber"
-        },
-        "objects": [
-            {
-                "car_number": 97
             }
         ]
     }
