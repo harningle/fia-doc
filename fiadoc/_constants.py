@@ -50,9 +50,6 @@ DRIVERS = {
         'Oliver Bearman': 'bearman',
         'Franco Colapinto': 'colapinto',
         'Jack Doohan': 'doohan',
-        'Patricio O’Ward': 'oward',         # TODO: inconsistent with jolpica
-        'Felipe Drugovich': 'drugovich',    # TODO: inconsistent with jolpica
-        'Robert Shwartzman': 'shwartzman',  # TODO: inconsistent with jolpica
         'Liam Lawson': 'lawson',
         'Andrea Kimi Antonelli': 'antonelli'
     },
