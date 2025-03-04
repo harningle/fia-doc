@@ -950,14 +950,15 @@ class RaceParser:
                                  and i['fill'] is None]
                         assert len(lines) >= 1, \
                             f'Expected at least one horizontal line for table(s) in row {row}, ' \
-                            f'col {col} in p.{page.number} in {self.lap_times_file}. Found none'
+                            f'col {col} in p.{page.number} in {self.lap_analysis_file}. Found none'
                         assert np.allclose(
                             [i['rect'].y0 for i in lines],
                             lines[0]['rect'].y0,
                             atol=1
                         ), \
                             f'Horizontal lines for table(s) in row {row}, col {col} on p.' \
-                            f'{page.number} in {self.lap_times_file} are not at the same y-coord.'
+                            f'{page.number} in {self.lap_analysis_file} are not at the same '\
+                            f'y-coord.'
 
                         # Concat lines.
                         lines.sort(key=lambda x: x['rect'].x0)
@@ -977,7 +978,7 @@ class RaceParser:
                                 top_lines.append((rect.x0, rect.y0, rect.x1, rect.y1))
                         assert len(top_lines) in [1, 2], \
                             f'Expected at most two horizontal lines for table(s) in row {row}, ' \
-                            f'col. {col} on p.{page.number} in {self.lap_times_file}. Found ' \
+                            f'col. {col} on p.{page.number} in {self.lap_analysis_file}. Found ' \
                             f'{len(top_lines)}'
 
                         # Find the column separators
@@ -1275,14 +1276,14 @@ class QualifyingParser:
             )
             assert len(not_classified.tables) == 1, \
                 f'Expected one table for "NOT CLASSIFIED", got {len(not_classified.tables)} ' \
-                f'in {self.file}'
+                f'in {self.classification_file}'
             not_classified = not_classified[0].to_pandas()
             not_classified.loc[-1] = not_classified.columns.str.replace(r'Col\d+', '', regex=True)
             not_classified.sort_index(inplace=True)
             not_classified.reset_index(drop=True, inplace=True)
             assert not_classified.shape[1] == 15, \
                 f'Expected 15 columns for "NOT CLASSIFIED" table , got ' \
-                f'{not_classified.shape[1]} in {self.file}'
+                f'{not_classified.shape[1]} in {self.classification_file}'
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
