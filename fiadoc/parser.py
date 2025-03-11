@@ -1159,7 +1159,7 @@ class QualifyingParser:
         doc = pymupdf.open(self.classification_file)
         found = []
         for i in range(len(doc)):
-            page = doc[i]
+            page = Page(doc[i])
             found = page.search_for('Final Classification')
             if found:
                 break
@@ -1167,6 +1167,12 @@ class QualifyingParser:
             if found:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
+            else:
+                found = page.get_image_header()
+                if found:
+                    found = [found]
+                    warnings.warn('Found an image header, instead of strings')
+                    break
         if not found:
             doc.close()  # TODO: check docs. Do we need to manually close it? Memory safe?
             raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
@@ -1188,7 +1194,6 @@ class QualifyingParser:
         else:
             bottom = page.search_for('POLE POSITION LAP')
         if not bottom:
-            page = Page(page)
             lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
             lines = [i for i in lines
                      if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
@@ -1260,7 +1265,7 @@ class QualifyingParser:
                     headers[i] = f'Q{q}_{headers[i]}'  # E.g., "TIME" --> "Q2_TIME"
                 i += 1
         df = pd.DataFrame(np.vstack([cols, df]), columns=headers)
-        df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
+        df = df[(df.NO != '') & df.NO.notna()]  # May get some empty rows at the bottom. Drop them
         df['finishing_status'] = 0
 
         # Do the same for the "NOT CLASSIFIED" table
@@ -1291,14 +1296,14 @@ class QualifyingParser:
 
             # Fill in the position for DNF and DSQ drivers
             # TODO: should find a PDF with DSQ drivers to handle such cases
-            df.replace({'': None, 'DNF': None}, inplace=True)
+            df = df.replace({'': None, 'DNF': None})
             df.position = df.position.astype(float).ffill() + df.position.isnull().cumsum()
             df.position = df.position.astype(int)
 
         # Clean up
         df.NO = df.NO.astype(int)
         del df['NAT']
-        df.replace('', None, inplace=True)
+        df = df.replace('', None)
         df.position = df.position.astype(int)
 
         # Overwrite `.to_json()` and `.to_pkl()` methods
