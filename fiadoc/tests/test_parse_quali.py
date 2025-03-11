@@ -41,6 +41,24 @@ race_list = [
         'quali',
         '2024_05_quali_classification.json',
         '2024_05_quali_lap_times.json'
+    ),
+    (
+        '2024_02_ksa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
+        '2024_02_ksa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2024,
+        2,
+        'quali',
+        '2024_02_quali_classification.json',
+        '2024_02_quali_lap_times.json'
+    ),
+    (
+        '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionprovisionalclassification_v01.pdf',
+        '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
+        2024,
+        21,
+        'sprint_quali',
+        '2024_21_sprint_quali_classification.json',
+        '2024_21_sprint_quali_lap_times.json'
     )
 ]
 

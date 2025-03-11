@@ -1275,7 +1275,7 @@ class QualifyingParser:
             b = page.search_for('POLE POSITION LAP')[0].y0
             not_classified = page.find_tables(
                 clip=pymupdf.Rect(0, t, w, b),
-                strategy='lines',
+                strategy='lines_strict',
                 vertical_lines=aux_lines,
                 add_lines=[((0, t), (w, t)), ((0, b), (w, b))]
             )
@@ -1284,10 +1284,10 @@ class QualifyingParser:
                 f'in {self.classification_file}'
             not_classified = not_classified[0].to_pandas()
             not_classified.loc[-1] = not_classified.columns.str.replace(r'Col\d+', '', regex=True)
-            not_classified.sort_index(inplace=True)
-            not_classified.reset_index(drop=True, inplace=True)
-            assert not_classified.shape[1] == 15, \
-                f'Expected 15 columns for "NOT CLASSIFIED" table , got ' \
+            not_classified = not_classified.sort_index()
+            not_classified = not_classified.reset_index(drop=True)
+            assert not_classified.shape[1] == len(headers), \
+                f'Expected {len(headers)} columns for "NOT CLASSIFIED" table , got ' \
                 f'{not_classified.shape[1]} in {self.classification_file}'
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns
@@ -1296,7 +1296,7 @@ class QualifyingParser:
 
             # Fill in the position for DNF and DSQ drivers
             # TODO: should find a PDF with DSQ drivers to handle such cases
-            df = df.replace({'': None, 'DNF': None})
+            df = df.replace({'': None})
             df.position = df.position.astype(float).ffill() + df.position.isnull().cumsum()
             df.position = df.position.astype(int)
 
@@ -1311,7 +1311,7 @@ class QualifyingParser:
         def to_json() -> list[dict]:
             data = []
             for q in [1, 2, 3]:
-                temp = df[df[f'Q{q}_TIME'].notnull()][['NO', f'Q{q}']].copy()
+                temp = df[df[f'Q{q}'].notnull()][['NO', f'Q{q}']].copy()
                 temp.sort_values(by=f'Q{q}', inplace=True)
                 temp['position'] = range(1, len(temp) + 1)
                 temp['classification'] = temp.apply(
