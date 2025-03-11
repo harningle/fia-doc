@@ -32,6 +32,15 @@ race_list = [
         'sprint_quali',
         '2023_18_sprint_quali_classification.json',
         '2023_18_sprint_quali_lap_times.json'
+    ),
+    (
+        'doc_53_-_2024_chinese_grand_prix_-_final_qualifying_classification.pdf',
+        '2024_05_chn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2024,
+        5,
+        'quali',
+        '2024_05_quali_classification.json',
+        '2024_05_quali_lap_times.json'
     )
 ]
 
