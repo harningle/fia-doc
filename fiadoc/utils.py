@@ -256,7 +256,7 @@ class Page:
         for img in self.drawings:
             if img['rect'].width > self.bound()[2] * 0.8 \
                     and 10 < img['rect'].height < 50 \
-                    and np.isclose(img['fill'], [0.72, 0.72, 0.72], atol=0.2).all():
+                    and np.isclose(img['fill'], [0.72, 0.72, 0.72], rtol=0.1).all():
                 images.append(img)
         assert len(images) <= 1, f'found more than one header image on page {self.number} in ' \
                                  f'{self.parent.name}'
