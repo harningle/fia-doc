@@ -50,6 +50,17 @@ race_list = [
         'race',
         '2024_8_race_classification.json',
         '2024_8_race_lap_times.json'
+    ),
+    (
+        'doc_76_-_2023_austrian_grand_prix_-_final_race_classification.pdf',
+        '2023_10_aut_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2023_10_aut_f1_r0_timing_racehistorychart_v01.pdf',
+        '2023_10_aut_f1_r0_timing_racelapchart_v01.pdf',
+        2023,
+        9,
+        'race',
+        '2023_9_race_classification.json',
+        '2023_9_race_lap_times.json'
     )
 ]
 
