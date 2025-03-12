@@ -1204,9 +1204,9 @@ class QualifyingParser:
             lines = [i for i in lines
                      if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
                      and np.isclose(i['width'], 1, rtol=0.1)
-                     and i['rect'].x1 - i['rect'].x0 > 0.9 * w]
+                     and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
             if not lines:
-                raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a'
+                raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a '
                                  f'thick horizontal line in {self.classification_file}')
             lines.sort(key=lambda x: x['rect'].y0)
             bottom = [lines[0]['rect']]
