@@ -40,6 +40,17 @@ race_list = [
         '2024_10_race_classification.json',
         '2024_10_race_lap_times.json'
     ),
+    (
+        'doc_50_-_2024_monaco_grand_prix_-_provisional_race_classification.pdf',
+        '2024_08_mon_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2024_08_mon_f1_r0_timing_racehistorychart_v01.pdf',
+        '2024_08_mon_f1_r0_timing_racelapchart_v01.pdf',
+        2024,
+        8,
+        'race',
+        '2024_8_race_classification.json',
+        '2024_8_race_lap_times.json'
+    )
 ]
 
 

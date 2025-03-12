@@ -312,7 +312,7 @@ class RaceParser:
         doc = pymupdf.open(self.classification_file)
         found = []
         for i in range(len(doc)):
-            page = doc[i]
+            page = Page(doc[i])
             found = page.search_for('Final Classification')
             if found:
                 break
@@ -320,6 +320,12 @@ class RaceParser:
             if found:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
+            else:
+                found = page.get_image_header()
+                if found:
+                    found = [found]
+                    warnings.warn('Found an image header, instead of strings')
+                    break
         if not found:
             doc.close()
             raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
