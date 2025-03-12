@@ -59,6 +59,15 @@ race_list = [
         'sprint_quali',
         '2024_21_sprint_quali_classification.json',
         '2024_21_sprint_quali_lap_times.json'
+    ),
+    (
+        'doc_37_-_2023_spanish_grand_prix_-_final_qualifying_classification.pdf',
+        '2023_08_esp_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2023,
+        7,
+        'quali',
+        '2023_7_quali_classification.json',
+        '2023_7_quali_lap_times.json'
     )
 ]
 
