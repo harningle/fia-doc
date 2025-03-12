@@ -1,5 +1,5 @@
-import json
 from contextlib import nullcontext
+import json
 
 import pytest
 
