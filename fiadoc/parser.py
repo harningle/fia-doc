@@ -2,6 +2,7 @@
 import os
 import pickle
 import re
+from enum import StrEnum
 from typing import Literal
 import warnings
 
@@ -22,6 +23,16 @@ from .models.pit_stop import PitStop, PitStopData
 from .utils import Page, duration_to_millisecond, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
+
+
+class RaceSession(StrEnum):
+    Race = 'race'
+    Sprint = 'sprint'
+
+
+class QualiSession(StrEnum):
+    Quali = 'quali'
+    SprintQuali = 'sprint_quali'
 
 
 class EntryListParser:
@@ -274,7 +285,7 @@ class RaceParser:
             lap_chart_file: str | os.PathLike,
             year: int,
             round_no: int,
-            session: Literal['race', 'sprint_race']
+            session: RaceSession
     ):
         self.classification_file = classification_file
         self.lap_analysis_file = lap_analysis_file
@@ -290,9 +301,9 @@ class RaceParser:
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
-        if self.session not in ['race', 'sprint_race']:
-            raise ValueError(f'Invalid session: {self.session}. Valid sessions are: "race" and '
-                             f'"sprint_race""')
+        if self.session not in RaceSession:
+            raise ValueError(f'Invalid session: {self.session}. '
+                             f'Valid sessions are: {[s.value for s in RaceSession]}')
         return
 
     def _parse_classification(self) -> pd.DataFrame:
@@ -746,7 +757,7 @@ class RaceParser:
 
             # If it's race, then only three drivers (or less) on one page. And all of them should
             # start from the same y-coord. and have the same y-coord. for "LAP" and "TIME"
-            if self.session == 'race':
+            if self.session == RaceSession.Race:
                 assert len(laps) <= 6, f'Expected at most 6 "LAP" on p.{page.number} in ' \
                                        f'{self.lap_analysis_file}. Found {len(laps)}'
                 for i in range(len(laps) - 1):
@@ -774,7 +785,7 @@ class RaceParser:
             # Horizontally, three drivers share the full width of the page, side by side. If it's
             # race, then three drivers (or less) on one page
             # See QualifyingParser._parse_lap_times() for detailed explanation
-            if self.session == 'race':
+            if self.session == RaceSession.Race:
                 w = r / 3
                 for i in range(3):
                     # Driver's name is below "Race Lap Analysis" and above the table
@@ -1088,7 +1099,7 @@ class RaceParser:
                 lambda x: SessionEntry(
                     year=self.year,
                     round=self.round_no,
-                    session='R' if self.session == 'race' else 'SR',
+                    session='R' if self.session == RaceSession.Race else 'SR',
                     car_number=x
                 )
             )
@@ -1126,7 +1137,7 @@ class QualifyingParser:
             lap_times_file: str | os.PathLike,
             year: int,
             round_no: int,
-            session: Literal['quali', 'sprint_quali']
+            session: QualiSession
     ):
         self.classification_file = classification_file
         self.lap_times_file = lap_times_file
@@ -1140,9 +1151,9 @@ class QualifyingParser:
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
-        if self.session not in ['quali', 'sprint_quali']:
-            raise ValueError(f'Invalid session: {self.session}. Valid sessions are: "quali" and '
-                             f'"sprint_quali""')
+        if self.session not in QualiSession:
+            raise ValueError(f'Invalid session: {self.session}. '
+                             f'Valid sessions are: {[s.value for s in QualiSession]}"')
         # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
         return
 
@@ -1306,7 +1317,7 @@ class QualifyingParser:
                         foreign_keys=SessionEntry(
                             year=self.year,
                             round=self.round_no,
-                            session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
+                            session=f'Q{q}' if self.session == QualiSession.Quali else f'SQ{q}',
                             car_number=x.NO
                         ),
                         objects=[
@@ -1617,7 +1628,7 @@ class QualifyingParser:
                     lambda x: SessionEntry(
                         year=self.year,
                         round=self.round_no,
-                        session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
+                        session=f'Q{q}' if self.session == QualiSession.Quali else f'SQ{q}',
                         car_number=x
                     )
                 )
@@ -1647,7 +1658,7 @@ class PitStopParser:
             file: str | os.PathLike,
             year: int,
             round_no: int,
-            session: Literal['race', 'sprint']
+            session: RaceSession
     ):
         self.file = file
         self.year = year
@@ -1657,9 +1668,9 @@ class PitStopParser:
         self.df = self._parse()
 
     def _check_session(self) -> None:
-        if self.session not in ['race', 'sprint']:
-            raise ValueError(f'Invalid session: {self.session}. Valid sessions are '
-                             f'"race" and "sprint"')
+        if self.session not in RaceSession:
+            raise ValueError(f'Invalid session: {self.session}. '
+                             f'Valid sessions are {[s.value for s in RaceSession]}')
         return
 
     def _parse(self) -> pd.DataFrame:
@@ -1708,7 +1719,7 @@ class PitStopParser:
                 lambda x: PitStopEntry(
                     year=self.year,
                     round=self.round_no,
-                    session=self.session if self.session == 'race' else 'SR',
+                    session=self.session if self.session == RaceSession.Race else 'SR',
                     car_number=x.car_no,
                     lap=x.lap
                 ), axis=1
