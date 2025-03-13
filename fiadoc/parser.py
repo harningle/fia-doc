@@ -300,7 +300,9 @@ class RaceParser:
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
-        if self.session not in RaceSession:
+        try:
+            self.session = RaceSession(self.session)
+        except ValueError:
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {[s.value for s in RaceSession]}')
         return
@@ -1150,7 +1152,9 @@ class QualifyingParser:
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
-        if self.session not in QualiSession:
+        try:
+            self.session = QualiSession(self.session)
+        except ValueError:
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {[s.value for s in QualiSession]}"')
         # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
@@ -1667,7 +1671,9 @@ class PitStopParser:
         self.df = self._parse()
 
     def _check_session(self) -> None:
-        if self.session not in RaceSession:
+        try:
+            self.session = RaceSession(self.session)
+        except ValueError:
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are {[s.value for s in RaceSession]}')
         return
