@@ -24,7 +24,7 @@ race_list = [
         '2023_19_usa_f1_s0_timing_sprintlapchart_v01.pdf',
         2023,
         18,
-        'sprint_race',
+        'sprint',
         '2023_18_sprint_classification.json',
         '2023_18_sprint_lap_times.json'
     ),
