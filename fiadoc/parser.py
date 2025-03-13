@@ -2,8 +2,11 @@
 import os
 import pickle
 import re
-from typing import Literal
 import warnings
+from typing import (
+    get_args,
+    Literal
+)
 
 import numpy as np
 import pandas as pd
@@ -24,6 +27,10 @@ from .models.pit_stop import PitStop, PitStopData
 from .utils import Page, duration_to_millisecond, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
+
+
+RaceSessionT = Literal['race', 'sprint']
+QualiSessionT = Literal['quali', 'sprint_quali']
 
 
 class EntryListParser:
@@ -281,7 +288,7 @@ class RaceParser:
             lap_chart_file: str | os.PathLike,
             year: int,
             round_no: int,
-            session: Literal['race', 'sprint_race']
+            session: RaceSessionT
     ):
         self.classification_file = classification_file
         self.lap_analysis_file = lap_analysis_file
@@ -297,9 +304,9 @@ class RaceParser:
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
-        if self.session not in ['race', 'sprint_race']:
-            raise ValueError(f'Invalid session: {self.session}. Valid sessions are: "race" and '
-                             f'"sprint_race""')
+        if self.session not in get_args(RaceSessionT):
+            raise ValueError(f'Invalid session: {self.session}. '
+                             f'Valid sessions are: {get_args(RaceSessionT)}')
         return
 
     def _parse_classification(self) -> pd.DataFrame:
@@ -1140,7 +1147,7 @@ class QualifyingParser:
             lap_times_file: str | os.PathLike,
             year: int,
             round_no: int,
-            session: Literal['quali', 'sprint_quali']
+            session: QualiSessionT
     ):
         self.classification_file = classification_file
         self.lap_times_file = lap_times_file
@@ -1154,9 +1161,9 @@ class QualifyingParser:
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
-        if self.session not in ['quali', 'sprint_quali']:
-            raise ValueError(f'Invalid session: {self.session}. Valid sessions are: "quali" and '
-                             f'"sprint_quali""')
+        if self.session not in get_args(QualiSessionT):
+            raise ValueError(f'Invalid session: {self.session}. '
+                             f'Valid sessions are: {get_args(QualiSessionT)}"')
         # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
         return
 
@@ -1666,7 +1673,7 @@ class PitStopParser:
             file: str | os.PathLike,
             year: int,
             round_no: int,
-            session: Literal['race', 'sprint']
+            session: RaceSessionT
     ):
         self.file = file
         self.year = year
@@ -1676,9 +1683,9 @@ class PitStopParser:
         self.df = self._parse()
 
     def _check_session(self) -> None:
-        if self.session not in ['race', 'sprint']:
-            raise ValueError(f'Invalid session: {self.session}. Valid sessions are '
-                             f'"race" and "sprint"')
+        if self.session not in get_args(RaceSessionT):
+            raise ValueError(f'Invalid session: {self.session}. '
+                             f'Valid sessions are {get_args(RaceSessionT)}')
         return
 
     def _parse(self) -> pd.DataFrame:
