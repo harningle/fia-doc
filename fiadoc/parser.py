@@ -2,9 +2,8 @@
 import os
 import pickle
 import re
-from enum import StrEnum
-from typing import Literal
 import warnings
+from enum import Enum
 
 import numpy as np
 import pandas as pd
@@ -25,12 +24,12 @@ from .utils import Page, duration_to_millisecond, time_to_timedelta
 pd.set_option('future.no_silent_downcasting', True)
 
 
-class RaceSession(StrEnum):
+class RaceSession(str, Enum):
     Race = 'race'
     Sprint = 'sprint'
 
 
-class QualiSession(StrEnum):
+class QualiSession(str, Enum):
     Quali = 'quali'
     SprintQuali = 'sprint_quali'
 
