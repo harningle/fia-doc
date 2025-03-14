@@ -270,7 +270,7 @@
         "foreign_keys": {
             "year": 2025,
             "round": 1,
-            "driver_reference": "borotoleto",
+            "driver_reference": "bortoleto",
             "team_reference": "sauber"
         },
         "objects": [
