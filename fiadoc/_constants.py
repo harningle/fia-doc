@@ -73,7 +73,8 @@ DRIVERS = {
         'Alexander Albon': 'albon',
         'Carlos Sainz': 'sainz',
         'Nico Hulkenberg': 'hulkenberg',
-        'Gabriel Bortoleto': 'borotoleto'
+        'Gabriel Bortoleto': 'borotoleto',
+        'Garbiel Bortoleto': 'borotoleto'  # Typo in entry list in 2025 Australian
     }
 }
 
@@ -102,7 +103,18 @@ TEAMS = {
         'Kick Sauber Ferrari': 'sauber',
         'Haas Ferrari': 'haas'
     },
-    2025: {}
+    2025: {
+        'McLaren Mercedes': 'mclaren',
+        'Ferrari': 'ferrari',
+        'Red Bull Racing Honda RBPT': 'red_bull',
+        'Mercedes': 'mercedes',
+        'Aston Martin Aramco Mercedes': 'aston_martin',
+        'Alpine Renault': 'alpine',
+        'Haas Ferrari': 'haas',
+        'Racing Bulls Honda RBPT': 'rb',
+        'Williams Mercedes': 'williams',
+        'Kick Sauber Ferrari': 'sauber'
+    }
 }
 
 
