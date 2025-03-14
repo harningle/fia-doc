@@ -45,8 +45,13 @@ class EntryListParser:
         self.round_no = round_no
         self.df = self._parse()
 
-    def _parse_table_by_grid(self, page: pymupdf.Page, vlines: list[float], hlines: list[float]) \
-            -> pd.DataFrame:
+    def _parse_table_by_grid(
+            self,
+            page: pymupdf.Page,
+            vlines: list[float],
+            hlines: list[float],
+            tol: float = 2
+    ) -> pd.DataFrame:
         """Manually parse the table cell by cell, defined by lines separating the columns and rows
 
         The reason why we parse this table manually rather than using `page.find_tables` is that
@@ -57,7 +62,7 @@ class EntryListParser:
 
         :param vlines: x-coords. of vertical lines separating the cols.
         :param hlines: y-coords. of horizontal lines separating the rows
-        :return:
+        :param tol: tolerance for bbox. of text. Default is 2 pixels. See #33
         """
         cells = []
         vgap = vlines[1] - vlines[0]  # Usual gap between two vertical lines
@@ -75,13 +80,22 @@ class EntryListParser:
                     if i >= 1:  # The zero-th row is always fine
                         if hlines[i] - hlines[i - 1] < vgap + 5:  # The unusual big gap is below,
                             t = hlines[i]                         # so we are at the main table
-                            b = hlines[i] + vgap + 2
+                            b = hlines[i] + vgap + tol
                         else:  # The unusual big gap is above, so now at the reserve driver table
-                            t = hlines[i + 1] - vgap - 2
+                            t = hlines[i + 1] - vgap - tol
                             b = hlines[i + 1]
 
                 # Get text in the cell
                 # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
+                """
+                For each cell defined by the `vlines` and `hlines`, we get text inside it. However,
+                texts that are partially inside the cell will also be captured by pymupdf. So we
+                need to check whether the found text is indeed inside the cell's bbox, and do not
+                false include other texts. However, we do want to allow a bit of tolerance, as
+                `hlines` are not always perfect. The tolerance is set to 2 pixels in general. But
+                for PDFs that have smaller page margin, i.e. texts and line height are bigger in
+                these PDFs, we need to increase the tolerance.
+                """
                 cell = page.get_text(
                     'dict',
                     clip=(vlines[j], t, vlines[j + 1], b)
@@ -94,11 +108,11 @@ class EntryListParser:
                                 bbox = span['bbox']
                                 # Need to check if the found text is indeed in the cell's bbox.
                                 # PyMuPDF is notoriously bad for not respecting `clip` parameter.
-                                # We give two pixels tolerance
-                                if bbox[0] >= vlines[j] - 2 \
-                                        and bbox[2] <= vlines[j + 1] + 2 \
-                                        and bbox[1] >= t - 2 \
-                                        and bbox[3] <= b + 2:
+                                # We give two pixels tolerance. See #33
+                                if bbox[0] >= vlines[j] - tol \
+                                        and bbox[2] <= vlines[j + 1] + tol \
+                                        and bbox[1] >= t - tol \
+                                        and bbox[3] <= b + tol:
                                     spans.append(span)
 
                 # Check if any superscript
@@ -245,7 +259,8 @@ class EntryListParser:
         aux_hlines.append(2 * aux_hlines[-1] - aux_hlines[-2])
 
         # Get the table
-        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines)
+        tol = 2 if l > 40 else 3
+        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, tol)
 
         def to_json() -> list[dict]:
             drivers = []
