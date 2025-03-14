@@ -48,6 +48,14 @@ race_list = [
         '2024_05_entry_list.json',
         pytest.warns(UserWarning, match='Ricciardo is indicated as')
     ),
+    (
+        # Weird PDF page margin (#33)
+        '2025_australian_grand_prix_-_entry_list_corrected_.pdf',
+        2025,
+        1,
+        '2025_1_entry_list.json',
+        nullcontext()
+    )
 ]
 # Not going to test year 2023 for entry list, as the PDF format changed, and we are not interested
 # in retrospectively parsing old entry list PDFs
@@ -57,7 +65,11 @@ race_list = [
 def prepare_entry_list_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
     # Download and parse entry list PDF
     url, year, round_no, expected, context = request.param
-    download_pdf('https://www.fia.com/sites/default/files/decision-document/' + url,
+    if year <= 2024:
+        base_url = 'https://www.fia.com/sites/default/files/decision-document/'
+    else:
+        base_url = 'https://www.fia.com/system/files/decision-document/'
+    download_pdf(base_url + url,
                  tmp_path / 'entry_list.pdf')
 
     with context:
