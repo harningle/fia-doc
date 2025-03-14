@@ -73,8 +73,8 @@ DRIVERS = {
         'Alexander Albon': 'albon',
         'Carlos Sainz': 'sainz',
         'Nico Hulkenberg': 'hulkenberg',
-        'Gabriel Bortoleto': 'borotoleto',
-        'Garbiel Bortoleto': 'borotoleto'  # Typo in entry list in 2025 Australian
+        'Gabriel Bortoleto': 'bortoleto',
+        'Garbiel Bortoleto': 'bortoleto'  # Typo in entry list in 2025 Australian
     }
 }
 
