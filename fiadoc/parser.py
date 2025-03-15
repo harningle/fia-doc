@@ -324,6 +324,48 @@ class RaceParser:
                              f'Valid sessions are: {get_args(RaceSessionT)}')
         return
 
+    # TODO: refactor. Have too many parse table by grid, in utils, in quali. parser, here, and in
+    #       entry list
+    def _parse_table_by_grid(
+            self,
+            page: Page,
+            vlines: list[float],
+            hlines: list[float],
+            tol: float = 2
+    ) -> pd.DataFrame:
+        """Manually parse the table cell by cell, defined by lines separating the columns and rows
+
+        See `EntryListParser._parse_table_by_grid()` for detailed explanation.
+
+        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
+                       boundaries need to be included
+        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
+                       boundaries need to be included
+        :param tol: tolerance for bbox. of text. Default is 2 pixels
+        """
+        cells = []
+        for i in range(len(hlines) - 1):
+            row = []
+            for j in range(len(vlines) - 1):
+                text = ''
+                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
+                cell = page.get_text('blocks', clip=(l, t, r, b))
+                if cell:
+                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
+                                           f'{self.classification_file}. Found {len(cell)}'
+                    cell = cell[0]
+                    if cell[4].strip():
+                        bbox = cell[0:4]
+                        if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
+                                or bbox[1] < t - tol or bbox[3] > b + tol:
+                            raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
+                                             f'{self.classification_file}')
+                        text = cell[4].strip()
+                row.append(text)
+            cells.append(row)
+        cells[0][0] = 'position'  # Finishing order col. has no col. name in PDF
+        return pd.DataFrame(cells[1:], columns=cells[0])
+
     def _parse_classification(self) -> pd.DataFrame:
         """Parse "Race/Sprint Race Final Classification" PDF
 
@@ -384,12 +426,13 @@ class RaceParser:
                 'right': page.search_for(col, clip=bbox)[0].x1
             }
 
-        # Auxiliary vertical lines separating the columns
-        aux_lines = [
+        # Vertical lines separating the columns
+        vlines = [
+            0,
             pos['NO']['left'],
             (pos['NO']['right'] + pos['DRIVER']['left']) / 2,
-            pos['NAT']['left'],
-            pos['NAT']['right'],
+            pos['NAT']['left'] - 1,
+            (pos['NAT']['right'] + pos['ENTRANT']['left']) / 2,
             pos['LAPS']['left'],
             pos['LAPS']['right'],
             (pos['TIME']['right'] + pos['GAP']['left']) / 2,
@@ -401,54 +444,42 @@ class RaceParser:
             pos['PTS']['right']
         ]
 
-        # Find the table using the bounding box and auxiliary lines above
-        """
-        TODO: We fine tuned `snap_x_tolerance` a bit. Otherwise, pymupdf would think there is
-        another (empty) col. between "FASTEST" and "ON". Can be a bit fragile.
-        """
-        df = page.find_tables(
-            clip=bbox,
-            strategy='lines',
-            vertical_lines=aux_lines,
-            snap_x_tolerance=pos['ON']['left'] - pos['FASTEST']['right']
-        )
-        assert len(df.tables) == 1, \
-            f'Expected one table, got {len(df.tables)} in {self.classification_file}'
-        df = df[0].to_pandas()
-        df = df[(df.NO != '') | df.NO.isnull()]  # May get some empty rows at the bottom. Drop them
+        # Horizontal lines separating the rows
+        car_nos = page.get_text('blocks', clip=(pos['NO']['left'], y, pos['NO']['right'], b))
+        hlines = [y]
+        for i in range(len(car_nos) - 1):
+            hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
+        hlines.append(b)
+
+        # Parse the table using the grid above
+        df = self._parse_table_by_grid(page, vlines, hlines)
         assert df.shape[1] == 13, \
             f'Expected 13 columns, got {df.shape[1]} in {self.classification_file}'
 
-        # Do the same for the "NOT CLASSIFIED" table
+        # Do the same for the "NOT CLASSIFIED" table. See `QualifyingParser._parse_classification`
         if has_not_classified:
             t = page.search_for('NOT CLASSIFIED')[0].y1
-            b = page.search_for('FASTEST LAP')[0].y0
-            not_classified = page.find_tables(
-                clip=(0, t, w, b),
-                strategy='lines',
-                vertical_lines=aux_lines,
-                snap_x_tolerance=pos['ON']['left'] - pos['FASTEST']['right']
-            )
-            assert len(not_classified.tables) == 1, \
-                f'Expected one table for "NOT CLASSIFIED", got {len(not_classified.tables)} ' \
-                f'in {self.classification_file}'
-            not_classified = not_classified[0].to_pandas()
-
-            # The table header is actually the first row of the "NOT CLASSIFIED" table
-            """
-            The table header, i.e. col. names, is in the format of "x-yyy". E.g., "1-18",
-            "2-Lance Stroll", "4-Aston Martin Aramco F1 Team", or "7-DNF". So we want to remove the
-            "digit-" part. An example is 2024 Saudi Arabia
-            """
-            # TODO: check
-            not_classified.loc[-1] = [re.sub(r'^\d+-', '', i) for i in not_classified.columns]
-            not_classified.sort_index(inplace=True)
-            not_classified.reset_index(drop=True, inplace=True)
+            line_height = max([i[3] - i[1] for i in car_nos])
+            car_nos = []
+            while car_no := page.get_text('blocks',
+                                          clip=(vlines[1], t, vlines[2], t + line_height)):
+                assert len(car_no) == 1, f'Error in detecting rows in the "NOT CLASSIFIED" ' \
+                                         f'table in {self.classification_file}'
+                car_no = car_no[0]
+                car_nos.append([car_no[1], car_no[3]])
+                t = car_no[3]
+            hlines = [car_nos[0][0] - 1]
+            for i in range(len(car_nos) - 1):
+                hlines.append((car_nos[i][1] + car_nos[i + 1][0]) / 2)
+            hlines.append(car_nos[-1][1] + 1)
+            not_classified = self._parse_table_by_grid(page, vlines, hlines)
+            not_classified.loc[-1] = not_classified.columns
+            not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
+            not_classified = not_classified.sort_index().reset_index(drop=True)
             assert not_classified.shape[1] == 13, \
                 f'Expected 13 columns for "NOT CLASSIFIED" table , got ' \
                 f'{not_classified.shape[1]} in {self.classification_file}'
             not_classified.columns = df.columns
-            not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
 
         else:
             # no unclassified drivers
@@ -463,24 +494,21 @@ class RaceParser:
 
         # Set col. names
         del df['NAT']
-        df.rename(columns={
-            'Col0':    'finishing_position',
-            'NO':      'car_no',
-            'DRIVER':  'driver',
-            'ENTRANT': 'team',
-            'LAPS':    'laps_completed',
-            'TIME':    'time',            # How long it took the driver to finish the race
-            'GAP':     'gap',
-            'INT':     'int',
-            'KM/H':    'avg_speed',
-            'FASTEST': 'fastest_lap_time',
-            'ON':      'fastest_lap_no',  # The lap number on which the fastest lap was set
-            'PTS':     'points'
-        }, inplace=True)
-        df.replace({'': None}, inplace=True)  # Empty string --> `None`, so `pd.isnull` works
-
-        # Remove the "Colx" in cells. These are col. name placeholders from the parsing above
-        df.replace(r'Col\d+', None, regex=True, inplace=True)
+        df = df.rename(columns={
+            'position': 'finishing_position',
+            'NO':       'car_no',
+            'DRIVER':   'driver',
+            'ENTRANT':  'team',
+            'LAPS':     'laps_completed',
+            'TIME':     'time',            # How long it took the driver to finish the race
+            'GAP':      'gap',
+            'INT':      'int',
+            'KM/H':     'avg_speed',
+            'FASTEST':  'fastest_lap_time',
+            'ON':       'fastest_lap_no',  # The lap number on which the fastest lap was set
+            'PTS':      'points'
+        })
+        df = df.replace({'': None})  # Empty string --> `None`, so `pd.isnull` works
 
         # Clean up finishing status, e.g. is lapped? Is DSQ?
         df.loc[df.gap.fillna('').str.contains('LAP', regex=False), 'finishing_status'] = 1
@@ -1427,7 +1455,7 @@ class QualifyingParser:
                 temp = df[df[f'Q{q}'].notnull()][['NO', f'Q{q}', 'finishing_status']].copy()
                 temp.sort_values(by=f'Q{q}', inplace=True)
                 temp['position'] = range(1, len(temp) + 1)
-                temp.loc[temp[f'Q{q}'].isin(['DNF', 'DSQ', 'DNS']), 'finishing_status'] = 11
+                temp.loc[temp[f'Q{q}'].isin(['DNF', 'DSQ', 'DNS', 'DQ']), 'finishing_status'] = 11
                 temp['classification'] = temp.apply(
                     lambda x: QualiClassificationData(
                         foreign_keys=SessionEntry(
