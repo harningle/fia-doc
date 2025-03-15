@@ -35,6 +35,7 @@ class ClassificationData(BaseModel):
 
 class QualiClassification(BaseModel):
     position: PositiveInt
+    is_classified: bool
 
 
 class QualiClassificationData(BaseModel):

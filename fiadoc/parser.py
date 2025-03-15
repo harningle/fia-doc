@@ -1182,6 +1182,46 @@ class QualifyingParser:
         # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
         return
 
+    def _parse_table_by_grid(
+            self,
+            page: Page,
+            vlines: list[float],
+            hlines: list[float],
+            tol: float = 2
+    ) -> pd.DataFrame:
+        """Manually parse the table cell by cell, defined by lines separating the columns and rows
+
+        See `EntryListParser._parse_table_by_grid()` for detailed explanation.
+
+        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
+                       boundaries need to be included
+        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
+                       boundaries need to be included
+        :param tol: tolerance for bbox. of text. Default is 2 pixels
+        """
+        cells = []
+        for i in range(len(hlines) - 1):
+            row = []
+            for j in range(len(vlines) - 1):
+                text = ''
+                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
+                cell = page.get_text('blocks', clip=(l, t, r, b))
+                if cell:
+                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
+                                           f'{self.classification_file}. Found {len(cell)}'
+                    cell = cell[0]
+                    if cell[4].strip():
+                        bbox = cell[0:4]
+                        if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
+                                or bbox[1] < t - tol or bbox[3] > b + tol:
+                            raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
+                                             f'{self.classification_file}')
+                        text = cell[4].strip()
+                row.append(text)
+            cells.append(row)
+        cells[0][0] = 'position'  # Finishing order col. has no col. name in PDF
+        return pd.DataFrame(cells[1:], columns=cells[0])
+
     def _parse_classification(self):
         # Find the page with "Qualifying Session Final Classification"
         doc = pymupdf.open(self.classification_file)
@@ -1234,89 +1274,134 @@ class QualifyingParser:
             bottom = [lines[0]['rect']]
         b = bottom[0].y0
 
-        # Table bounding box
-        bbox = pymupdf.Rect(0, y, w, b)
-
-        # Dist. between "NAT" and "ENTRANT"
-        nat = page.search_for('NAT')[0]
-        entrant = page.search_for('ENTRANT')[0]
-        snap_x_tolerance = (entrant.x0 - nat.x1) * 1.2  # 20% buffer. TODO: fragile
-
-        # Get the table
-        df = page.find_tables(clip=bbox, snap_x_tolerance=snap_x_tolerance)
-        assert len(df.tables) == 1, \
-            f'Expected one table, got {len(df.tables)} in {self.classification_file}'
-        aux_lines = sorted(set([round(i[0], 2) for i in df[0].cells]))  # For unclassified table
-        df = df[0].to_pandas()
-
-        # Check if we get the correct cols.
+        # Get the location of cols.
         """
-        See #21. Basically the quali. classification PDFs don't have the same cols. across races.
-        Even within a same year, different races can have different cols. (e.g., 2024 Spanish and
-        2024 Mexican). Therefore, we need to manually read the col. headers, make sure we get all
-        cols., and name them accordingly.
-        
-        The header is located under "Final Classification" (`y`). The leftmost col. is always car
-        No. "NO". So the header is above the bottom of "NO". We go and read all texts between `y`
-        and the bottom of "NO". They are the col. headers. The first col. is the ranking/finishing
-        position, which does not have a col. name in the header row. Need to add it manually.
-        
-        TODO: we assume the col. header never contains whitespace in the text search below. Need to
-        check later
+        The default `page.find_tables` was working fine until Antonelli. His full name is long, so
+        that the horizontal gap between the driver name col. and nationality col. in his row is
+        narrow. This breaks the automatic col. detection of pymupdf. Therefore, we need to manually
+        specify the vertical lines separating cols.
         """
         no = page.search_for('NO', clip=(0, y, w, b))
         no.sort(key=lambda x: x.y0)  # The topmost "NO" under "Final Classification"
-        no = no[0].y1
-        headers = page.get_text('text', clip=(0, y, w, no + 1)).split()
-        headers.insert(0, 'position')  # The first col. does not have col. name so add it manually
-        assert df.shape[1] == len(headers), \
-            f'Expected {len(headers)} columns, got {df.shape[1]} in {self.classification_file}'
+        no = no[0]
+        b_header = no.y1 + 1  # The bottom of the header row
+        headers = page.get_text('text', clip=(0, y, w, b_header)).split()  # Col. headers/names
+        cols: dict[str, tuple[float, float]] = {}
+        l = no.x0 - 1
+        q = 1
+        for col in headers:
+            col_name = col
+            col = page.search_for(col, clip=(l, y, w, b_header))
+            # These col. names are unique
+            if col_name not in ['LAPS', 'TIME']:
+                assert len(col) == 1, f'Expected exactly one "{col}" in the header row in ' \
+                                      f'{self.classification_file}. Found {len(col)}'
+            # We will have three "LAPS" and "TIME" for Q1, Q2, and Q3
+            else:
+                assert len(col) == 4 - q, f'Expected {4 - q} "{col}" in the header row after ' \
+                                          f'Q{q} (incl.) in {self.classification_file}. Found ' \
+                                          f'{len(col)}'
+                col.sort(key=lambda x: x.x0)
+                col_name = f'Q{q}_{col_name}'
+            col = col[0]
+            cols[col_name] = (col.x0, col.x1)
+            # Update the new leftmost x-coord. for the next col. I.e., instead of starting from the
+            # very left of the page, start from the right of the current col.
+            l = col.x1
+            # Update the session if necessary
+            if 'Q2' in col_name:  # Captures both "Q2" and "SQ2"
+                q = 2
+            elif 'Q3' in col_name:
+                q = 3
+        for col in ['SQ1', 'SQ2', 'SQ3']:
+            if col in cols:
+                cols[col.replace('SQ', 'Q')] = cols.pop(col)
 
-        # Clean up column name: the first row is mistakenly taken as column names
+        # Specify the vertical lines separating the cols.
+        shifter = 1.1 if self.session == 'quali' else 0.8
         """
-        TODO: need to check if the first row is correctly treated as the table content, or
-        mistakenly treated as col. header. Can be checked by the top y-position of `tableheader`
-        from `page.find_tables()`. If the y-position exceeds the `y`, then it's a mistake.
-        
-        Also, we name the sessions as "Q1", "Q2", and "Q3", regardless of whether it's a normal
+        We don't have very good ways to detect the left and right boundary for col. "Q2" or "SQ2".
+        Generally, the left of "Q2" shifted to the left by a bit will do the job. We define "a bit"
+        as a fraction of the width of "Q2", so that the page/text size won't affect the detection.
+        Howover, the width of "Q2" and "SQ2" may not be the same, so the shifter will be different.
+        """
+        vlines = [
+            0,                                                        # Left of the page
+            cols['NO'][0] - 1,                                        # Left of "NO"
+            (cols['NO'][1] + cols['DRIVER'][0]) / 2,                  # Between "NO" and "DRIVER"
+            cols['NAT'][0] - 1,                                       # Left of "NAT"
+            (cols['NAT'][1] + cols['ENTRANT'][0]) / 2,                # Between "NAT" and "ENTRANT"
+            (1 + shifter) * cols['Q1'][0] - shifter * cols['Q1'][1],  # See notes above
+            cols['Q1_LAPS'][0],                                       # Left of "Q1_LAPS"
+            cols['Q1_LAPS'][1],                                       # Right of "Q1_LAPS"
+            (1 + shifter) * cols['Q2'][0] - shifter * cols['Q2'][1],
+            cols['Q2_LAPS'][0],                                       # Left of "Q2_LAPS"
+            cols['Q2_LAPS'][1],                                       # Right of "Q2_LAPS"
+            (1 + shifter) * cols['Q3'][0] - shifter * cols['Q3'][1],
+            cols['Q3_LAPS'][0],                                       # Left of "Q3_LAPS"
+            cols['Q3_LAPS'][1],                                       # Right of "Q3_LAPS"
+            w                                                         # Right of the page
+        ]
+        if '%' in headers:  # Some PDFs may have one additional col. for Q1 cutoff percentage
+            vlines.insert(headers.index('%') + 2,
+                          1.4 * cols['Q1_TIME'][0] - 0.4 * cols['Q1_TIME'][1])
+
+        # Get the row positions. We have car numbers in "NO" col., so the top and bottom of them
+        # are the top and bottom of their rows
+        car_nos = page.get_text('blocks', clip=(cols['NO'][0] - 1, b_header, cols['NO'][1] + 1, b))
+        hlines: list[float] = [y, b_header]
+        for i, car_no in enumerate(car_nos):
+            assert re.match(r'\d+', car_no[4].strip()), \
+                f'Expected car number (pure digits) in "NO" col. in {self.classification_file}. ' \
+                f'Found "{car_no}"'
+            if i < len(car_nos) - 1:
+                hlines.append((car_no[3] + car_nos[i + 1][1]) / 2)
+        hlines.append(b)
+
+        # Get the table
+        df = self._parse_table_by_grid(page, vlines, hlines)
+
+        # Clean up column name, e.g. "TIME" -> "Q2_TIME"
+        """
+        We name the sessions as "Q1", "Q2", and "Q3", regardless of whether it's a normal
         qualifying or a sprint qualifying. This makes the code simpler, and we should always use
         `self.session` to determine what session it is.
         """
         cols = df.columns.tolist()
-        for i in range(len(df.columns)):
-            cols[i] = df.columns[i].removeprefix(f'{i}-')
-        headers = [i.replace('SQ', 'Q') if i.startswith('SQ') else i for i in headers]
+        headers = [i.replace('SQ', 'Q') if i.startswith('SQ') else i for i in cols]
         i = headers.index('Q1') + 1  # TODO: rewrite this. I myself don't understand now...
         for q in [1, 2, 3]:
             while i < len(headers) and headers[i] != f'Q{q + 1}':
                 if headers[i] != f'Q{q}':
                     headers[i] = f'Q{q}_{headers[i]}'  # E.g., "TIME" --> "Q2_TIME"
                 i += 1
-        df = pd.DataFrame(np.vstack([cols, df]), columns=headers)
-        df = df[(df.NO != '') & df.NO.notna()]  # May get some empty rows at the bottom. Drop them
+        df.columns = headers
         df['finishing_status'] = 0
 
         # Do the same for the "NOT CLASSIFIED" table
-        # TODO: this can fail when the "NOT CLASSIFIED" table is very short, e.g. only one row
         if has_not_classified:
             t = page.search_for('NOT CLASSIFIED - ')[0].y1
-            b = page.search_for('POLE POSITION LAP')[0].y0
-            not_classified = page.find_tables(
-                clip=pymupdf.Rect(0, t, w, b),
-                strategy='lines_strict',
-                vertical_lines=aux_lines,
-                add_lines=[((0, t), (w, t)), ((0, b), (w, b))]
-            )
-            assert len(not_classified.tables) == 1, \
-                f'Expected one table for "NOT CLASSIFIED", got {len(not_classified.tables)} ' \
-                f'in {self.classification_file}'
-            not_classified = not_classified[0].to_pandas()
-            not_classified.loc[-1] = not_classified.columns.str.replace(r'Col\d+', '', regex=True)
-            not_classified = not_classified.sort_index()
-            not_classified = not_classified.reset_index(drop=True)
-            assert not_classified.shape[1] == len(headers), \
-                f'Expected {len(headers)} columns for "NOT CLASSIFIED" table , got ' \
-                f'{not_classified.shape[1]} in {self.classification_file}'
+            # Car No. col. should have car numbers with little vertical gap between them. When we
+            # find a big gap, it's the bottom of the table
+            line_height = max([i[3] - i[1] for i in car_nos])
+            car_nos = []
+            while car_no := page.get_text('blocks',
+                                          clip=(vlines[1], t, vlines[2], t + line_height)):
+                assert len(car_no) == 1, f'Error in detecting rows in the "NOT CLASSIFIED" ' \
+                                         f'table in {self.classification_file}'
+                car_no = car_no[0]
+                car_nos.append([car_no[1], car_no[3]])
+                t = car_no[3]
+            hlines = [car_nos[0][0] - 1]
+            for i in range(len(car_nos) - 1):
+                hlines.append((car_nos[i][1] + car_nos[i + 1][0]) / 2)
+            hlines.append(car_nos[-1][1] + 1)
+            not_classified = self._parse_table_by_grid(page, vlines, hlines)
+            # No col. header in NOT CLASSIFIED table. The detected col. header is actually table
+            # content, so need to append the col. header to the table
+            not_classified.loc[-1] = not_classified.columns
+            not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
+            not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
@@ -1339,9 +1424,10 @@ class QualifyingParser:
         def to_json() -> list[dict]:
             data = []
             for q in [1, 2, 3]:
-                temp = df[df[f'Q{q}'].notnull()][['NO', f'Q{q}']].copy()
+                temp = df[df[f'Q{q}'].notnull()][['NO', f'Q{q}', 'finishing_status']].copy()
                 temp.sort_values(by=f'Q{q}', inplace=True)
                 temp['position'] = range(1, len(temp) + 1)
+                temp.loc[temp[f'Q{q}'].isin(['DNF', 'DSQ', 'DNS']), 'finishing_status'] = 11
                 temp['classification'] = temp.apply(
                     lambda x: QualiClassificationData(
                         foreign_keys=SessionEntry(
@@ -1352,7 +1438,8 @@ class QualifyingParser:
                         ),
                         objects=[
                             QualiClassification(
-                                position=x.position
+                                position=x.position,
+                                is_classified=(x.finishing_status == 0)
                             )
                         ]
                     ).model_dump(),

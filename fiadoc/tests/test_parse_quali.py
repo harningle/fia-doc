@@ -68,6 +68,16 @@ race_list = [
         'quali',
         '2023_7_quali_classification.json',
         '2023_7_quali_lap_times.json'
+    ),
+    (
+        # New quali. parser due to Antonelli's name being long
+        '2025_01_aus_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
+        '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2025,
+        1,
+        'quali',
+        '2025_1_quali_provisional_classification.json',
+        '2025_1_quali_lap_times.json'
     )
 ]
 
