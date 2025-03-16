@@ -314,6 +314,7 @@ class RaceParser:
         self.round_no = round_no
         self._check_session()
         self.classification_df = self._parse_classification()
+        self.starting_grid = None  # By `_parse_lap_chart` in `self._parse_lap_times()`
         self.lap_times_df = self._parse_lap_times()
         # self._cross_validate()
 
@@ -565,6 +566,10 @@ class RaceParser:
         }, inplace=True)
         df.finishing_status = df.finishing_status.astype(int)
 
+        # Merge in starting grid from lap chart PDF
+        self._parse_lap_chart()
+        df = df.merge(self.starting_grid, on='car_no', how='left')
+
         def to_json() -> list[dict]:
             return df.apply(
                 lambda x: ClassificationData(
@@ -582,7 +587,8 @@ class RaceParser:
                             points=x.points,
                             time=x.time,
                             laps_completed=x.laps_completed,
-                            fastest_lap_rank=x.fastest_lap_rank if x.fastest_lap_time else None
+                            fastest_lap_rank=x.fastest_lap_rank if x.fastest_lap_time else None,
+                            grid=x.starting_grid
                             # TODO: replace the rank with missing or -1 in self.classification_df
                         )
                     ]
@@ -777,7 +783,15 @@ class RaceParser:
             tab.columns = tab.iloc[0]
             tab = tab[1:]
             tab.index.name = None
-            tab = tab[tab.POS != 'GRID']  # TODO: should get starting grid here later
+            if (tab.POS == 'GRID').any():
+                self.starting_grid = tab[tab.POS == 'GRID'] \
+                    .drop(columns='POS') \
+                    .T \
+                    .reset_index() \
+                    .rename(columns={0: 'starting_grid', 1: 'car_no'})
+                self.starting_grid.car_no = self.starting_grid.car_no.astype(int)
+                self.starting_grid.starting_grid = self.starting_grid.starting_grid.astype(int)
+            tab = tab[tab.POS != 'GRID']
             tab.POS = tab.POS.str.removeprefix('LAP ').astype(int)
             tab = tab.set_index('POS').stack().reset_index(name='car_no')
             tab.rename(columns={'POS': 'lap', 0: 'position'}, inplace=True)
