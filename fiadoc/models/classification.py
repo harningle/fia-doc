@@ -21,6 +21,7 @@ class Classification(BaseModel):
     time: dict[str, str | int] | None
     laps_completed: NonNegativeInt  # TODO: or positive int? What if retire in lap 1?
     fastest_lap_rank: PositiveInt | None
+    grid: PositiveInt
 
     model_config = ConfigDict(extra='forbid')
 
