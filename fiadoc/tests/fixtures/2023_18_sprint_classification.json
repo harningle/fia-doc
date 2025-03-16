@@ -18,7 +18,8 @@
                     "milliseconds": 1890849
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 1
+                "fastest_lap_rank": 1,
+                "grid": 1
             }
         ]
     },
@@ -41,7 +42,8 @@
                     "milliseconds": 1900314
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 2
+                "fastest_lap_rank": 2,
+                "grid": 3
             }
         ]
     },
@@ -64,7 +66,8 @@
                     "milliseconds": 1908836
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 3
+                "fastest_lap_rank": 3,
+                "grid": 2
             }
         ]
     },
@@ -87,7 +90,8 @@
                     "milliseconds": 1909712
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 4
+                "fastest_lap_rank": 4,
+                "grid": 4
             }
         ]
     },
@@ -110,7 +114,8 @@
                     "milliseconds": 1913777
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 5
+                "fastest_lap_rank": 5,
+                "grid": 7
             }
         ]
     },
@@ -133,7 +138,8 @@
                     "milliseconds": 1919156
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 8
+                "fastest_lap_rank": 8,
+                "grid": 6
             }
         ]
     },
@@ -156,7 +162,8 @@
                     "milliseconds": 1923252
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 7
+                "fastest_lap_rank": 7,
+                "grid": 9
             }
         ]
     },
@@ -179,7 +186,8 @@
                     "milliseconds": 1925099
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 9
+                "fastest_lap_rank": 9,
+                "grid": 11
             }
         ]
     },
@@ -202,7 +210,8 @@
                     "milliseconds": 1925416
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 6
+                "fastest_lap_rank": 6,
+                "grid": 8
             }
         ]
     },
@@ -225,7 +234,8 @@
                     "milliseconds": 1933252
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 14
+                "fastest_lap_rank": 14,
+                "grid": 5
             }
         ]
     },
@@ -248,7 +258,8 @@
                     "milliseconds": 1935835
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 13
+                "fastest_lap_rank": 13,
+                "grid": 13
             }
         ]
     },
@@ -271,7 +282,8 @@
                     "milliseconds": 1936358
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 10
+                "fastest_lap_rank": 10,
+                "grid": 10
             }
         ]
     },
@@ -294,7 +306,8 @@
                     "milliseconds": 1939935
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 12
+                "fastest_lap_rank": 12,
+                "grid": 12
             }
         ]
     },
@@ -317,7 +330,8 @@
                     "milliseconds": 1940582
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 11
+                "fastest_lap_rank": 11,
+                "grid": 19
             }
         ]
     },
@@ -340,7 +354,8 @@
                     "milliseconds": 1947499
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 15
+                "fastest_lap_rank": 15,
+                "grid": 16
             }
         ]
     },
@@ -363,7 +378,8 @@
                     "milliseconds": 1955250
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 17
+                "fastest_lap_rank": 17,
+                "grid": 18
             }
         ]
     },
@@ -386,7 +402,8 @@
                     "milliseconds": 1958821
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 18
+                "fastest_lap_rank": 18,
+                "grid": 15
             }
         ]
     },
@@ -409,7 +426,8 @@
                     "milliseconds": 1961971
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 19
+                "fastest_lap_rank": 19,
+                "grid": 17
             }
         ]
     },
@@ -432,7 +450,8 @@
                     "milliseconds": 1962298
                 },
                 "laps_completed": 19,
-                "fastest_lap_rank": 20
+                "fastest_lap_rank": 20,
+                "grid": 20
             }
         ]
     },
@@ -455,7 +474,8 @@
                     "milliseconds": 1645131
                 },
                 "laps_completed": 16,
-                "fastest_lap_rank": 16
+                "fastest_lap_rank": 16,
+                "grid": 14
             }
         ]
     }
