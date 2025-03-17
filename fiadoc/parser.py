@@ -2,18 +2,15 @@
 import os
 import pickle
 import re
+from typing import Literal, get_args
 import warnings
-from typing import (
-    get_args,
-    Literal
-)
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
 import pymupdf
 
-from pydantic import ValidationError
-
+from ._constants import QUALI_DRIVERS
 from .models.classification import(
     Classification,
     ClassificationData,
@@ -530,7 +527,7 @@ class RaceParser:
         df.loc[df.finishing_position != 'DQ', 'temp'] \
             = df.loc[df.finishing_position != 'DQ', 'temp'].ffill() \
             + df.loc[df.finishing_position != 'DQ', 'temp'].isna().cumsum()
-        df.sort_values(by='temp', inplace=True)
+        df = df.sort_values(by='temp')
         df.temp = df.temp.ffill() + df.temp.isna().cumsum()
         df.finishing_position = df.temp.astype(int)
         del df['temp']
@@ -1419,6 +1416,7 @@ class QualifyingParser:
                 i += 1
         df.columns = headers
         df['finishing_status'] = 0
+        df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
 
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
@@ -1445,15 +1443,23 @@ class QualifyingParser:
             not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
             not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
-            not_classified.columns = df.columns
+            not_classified.columns = df.columns.drop('original_order')
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
+            n = len(df)
+            not_classified['original_order'] = range(n + 1, n + len(not_classified) + 1)
             df = pd.concat([df, not_classified], ignore_index=True)
 
-            # Fill in the position for DNF and DSQ drivers
-            # TODO: should find a PDF with DSQ drivers to handle such cases
-            df = df.replace({'': None})
-            df.position = df.position.astype(float).ffill() + df.position.isnull().cumsum()
-            df.position = df.position.astype(int)
+        # Fill in the position for DNF and DSQ drivers. See `QualifyingParser` for details
+        df = df.replace({'': None})
+        df.loc[df.position.isin(['DQ', 'DSQ']), 'finishing_status'] = 20
+        df.loc[df.position != 'DQ', 'temp'] = df.position
+        df.temp = df.temp.astype(float)
+        df.loc[df.position != 'DQ', 'temp'] = df.loc[df.position != 'DQ', 'temp'].ffill() \
+                                              + df.loc[df.position != 'DQ', 'temp'].isna().cumsum()
+        df = df.sort_values(by='temp')
+        df.temp = df.temp.ffill() + df.temp.isna().cumsum()
+        df.position = df.temp.astype(int)
+        del df['temp']
 
         # Clean up
         df.NO = df.NO.astype(int)
@@ -1466,10 +1472,24 @@ class QualifyingParser:
         def to_json() -> list[dict]:
             data = []
             for q in [1, 2, 3]:
-                temp = df[df[f'Q{q}'].notnull()][['NO', f'Q{q}', 'finishing_status']].copy()
-                temp.sort_values(by=f'Q{q}', inplace=True)
+                n_drivers = QUALI_DRIVERS[self.year][q]
+                temp = df[df.original_order <= n_drivers].copy()
+                # Clean up DNS/DNF/DSQ drivers
+                temp.loc[temp[f'Q{q}'].isin(['DQ', 'DSQ']), 'finishing_status'] = 20
+                temp.loc[temp[f'Q{q}'] == 'DNF', 'finishing_status'] = 11
+                temp.loc[temp[f'Q{q}'] == 'DNS', 'finishing_status'] = 30
+                temp.loc[temp[f'Q{q}'].isin(['DNS', 'DNF']), f'Q{q}'] = 'Z'
+                temp['is_dsq'] = (temp.finishing_status == 20)
+                """
+                Drivers finishing normally, incl. DNF or DNS, are ranked first. Then DSQ drivers
+                are at the bottom. For normal drivers, we order them by quali. lap time. DNF or DNS
+                drivers will have lap time being replaced by "Z" above, so they will be ranked
+                after normal finishing drivers. And their relative order will be the same as their
+                original order in the PDF. DSQ drivers are ranked first by their lap time, if not
+                missing, and if missing then by their original order in the PDF
+                """
+                temp = temp.sort_values(by=['is_dsq', f'Q{q}', 'original_order'])
                 temp['position'] = range(1, len(temp) + 1)
-                temp.loc[temp[f'Q{q}'].isin(['DNF', 'DSQ', 'DNS', 'DQ']), 'finishing_status'] = 11
                 temp['classification'] = temp.apply(
                     lambda x: QualiClassificationData(
                         foreign_keys=SessionEntry(
