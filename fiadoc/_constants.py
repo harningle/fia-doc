@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Manually map driver and team names to their ID in jolpica database"""
-
+# Manually map driver and team names to their ID in jolpica database
 DRIVERS = {
     2023: {
         'Max Verstappen': 'max_verstappen',
@@ -77,7 +76,6 @@ DRIVERS = {
         'Garbiel Bortoleto': 'bortoleto'  # Typo in entry list in 2025 Australian
     }
 }
-
 TEAMS = {
     2023: {
         'Red Bull Racing Honda RBPT': 'red_bull',
@@ -114,6 +112,25 @@ TEAMS = {
         'Racing Bulls Honda RBPT': 'rb',
         'Williams Mercedes': 'williams',
         'Kick Sauber Ferrari': 'sauber'
+    }
+}
+
+# How many drivers in each quali. session
+QUALI_DRIVERS = {
+    2023: {
+        1: float('inf'),
+        2: 15,
+        3: 10
+    },
+    2024: {
+        1: float('inf'),
+        2: 15,
+        3: 10
+    },
+    2025: {
+        1: float('inf'),
+        2: 15,
+        3: 10
     }
 }
 

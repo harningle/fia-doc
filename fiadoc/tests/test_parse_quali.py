@@ -48,8 +48,8 @@ race_list = [
         2024,
         2,
         'quali',
-        '2024_02_quali_classification.json',
-        '2024_02_quali_lap_times.json'
+        '2024_2_quali_classification.json',
+        '2024_2_quali_lap_times.json'
     ),
     (
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionprovisionalclassification_v01.pdf',
@@ -78,6 +78,16 @@ race_list = [
         'quali',
         '2025_1_quali_provisional_classification.json',
         '2025_1_quali_lap_times.json'
+    ),
+    (
+        # DSQ drivers in quali.
+        'https://www.fia.com/sites/default/files/decision-document/2024%20Monaco%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
+        '2024_08_mon_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2024,
+        8,
+        'quali',
+        '2024_8_quali_classification.json',
+        '2024_8_quali_lap_times.json'
     )
 ]
 
@@ -87,8 +97,9 @@ def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[
     # Download and parse quali. classification and lap times PDF
     url_classification, url_lap_time, year, round_no, session, expected_classification, \
         expected_lap_times = request.param
-    download_pdf('https://www.fia.com/sites/default/files/' + url_classification,
-                 tmp_path / 'classification.pdf')
+    if 'https://' not in url_classification:  # TODO: clean this up
+        url_classification = 'https://www.fia.com/sites/default/files/' + url_classification
+    download_pdf(url_classification, tmp_path / 'classification.pdf')
     download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
                  tmp_path / 'lap_times.pdf')
     parser = QualifyingParser(tmp_path / 'classification.pdf', tmp_path / 'lap_times.pdf',
