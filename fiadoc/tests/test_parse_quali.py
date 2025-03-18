@@ -88,6 +88,16 @@ race_list = [
         'quali',
         '2024_8_quali_classification.json',
         '2024_8_quali_lap_times.json'
+    ),
+    (
+        # No "POLE POSITION" in quali. classification
+        'https://www.fia.com/sites/default/files/decision-document/2024%20Australian%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
+        '2024_03_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2024,
+        3,
+        'quali',
+        '2024_3_quali_classification.json',
+        '2024_3_quali_lap_times.json'
     )
 ]
 
