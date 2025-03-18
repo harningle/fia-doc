@@ -1304,13 +1304,35 @@ class QualifyingParser:
             lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
             lines = [i for i in lines
                      if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
+                     and i['width'] is not None
                      and np.isclose(i['width'], 1, rtol=0.1)
                      and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
             if not lines:
-                raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a '
-                                 f'thick horizontal line in {self.classification_file}')
-            lines.sort(key=lambda x: x['rect'].y0)
-            bottom = [lines[0]['rect']]
+                # Go though the pixel map and find a wide horizontal white strip with 10+ px height
+                pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
+                l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+                is_white_row = np.all(pixmap == 255, axis=(1, 2))
+                white_strips = []
+                strip_start = None
+                for i, is_white in enumerate(is_white_row):
+                    if is_white and strip_start is None:
+                        strip_start = i
+                    elif not is_white and strip_start is not None:
+                        if i - strip_start >= 10:  # At least 10 rows of white
+                            white_strips.append(strip_start + t)
+                        strip_start = None
+                # If the strip is at the bottom. Shouldn't happen but just in case
+                if strip_start is not None and len(is_white_row) - strip_start >= 10:
+                    white_strips.append(strip_start + t)
+                if not white_strips:
+                    raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
+                                     f'or a thick horizontal line in {self.classification_file}')
+                strip_start = white_strips[0]  # The topmost one is the bottom of the table
+                bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
+            else:
+                lines.sort(key=lambda x: x['rect'].y0)
+                bottom = [lines[0]['rect']]
         b = bottom[0].y0
 
         # Get the location of cols.
