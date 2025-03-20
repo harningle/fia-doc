@@ -34,13 +34,14 @@ race_list = [
         '2023_18_sprint_quali_lap_times.json'
     ),
     (
+        # Page header is an image instead of text
         'doc_53_-_2024_chinese_grand_prix_-_final_qualifying_classification.pdf',
         '2024_05_chn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
         5,
         'quali',
-        '2024_05_quali_classification.json',
-        '2024_05_quali_lap_times.json'
+        '2024_5_quali_classification.json',
+        '2024_5_quali_lap_times.json'
     ),
     (
         '2024_02_ksa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',

@@ -2,6 +2,7 @@
 import os
 import pickle
 import re
+from string import printable
 from typing import Literal, get_args
 import warnings
 
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 import pymupdf
 
 from ._constants import QUALI_DRIVERS
+from .core import Page, ParsingError
 from .models.classification import(
     Classification,
     ClassificationData,
@@ -21,10 +23,9 @@ from .models.driver import Driver, DriverData
 from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntry
 from .models.lap import Lap, LapData, QualiLap
 from .models.pit_stop import PitStop, PitStopData
-from .utils import Page, duration_to_millisecond, time_to_timedelta
+from .utils import duration_to_millisecond, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
-
 
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
@@ -1191,7 +1192,6 @@ class RaceParser:
 class QualifyingParser:
     """
     TODO: need better docstring
-    TODO: probably need to refactor this. Not clean
     Quali. sessions have to be parsed using multiple PDFs jointly. Otherwise, we don't know which
     lap is in which quali. session
     """
@@ -1218,7 +1218,6 @@ class QualifyingParser:
         if self.session not in get_args(QualiSessionT):
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {get_args(QualiSessionT)}"')
-        # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
         return
 
     def _parse_table_by_grid(
@@ -1261,27 +1260,147 @@ class QualifyingParser:
         cells[0][0] = 'position'  # Finishing order col. has no col. name in PDF
         return pd.DataFrame(cells[1:], columns=cells[0])
 
+    def _clean_up_classification_table(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean wrong chars. from OCR"""
+        for col in df:
+            if df[col].dtype == 'object':
+                # Drop invisible chars.
+                df[col] = df[col].apply(lambda x: ''.join([c for c in x if c in printable]))
+                # Table/col. border/sep. mistakenly OCR-ed as "|"
+                df[col] = df[col].str.removeprefix('|').str.removesuffix('|').str.strip()
+
+        # Finishing position col. should either be a number or "DQ". It can also be empty if it's
+        # the NOT CLASSIFIED table
+        """
+        Sometimes we can have stuff like ". 15" where it should be "15". In such cases, if the "15"
+        is equal to the previous row's "14" + 1, and the next row's "16" - 1, then we can safely
+        replace ". 15" with "15". If not, raise an error
+        """
+        df.position = df.position.str.replace('q', '9')  # Some common OCR errors
+        mask = df.position.str.fullmatch(r'\d{1,2}|DQ|DSQ') | (df.position == '')
+        if not mask.all():
+            digits = df[~mask].position.str.extract(r'(\d+)')
+            digits = digits.astype(int)
+            row_above = df.loc[digits.index - 1, 'position'].astype(int)
+            row_below = df.loc[digits.index + 1, 'position'].astype(int)
+            if not ((digits.values == row_above.values + 1)
+                    & (digits.values == row_below.values - 1)):
+                raise ParsingError(f'Position col. in {self.classification_file} is not all '
+                                   f'numeric or "DQ": {df[~mask].position}')
+            else:
+                df.loc[~mask, 'position'] = digits
+
+        # Car No. should be pure digits
+        if not df.NO.str.isnumeric().all():
+            raise ParsingError(f'NO col. in {self.classification_file} is not all numeric or "DQ"')
+        df.NO = df.NO.astype(int)
+
+        # Don't care about driver name, nationality, or team name
+
+        # Q1, Q2, Q3 should be either a time or empty
+        """
+        If it does not match the time format, then the cell should be empty. However, OCR may get a
+        "." or "_" or whatever instead of an empty cell. But in any case, it should only be one to
+        three chars. long. If so, we replace it with an empty string
+        """
+        pat = r'\d:\d{2}\.\d{3}|DNF|DNS|DSQ|DQ'
+        for col in ['Q1', 'Q2', 'Q3']:
+            df[col] = df[col].str.extract(f'({pat})')[0].fillna(df[col])
+            mask = df[col].str.fullmatch(pat) | (df[col].str.len() <= 3)
+            if not mask.all():
+                raise ParsingError(f'{col} col. in {self.classification_file} is not all time or '
+                                   f'empty: {df[~mask][col]}')
+            df.loc[(~df[col].str.fullmatch(pat)) & (df[col].str.len() <= 3), col] = ''
+
+        # The same holds for the calendar time col.
+        pat = r'\d{1,2}:\d{2}:\d{2}'
+        for col in ['Q1_TIME', 'Q2_TIME', 'Q3_TIME']:
+            df[col] = df[col].str.extract(f'({pat})')[0].fillna(df[col])
+            mask = df[col].str.fullmatch(pat) | (df[col].str.len() <= 3)
+            if not mask.all():
+                raise ParsingError(f'TIME col. in {self.classification_file} is not all time or '
+                                   f'empty: {df[~mask][col]}')
+            df.loc[(~df[col].str.fullmatch(pat)) & (df[col].str.len() <= 3), col] = ''
+
+        # Laps completed should be a number or empty
+        for col in ['Q1_LAPS', 'Q2_LAPS', 'Q3_LAPS']:
+            mask = df[col].str.isnumeric() | (df[col].str.len() <= 3)
+            if not mask.all():
+                raise ParsingError(f'LAPS col. in {self.classification_file} is not all numeric '
+                                   f'or empty: {df[~mask][col]}')
+            df.loc[(~df[col].str.isnumeric()) & (df[col].str.len() <= 3), col] = ''
+        return df
+
+    def _search_for_table_bottom(self, page: Page, y: float) -> tuple[float, bool]:
+        """y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first
+
+        The quali. classification table's bottom is above "NOT CLASSIDIED" or "POLE POSITION". Some
+        PDFs may not have these texts. In these cases, we use the long black thick horizontal line
+        to determine the bottom of the table
+
+        :param page: Page
+        :param y: y-coord. of the top of the table. The search will start 50px below this coord.
+        :return: (y-coord. of the bottom of the table, whether "NOT CLASSIFIED - " is found)
+        """
+        # Whether we have a table for not classified drivers
+        bottom = page.search_for('NOT CLASSIFIED - ')
+        if bottom:
+            return bottom[0].y0, True
+
+        # If code reaches here, then there is no "NOT CLASSIFIED - ". Check for "POLE POSITION LAP"
+        bottom = page.search_for('POLE POSITION LAP')
+        if bottom:
+            return bottom[0].y0, False
+
+        # If still nothing is found, then we have to use the thick horizontal line to determine the
+        # table bottom. We first try to find lines as vector graphics
+        w = page.bound()[2]
+        lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
+        lines = [i for i in lines
+                 if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
+                 and i['width'] is not None
+                 and np.isclose(i['width'], 1, rtol=0.1)
+                 and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
+        if lines:
+            lines.sort(key=lambda x: x['rect'].y0)
+            return lines[0]['rect'].y0, False
+
+        # If no vector graphics lines are found, then find lines as pure image in the pixel map: a
+        # wide horizontal white strip with 10+ px height
+        pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
+        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+        is_white_row = np.all(pixmap == 255, axis=(1, 2))
+        white_strips = []
+        strip_start = None
+        for i, is_white in enumerate(is_white_row):
+            if is_white and strip_start is None:
+                strip_start = i
+            elif not is_white and strip_start is not None:
+                if i - strip_start >= 10:  # At least 10 rows/px of white
+                    white_strips.append(strip_start + t)
+                strip_start = None
+        # Edge case for the strip being at the bottom. Shouldn't happen but just in case
+        if strip_start is not None and len(is_white_row) - strip_start >= 10:
+            white_strips.append(strip_start + t)
+        if not white_strips:
+            raise ParsingError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
+                               f'or a thick horizontal line in {self.classification_file}')
+        strip_start = white_strips[0]  # The topmost line is the bottom of the table
+        return strip_start + 1, False  # One pixel buffer
+
     def _parse_classification(self):
         # Find the page with "Qualifying Session Final Classification"
         doc = pymupdf.open(self.classification_file)
-        found = []
-        for i in range(len(doc)):
-            page = Page(doc[i])
-            found = page.search_for('Final Classification')
-            if found:
-                break
-            found = page.search_for('Provisional Classification')
-            if found:
-                warnings.warn('Found and using provisional classification, not the final one')
-                break
-            else:
-                found = page.get_image_header()
+        found = False
+        for page in doc:
+            page = Page(page)
+            for keyword in ['Final Classification', 'Provisional Classification']:
+                found = page.search_for_header(keyword)
                 if found:
-                    found = [found]
-                    warnings.warn('Found an image header, instead of strings')
                     break
-        if not found:
-            doc.close()  # TODO: check docs. Do we need to manually close it? Memory safe?
+        if found is False:
+            doc.close()
             raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
                              f'on any page in {self.classification_file}')
 
@@ -1289,51 +1408,10 @@ class QualifyingParser:
         w = page.bound()[2]
 
         # y-position of "Final Classification", which is the topmost y-coord. of the table
-        y = found[0].y1
+        y = found.y1
 
-        # y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first. This
-        # is the bottom of the classification table. Some PDFs may not have these texts. In these
-        # cases, we use the long black thick horizontal line to determine the bottom of the table
-        has_not_classified = False
-        bottom = page.search_for('NOT CLASSIFIED - ')
-        if bottom:
-            has_not_classified = True
-        else:
-            bottom = page.search_for('POLE POSITION LAP')
-        if not bottom:
-            lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
-            lines = [i for i in lines
-                     if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
-                     and i['width'] is not None
-                     and np.isclose(i['width'], 1, rtol=0.1)
-                     and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
-            if not lines:
-                # Go though the pixel map and find a wide horizontal white strip with 10+ px height
-                pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
-                l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
-                is_white_row = np.all(pixmap == 255, axis=(1, 2))
-                white_strips = []
-                strip_start = None
-                for i, is_white in enumerate(is_white_row):
-                    if is_white and strip_start is None:
-                        strip_start = i
-                    elif not is_white and strip_start is not None:
-                        if i - strip_start >= 10:  # At least 10 rows of white
-                            white_strips.append(strip_start + t)
-                        strip_start = None
-                # If the strip is at the bottom. Shouldn't happen but just in case
-                if strip_start is not None and len(is_white_row) - strip_start >= 10:
-                    white_strips.append(strip_start + t)
-                if not white_strips:
-                    raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
-                                     f'or a thick horizontal line in {self.classification_file}')
-                strip_start = white_strips[0]  # The topmost one is the bottom of the table
-                bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
-            else:
-                lines.sort(key=lambda x: x['rect'].y0)
-                bottom = [lines[0]['rect']]
-        b = bottom[0].y0
+        # y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first
+        b, has_not_classified = self._search_for_table_bottom(page, y)
 
         # Get the location of cols.
         """
@@ -1343,10 +1421,17 @@ class QualifyingParser:
         specify the vertical lines separating cols.
         """
         no = page.search_for('NO', clip=(0, y, w, b))
-        no.sort(key=lambda x: x.y0)  # The topmost "NO" under "Final Classification"
+        if not no:
+            raise ParsingError(f'Cannot find "NO" in table header on page {page.number} in '
+                               f'{self.classification_file}')
+        no.sort(key=lambda x: (x.y0, x.x0))  # The most top left "NO" under "Final Classification"
         no = no[0]
-        b_header = no.y1 + 1  # The bottom of the header row
-        headers = page.get_text('text', clip=(0, y, w, b_header)).split()  # Col. headers/names
+        b_header = no.y1 + 1  # The bottom of the table header row
+        headers = page.get_text('text', clip=(0, y, w, b_header))  # Col. headers/names
+        if not headers:
+            raise ParsingError(f'Cannot find any text in table header on page {page.number} '
+                               f'in {self.classification_file}')
+        headers = headers.split()
         cols: dict[str, tuple[float, float]] = {}
         l = no.x0 - 1
         q = 1
@@ -1387,7 +1472,7 @@ class QualifyingParser:
         Howover, the width of "Q2" and "SQ2" may not be the same, so the shifter will be different.
         """
         vlines = [
-            0,                                                        # Left of the page
+            3 * cols['NO'][0] - 2 * cols['NO'][1] - 1,                # Left border of the table
             cols['NO'][0] - 1,                                        # Left of "NO"
             (cols['NO'][1] + cols['DRIVER'][0]) / 2,                  # Between "NO" and "DRIVER"
             cols['NAT'][0] - 1,                                       # Left of "NAT"
@@ -1440,6 +1525,14 @@ class QualifyingParser:
         df['finishing_status'] = 0
         df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
 
+        # Sanitise the table cells
+        """
+        Because we may use OCR to read the table, OCR is very likely to give e.g. "_" (the row
+        line) when the cell should be empty. So depending on which col. it is, we try to remove
+        these chars.
+        """
+        df = self._clean_up_classification_table(df)  # TODO: modify inplace or copy?
+
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
             t = page.search_for('NOT CLASSIFIED - ')[0].y1
@@ -1451,7 +1544,9 @@ class QualifyingParser:
                                           clip=(vlines[1], t, vlines[2], t + line_height)):
                 assert len(car_no) == 1, f'Error in detecting rows in the "NOT CLASSIFIED" ' \
                                          f'table in {self.classification_file}'
-                car_no = car_no[0]
+                if not re.match(r'\d+', car_no[0][4].strip()):  # It's a car number so digits.
+                    break                                       # Otherwise, it's an OCR error and
+                car_no = car_no[0]                              # should be empty
                 car_nos.append([car_no[1], car_no[3]])
                 t = car_no[3]
             hlines = [car_nos[0][0] - 1]
@@ -1466,6 +1561,7 @@ class QualifyingParser:
             not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns.drop('original_order')
+            not_classified = self._clean_up_classification_table(not_classified)
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
             n = len(df)
             not_classified['original_order'] = range(n + 1, n + len(not_classified) + 1)
@@ -1482,12 +1578,6 @@ class QualifyingParser:
         df.temp = df.temp.ffill() + df.temp.isna().cumsum()
         df.position = df.temp.astype(int)
         del df['temp']
-
-        # Clean up
-        df.NO = df.NO.astype(int)
-        del df['NAT']
-        df = df.replace('', None)
-        df.position = df.position.astype(int)
 
         # Overwrite `.to_json()` and `.to_pkl()` methods
         # TODO: bad practice
@@ -1667,7 +1757,7 @@ class QualifyingParser:
 
                     # Find the driver name, which is located immediately above the table
                     driver = page.get_text(
-                        'block',
+                        'text',
                         clip=(
                             col * w / 3,        # Each driver occupies ~1/3 of the page width
                             top_pos[row] - 30,  # Driver name is usually 20-30 px above the table
