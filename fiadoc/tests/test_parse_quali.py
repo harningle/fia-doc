@@ -99,6 +99,16 @@ race_list = [
         'quali',
         '2024_3_quali_classification.json',
         '2024_3_quali_lap_times.json'
+    ),
+    (
+        # Text is image in the PDF...
+        'https://www.fia.com/system/files/decision-document/2025_australian_grand_prix_-_final_qualifying_classification.pdf',
+        '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2025,
+        1,
+        'quali',
+        '2025_1_quali_final_classification.json',
+        '2025_1_quali_lap_times.json'
     )
 ]
 

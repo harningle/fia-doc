@@ -29,10 +29,10 @@ class Page:
         :return: Path to the saved file
         """
         if self.ocr_page is None:
-            self.get_pixmap(dpi=150).pil_save(path / 'page.png')
+            self.get_pixmap(dpi=300).pil_save(path / 'page.png')
             with open(path / 'page.pdf', 'wb') as f:
                 f.write(pytesseract.image_to_pdf_or_hocr(str(path / 'page.png'),
-                                                         config='--dpi 150'))
+                                                         config='--dpi 300'))
             self.ocr_page = pymupdf.open(path / 'page.pdf')[0]  # Memory safe?
         return path / 'page.pdf'
 
@@ -109,6 +109,7 @@ class Page:
 
         :param option: When `clip` is specified, `option` can only be "text", "words", or "blocks"
         """
+        # Try simple search first
         if text := self._pymupdf_page.get_text(option, clip=clip, **kwargs):
             if isinstance(text, list):
                 temp = [''.join([c for i in text for c in i[4] if c in printable]).strip()]
@@ -129,10 +130,45 @@ class Page:
                 self.save_ocr()
             return self.ocr_page.get_text(option, **kwargs)
 
-        # If we have `clip`, only OCR the clipped area
-        tempdir = Path(tempfile.mkdtemp('fiadoc'))
-        self.get_pixmap(clip=clip, dpi=150).pil_save(tempdir / 'clip.png')
-        text = pytesseract.image_to_string(str(tempdir / 'clip.png'), config='--psm 7 --dpi 150')
+        # If we have `clip`, only OCR the clipped area. First check if any black pixels
+        """
+        We first check if there is any black pixel in the clipped area. If not, return an empty
+        string immediately. This is because all texts are black. We check this for two reasons:
+        
+        1. it's much faster to skip OCR if we know there is no text in the clipped area
+        2. tessaract quality is really bad. If you give it a all grey pure colour image, it can
+           spit out some random text like "-". This breaks most of our parsing
+           
+        TODO: fine-tune tesseract later
+        """
+        # tempdir = Path(tempfile.mkdtemp('fiadoc'))
+        tempdir = Path('temp')
+        pixmap = self.get_pixmap(clip=clip, dpi=300)
+        pixmap_arr = np.ndarray([pixmap.height, pixmap.width, 3], dtype=np.uint8,
+                                buffer=pixmap.samples_mv)
+        if not np.any(np.all(pixmap_arr <= 50, axis=2)):
+            if option == 'text':
+                return ''
+            elif option == 'words':
+                return []
+            elif option == 'blocks':
+                return []
+            else:
+                raise NotImplementedError(f'`option` can only be "text", "words", or "blocks",'
+                                          f'when `clip` is specified')
+
+        # If there are some black pixels, OCR the clipped area
+        # pixmap.pil_save(tempdir / 'clip.png')
+        if os.listdir(tempdir):
+            i = max([int(i.removesuffix('.png')) for i in os.listdir(tempdir) if i.endswith('.png')]) + 1
+        else:
+            i = 0
+        pixmap.pil_save(tempdir / f'{i}.png')
+        # text = pytesseract.image_to_string(str(tempdir / 'clip.png'), config='--psm 7 --dpi 300')
+        text = pytesseract.image_to_string(str(tempdir / f'{i}.png'), config='--psm 7 --dpi 300')
+        with open('text.csv', 'a+') as f:
+            f.write(f'{i},{text}\n')
+
         if option == 'text':
             return text
         elif option == 'words':

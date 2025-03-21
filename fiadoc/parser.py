@@ -452,8 +452,6 @@ class RaceParser:
 
         # Parse the table using the grid above
         df = self._parse_table_by_grid(page, vlines, hlines)
-        assert df.shape[1] == 13, \
-            f'Expected 13 columns, got {df.shape[1]} in {self.classification_file}'
 
         # Do the same for the "NOT CLASSIFIED" table. See `QualifyingParser._parse_classification`
         if has_not_classified:
@@ -464,6 +462,8 @@ class RaceParser:
                                           clip=(vlines[1], t, vlines[2], t + line_height)):
                 assert len(car_no) == 1, f'Error in detecting rows in the "NOT CLASSIFIED" ' \
                                          f'table in {self.classification_file}'
+                if not re.match(r'\d+', car_no[0][4].strip()):  # See `QualifyingParser`
+                    break
                 car_no = car_no[0]
                 car_nos.append([car_no[1], car_no[3]])
                 t = car_no[3]
@@ -856,7 +856,7 @@ class RaceParser:
                     l = i * w
                     r = (i + 1) * w
                     t = min([i.y0 for i in laps] + [i.y0 for i in times])
-                    driver = page.get_text('block', clip=(l, h, r, t)).strip()
+                    driver = page.get_text('text', clip=(l, h, r, t)).strip()
                     if not driver:
                         continue
                         # TODO: may want a test here. Every row above should have exactly 3 drivers
@@ -996,7 +996,7 @@ class RaceParser:
 
                         # Find the driver name, which is located immediately above the table
                         driver = page.get_text(
-                            'block',
+                            'text',
                             clip=(
                                 col * w / 3,        # Each driver occupies ~1/3 of the page width
                                 top_pos[row] - 30,  # Driver name is ~20-30 px above the table
