@@ -2,10 +2,24 @@ import os
 import re
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymupdf
 import requests
+
+rc = {'figure.figsize': (4, 3),
+      'axes.facecolor': 'white',  # Remove background colour
+      'axes.grid': False,         # Turn on grid
+      'axes.linewidth': '0.2',
+      'axes.edgecolor': '0',      # Set axes edge color to be black
+      'font.size': 2,
+      'xtick.major.size': 1,
+      'xtick.major.width': 0.2,
+      'ytick.major.size': 1,
+      'ytick.major.width': 0.2}
+plt.rcdefaults()
+plt.rcParams.update(rc)
 
 
 def duration_to_millisecond(s: str) -> Optional[dict[str, str | int]]:
@@ -101,6 +115,18 @@ class Page:
 
     def __getattr__(self, name: str):
         return getattr(self._pymupdf_page, name)
+
+    def show_page(self):
+        """May not working well. For debug process only
+
+        See https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/table-analysis/show_image.py
+        """
+        pix = self.get_pixmap(dpi=300)
+        img = np.ndarray([pix.h, pix.w, 3], dtype=np.uint8, buffer=pix.samples_mv)
+        plt.figure(dpi=300)
+        plt.imshow(img, extent=(0, pix.w * 72 / 300, pix.h * 72 / 300, 0))
+        plt.show()
+        pass
 
     def get_drawings_in_bbox(self, bbox: tuple[float, float, float, float], tol: float = 1) \
             -> list:
