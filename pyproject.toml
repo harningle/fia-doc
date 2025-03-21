@@ -11,6 +11,7 @@ readme = "README.md"
 requires-python = ">=3.10,<3.13"  # 3.10 should work but older versions may also be fine
 dependencies = [
   "camelot-py[base]>=1.0.0,<2.0.0",
+  "matplotlib>=3.4.0,<4.0.0",
   "pandas>=2.0.0,<3.0.0",
   "pydantic>=2.0.0,<3.0.0",
   "pymupdf==1.25.1",  # Seems related to pymupdf/PyMuPDF#4206? Check `assert option in formats`

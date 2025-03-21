@@ -1246,15 +1246,21 @@ class QualifyingParser:
                 l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
                 cell = page.get_text('blocks', clip=(l, t, r, b))
                 if cell:
-                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
-                                           f'{self.classification_file}. Found {len(cell)}'
+                    # Usually, one cell is one line of text. The only exception is Andrea Kimi
+                    # Antonelli. His name is too long and thus wrapped into two lines
+                    if len(cell) > 1:
+                        if len(cell) == 2 and cell[0][4].strip() == 'Andrea Kimi':
+                            text = cell[0][4].strip() + ' ' + cell[1][4].strip()
+                        else:
+                            raise Exception(f'Expected exactly one cell in row {i}, col {j} in '
+                                            f'{self.classification_file}. Found {cell}')
                     cell = cell[0]
                     if cell[4].strip():
                         bbox = cell[0:4]
                         if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
                                 or bbox[1] < t - tol or bbox[3] > b + tol:
                             raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
-                                             f'{self.classification_file}')
+                                             f'{self.classification_file}: {cell}')
                         text = cell[4].strip()
                 row.append(text)
             cells.append(row)
@@ -1407,17 +1413,20 @@ class QualifyingParser:
             vlines.insert(headers.index('%') + 2,
                           1.4 * cols['Q1_TIME'][0] - 0.4 * cols['Q1_TIME'][1])
 
-        # Get the row positions. We have car numbers in "NO" col., so the top and bottom of them
-        # are the top and bottom of their rows
-        car_nos = page.get_text('blocks', clip=(cols['NO'][0] - 1, b_header, cols['NO'][1] + 1, b))
+        # Get the row positions. The rows are coloured in grey, white, grey, white, ... So we just
+        # need to get the top and bottom positions of the grey rectangles
+        rects = []
+        for i in page.get_drawings_in_bbox(bbox=(0, b_header - 2, w, b)):
+            if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                rects.append(i['rect'].y0 + 1)
+                rects.append(i['rect'].y1 - 1)
+        rects.sort()
         hlines: list[float] = [y, b_header]
-        for i, car_no in enumerate(car_nos):
-            assert re.match(r'\d+', car_no[4].strip()), \
-                f'Expected car number (pure digits) in "NO" col. in {self.classification_file}. ' \
-                f'Found "{car_no}"'
-            if i < len(car_nos) - 1:
-                hlines.append((car_no[3] + car_nos[i + 1][1]) / 2)
-        hlines.append(b)
+        for i in rects:
+            if i - hlines[-1] > 5:
+                hlines.append(i)
+        if b - hlines[-1] > 5:
+            hlines.append(b)
 
         # Get the table
         df = self._parse_table_by_grid(page, vlines, hlines)
@@ -1439,29 +1448,74 @@ class QualifyingParser:
         df.columns = headers
         df['finishing_status'] = 0
         df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
+        df = df[(df.position != '') & df.position.notna()]
 
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
+            # Locate the bottom of the table
+            # TODO: refactor this. This is a copy of the above code
+            """
+            The bottom of "NOT CLASSIFIED" table is usually "POLE POSITION LAP", but some PDFs do
+            not have it, e.g. 2023 Australian. For these PDFs, we use a thick horizontal line,
+            which is the top of "POLE POSITION LAP" table, as the bottom of the "NOT CLASSIFIED"
+            table.
+            """
+            bottom = page.search_for('POLE POSITION LAP')
+            if not bottom:
+                lines = page.get_drawings_in_bbox((0, hlines[-1], w, page.bound()[3]))
+                lines = [i for i in lines
+                         if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
+                         and i['width'] is not None
+                         and np.isclose(i['width'], 1, rtol=0.1)
+                         and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
+                if not lines:
+                    # Go through the pixel map and find a wide horizontal white strip with 10+ px height
+                    pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
+                    l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+                    pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+                    is_white_row = np.all(pixmap == 255, axis=(1, 2))
+                    white_strips = []
+                    strip_start = None
+                    for i, is_white in enumerate(is_white_row):
+                        if is_white and strip_start is None:
+                            strip_start = i
+                        elif not is_white and strip_start is not None:
+                            if i - strip_start >= 10:  # At least 10 rows of white
+                                white_strips.append(strip_start + t)
+                            strip_start = None
+                    # If the strip is at the bottom. Shouldn't happen but just in case
+                    if strip_start is not None and len(is_white_row) - strip_start >= 10:
+                        white_strips.append(strip_start + t)
+                    if not white_strips:
+                        raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
+                                         f'or a thick horizontal line in {self.classification_file}')
+                    strip_start = white_strips[0]  # The topmost one is the bottom of the table
+                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
+                else:
+                    lines.sort(key=lambda x: x['rect'].y0)
+                    bottom = [lines[0]['rect']]
+            b = bottom[0].y0
+
+            # Use grey and white rectangles to determine the rows again
             t = page.search_for('NOT CLASSIFIED - ')[0].y1
-            # Car No. col. should have car numbers with little vertical gap between them. When we
-            # find a big gap, it's the bottom of the table
-            line_height = max([i[3] - i[1] for i in car_nos])
-            car_nos = []
-            while car_no := page.get_text('blocks',
-                                          clip=(vlines[1], t, vlines[2], t + line_height)):
-                assert len(car_no) == 1, f'Error in detecting rows in the "NOT CLASSIFIED" ' \
-                                         f'table in {self.classification_file}'
-                car_no = car_no[0]
-                car_nos.append([car_no[1], car_no[3]])
-                t = car_no[3]
-            hlines = [car_nos[0][0] - 1]
-            for i in range(len(car_nos) - 1):
-                hlines.append((car_nos[i][1] + car_nos[i + 1][0]) / 2)
-            hlines.append(car_nos[-1][1] + 1)
+            rects = []
+            for i in page.get_drawings_in_bbox(bbox=(0, t, w, b)):
+                if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                    rects.append(i['rect'].y0 + 1)
+                    rects.append(i['rect'].y1 - 1)
+            rects.sort()
+            hlines = [t + 1]
+            for i in rects:
+                if i - hlines[-1] > 5:
+                    hlines.append(i)
+            if b - hlines[-1] > 5:
+                hlines.append(b)
             not_classified = self._parse_table_by_grid(page, vlines, hlines)
             # No col. header in NOT CLASSIFIED table. The detected col. header is actually table
             # content, so need to append the col. header to the table
             not_classified.loc[-1] = not_classified.columns
+            not_classified = not_classified[(not_classified.position != '')
+                                            & not_classified.position.notna()]
             not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
             not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
