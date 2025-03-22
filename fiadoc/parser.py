@@ -1928,21 +1928,132 @@ class PitStopParser:
                              f'Valid sessions are {get_args(RaceSessionT)}')
         return
 
+    # TODO: refactor. Have too many parse table by grid, in utils, in quali. parser, here, and in
+    #       entry list
+    def _parse_table_by_grid(
+            self,
+            page: Page,
+            vlines: list[float],
+            hlines: list[float],
+            tol: float = 2
+    ) -> pd.DataFrame:
+        """Manually parse the table cell by cell, defined by lines separating the columns and rows
+
+        See `EntryListParser._parse_table_by_grid()` for detailed explanation.
+
+        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
+                       boundaries need to be included
+        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
+                       boundaries need to be included
+        :param tol: tolerance for bbox. of text. Default is 2 pixels
+        """
+        cells = []
+        for i in range(len(hlines) - 1):
+            row = []
+            for j in range(len(vlines) - 1):
+                text = ''
+                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
+                cell = page.get_text('blocks', clip=(l, t, r, b))
+                if cell:
+                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
+                                           f'{self.file}. Found: {cell}'
+                    cell = cell[0]
+                    if cell[4].strip():
+                        bbox = cell[0:4]
+                        if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
+                                or bbox[1] < t - tol or bbox[3] > b + tol:
+                            raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
+                                             f'{self.file}')
+                        text = cell[4].strip()
+                row.append(text)
+            cells.append(row)
+        return pd.DataFrame(cells[1:], columns=cells[0])
+
     def _parse(self) -> pd.DataFrame:
         doc = pymupdf.open(self.file)
         df = []
         # TODO: would be nice to add a test for page numbers: if more than one page, we should have
         #       "page x of xx" at the bottom right of each page
         for page in doc:  # Can have multiple pages, though usually only one. E.g., 2023 Dutch
-
             # Get the position of the table
-            t = page.search_for('DRIVER')[0].y0      # "DRIVER" gives the top of the table
-            w, h = page.bound()[2], page.bound()[3]  # Page right and bottom boundaries are the
-                                                     # table's as well
+            page = Page(page)
+            driver = page.search_for('DRIVER')
+            assert len(driver) == 1, f'Expected exactly one "DRIVER" in {self.file}. Found: ' \
+                                     f'{driver}'
+            driver = driver[0]
+            t = driver.y0 - 1    # "DRIVER" gives the top of the table
+            w = page.bound()[2]  # The right of the page
+
+            # Find the vertical lines separating the cols
+            no = page.search_for('NO', clip=(0, t, w, driver.y1))
+            assert len(no) == 1, f'Expected exactly one "NO" in the header row in {self.file}. ' \
+                                 f'Found: {no}'
+            no = no[0]
+            b_header = no.y1 + 1  # Bottom of the header row
+            # Find the positions of the col. headers
+            headers = ('NO', 'DRIVER', 'ENTRANT', 'LAP', 'TIME OF DAY', 'STOP', 'DURATION',
+                       'TOTAL TIME')  # The col. names
+            cols: dict[str, tuple[float, float]] = {}
+            l = no.x0 - 1
+            for col in headers:
+                col_name = col
+                col = page.search_for(col, clip=(l, t, w, b_header))
+                assert len(col) == 1, f'Expected exactly one "{col}" in the header row in ' \
+                                      f'{self.file}. Found: {col}'
+                col = col[0]
+                cols[col_name] = (col.x0, col.x1)
+            # Now the vertical line seps. are the left and right point of each col. header
+            vlines = [
+                cols['NO'][0] - 1,                        # Left of "NO"
+                (cols['NO'][1] + cols['DRIVER'][0]) / 2,  # Between "NO" and "DRIVER"
+                cols['ENTRANT'][0] - 1,                   # Left of "ENTRANT"
+                cols['LAP'][0] - 1,                       # Left of "LAP"
+                cols['LAP'][1] + 1,                       # Right of "LAP"
+                cols['TIME OF DAY'][1],                   # Right of "TIME OF DAY"
+                cols['STOP'][1],                          # Right of "STOP"
+                cols['DURATION'][1],                      # Left of "TOTAL TIME"
+                cols['TOTAL TIME'][1]                     # Right of "TOTAL TIME"
+            ]
+
+            # Get the bottom of the table. We identify page bottom by a white blank strip
+            pixmap = page.get_pixmap(clip=(0, t + 10, w, page.bound()[3]))
+            l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+            pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+            is_white_row = np.all(pixmap == 255, axis=(1, 2))
+            white_strips = []
+            strip_start = None
+            for i, is_white in enumerate(is_white_row):
+                if is_white and strip_start is None:
+                    strip_start = i
+                elif not is_white and strip_start is not None:
+                    if i - strip_start >= 10:  # At least 10 rows of white
+                        white_strips.append(strip_start + t)
+                    strip_start = None
+            # If the strip is at the bottom. Shouldn't happen but just in case
+            if strip_start is not None and len(is_white_row) - strip_start >= 10:
+                white_strips.append(strip_start + t)
+            if not white_strips:
+                raise ValueError(f'Could not find a blank white strip in {self.file}')
+            b = white_strips[0] + 1
+
+            # Get the row positions. The rows are coloured in grey, white, grey, white, so get the
+            # top and bottom positions of the grey rectangles
+            rects = []
+            for i in page.get_drawings_in_bbox(bbox=(0, b_header - 1, w, b)):
+                if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                    rects.append(i['rect'].y0 + 1)
+                    rects.append(i['rect'].y1 - 1)
+            rects.sort()
+            hlines: list[float] = [no.y0 - 1, b_header]
+            for i in rects:
+                if i - hlines[-1] > 5:
+                    hlines.append(i)
+            if b - hlines[-1] > 5:
+                hlines.append(b)
+
             # Parse
-            tab = page.find_tables(clip=(0, t, w, h), strategy='lines')
-            assert len(tab.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
-            df.append(tab[0].to_pandas())
+            tab = self._parse_table_by_grid(page, vlines, hlines)
+            df.append(tab)
 
         # Clean up the table
         df = pd.concat(df, ignore_index=True)
