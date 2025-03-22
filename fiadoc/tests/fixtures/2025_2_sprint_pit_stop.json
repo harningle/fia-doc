@@ -1,6 +1,6 @@
 [
     {
-        "object_type": "pit_stop",
+        "object_type": "PitStop",
         "foreign_keys": {
             "year": 2025,
             "round": 2,
