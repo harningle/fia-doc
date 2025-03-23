@@ -2,25 +2,23 @@
 import os
 import pickle
 import re
-from typing import Literal, get_args
 import warnings
+from typing import Literal, get_args
 
 import numpy as np
 import pandas as pd
-from pydantic import ValidationError
 import pymupdf
+from pydantic import ValidationError
 
 from ._constants import QUALI_DRIVERS
-from .models.classification import(
-    Classification,
-    ClassificationData,
-    QualiClassification,
-    QualiClassificationData
+from .models.classification import (
+    SessionEntryImport,
+    SessionEntryObject,
 )
-from .models.driver import Driver, DriverData
-from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntry
-from .models.lap import Lap, LapData, QualiLap
-from .models.pit_stop import PitStop, PitStopData
+from .models.driver import RoundEntryImport, RoundEntryObject
+from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
+from .models.lap import LapImport, LapObject
+from .models.pit_stop import PitStopData, PitStopObject
 from .utils import Page, duration_to_millisecond, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -28,7 +26,6 @@ pd.set_option('future.no_silent_downcasting', True)
 
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
-
 
 class EntryListParser:
     def __init__(
@@ -263,7 +260,8 @@ class EntryListParser:
             drivers = []
             for x in df.itertuples():
                 try:
-                    drivers.append(DriverData(
+                    drivers.append(RoundEntryImport(
+                            object_type="RoundEntry",
                             foreign_keys=RoundEntry(
                                 year=self.year,
                                 round=self.round_no,
@@ -271,11 +269,11 @@ class EntryListParser:
                                 driver_reference=x.driver
                             ),
                             objects=[
-                                Driver(
+                                RoundEntryObject(
                                     car_number=x.car_no
                                 )
                             ]
-                        ).model_dump())
+                        ).model_dump(exclude_unset=True))
                 except ValidationError as e:
                     warnings.warn(f'Error when parsing driver {x.driver} in '
                                   f'{self.file}: {e}', )
@@ -569,15 +567,16 @@ class RaceParser:
 
         def to_json() -> list[dict]:
             return df.apply(
-                lambda x: ClassificationData(
-                    foreign_keys=SessionEntry(
+                lambda x: SessionEntryImport(
+                    object_type="SessionEntry",
+                    foreign_keys=SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
                         session=self.session,
                         car_number=x.car_no
                     ),
                     objects=[
-                        Classification(
+                        SessionEntryObject(
                             position=x.finishing_position,
                             is_classified=x.is_classified,
                             status=x.finishing_status,
@@ -589,7 +588,7 @@ class RaceParser:
                             # TODO: replace the rank with missing or -1 in self.classification_df
                         )
                     ]
-                ).model_dump(exclude_none=True),
+                ).model_dump(exclude_none=True, exclude_unset=True),
                 axis=1
             ).tolist()
 
@@ -1150,7 +1149,7 @@ class RaceParser:
         def to_json() -> list[dict]:
             temp = df.copy()
             temp.lap = temp.apply(
-                lambda x: Lap(
+                lambda x: LapObject(
                     number=x.lap,
                     position=x.position,
                     time=duration_to_millisecond(x.lap_time),
@@ -1160,7 +1159,7 @@ class RaceParser:
             )
             temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
             temp['session_entry'] = temp.car_no.map(
-                lambda x: SessionEntry(
+                lambda x: SessionEntryForeignKeys(
                     year=self.year,
                     round=self.round_no,
                     session='R' if self.session == 'race' else 'SR',
@@ -1168,10 +1167,11 @@ class RaceParser:
                 )
             )
             return temp.apply(
-                lambda x: LapData(
+                lambda x: LapImport(
+                    object_type="Lap",
                     foreign_keys=x.session_entry,
                     objects=x.lap
-                ).model_dump(),
+                ).model_dump(exclude_unset=True),
                 axis=1
             ).tolist()
 
@@ -1567,20 +1567,21 @@ class QualifyingParser:
                 temp = temp.sort_values(by=['is_dsq', f'Q{q}', 'original_order'])
                 temp['position'] = range(1, len(temp) + 1)
                 temp['classification'] = temp.apply(
-                    lambda x: QualiClassificationData(
-                        foreign_keys=SessionEntry(
+                    lambda x: SessionEntryImport(
+                        object_type="SessionEntry",
+                        foreign_keys=SessionEntryForeignKeys(
                             year=self.year,
                             round=self.round_no,
                             session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
                             car_number=x.NO
                         ),
                         objects=[
-                            QualiClassification(
+                            SessionEntryObject(
                                 position=x.position,
                                 is_classified=(x.finishing_status == 0)
                             )
                         ]
-                    ).model_dump(),
+                    ).model_dump(exclude_unset=True),
                     axis=1
                 )
                 data.extend(temp['classification'].tolist())
@@ -1870,7 +1871,7 @@ class QualifyingParser:
             for q in [1, 2, 3]:
                 temp = lap_times[lap_times.Q == q].copy()
                 temp['lap'] = temp.apply(
-                    lambda x: QualiLap(
+                    lambda x: LapObject(
                         number=x.lap_no,
                         time=x.lap_time,
                         is_deleted=x.lap_time_deleted,
@@ -1880,7 +1881,7 @@ class QualifyingParser:
                 )
                 temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
                 temp['session_entry'] = temp['car_no'].map(
-                    lambda x: SessionEntry(
+                    lambda x: SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
                         session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
@@ -1888,10 +1889,11 @@ class QualifyingParser:
                     )
                 )
                 temp['lap_data'] = temp.apply(
-                    lambda x: LapData(
+                    lambda x: LapImport(
+                        object_type="Lap",
                         foreign_keys=x['session_entry'],
                         objects=x['lap']
-                    ).model_dump(),
+                    ).model_dump(exclude_unset=True),
                     axis=1
                 )
                 lap_data.extend(temp['lap_data'].tolist())
@@ -2074,7 +2076,7 @@ class PitStopParser:
         def to_json() -> list[dict]:
             pit_stop = df.copy()
             pit_stop['pit_stop'] = pit_stop.apply(
-                lambda x: PitStop(
+                lambda x: PitStopObject(
                     number=x.stop_no,
                     duration=duration_to_millisecond(x.duration),
                     local_timestamp=x.local_time
@@ -2082,7 +2084,7 @@ class PitStopParser:
                 axis=1
             )
             pit_stop['entry'] = pit_stop.apply(
-                lambda x: PitStopEntry(
+                lambda x: PitStopForeignKeys(
                     year=self.year,
                     round=self.round_no,
                     session=self.session if self.session == 'race' else 'SR',
@@ -2092,9 +2094,10 @@ class PitStopParser:
             )
             return pit_stop.apply(
                 lambda x: PitStopData(
+                    object_type="PitStop",
                     foreign_keys=x.entry,
                     objects=[x.pit_stop]
-                ).model_dump(),
+                ).model_dump(exclude_unset=True),
                 axis=1
             ).tolist()
 

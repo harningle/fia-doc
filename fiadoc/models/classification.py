@@ -1,47 +1,21 @@
 # -*- coding: utf-8 -*-
-from typing import Optional
-
+from jolpica.schemas import data_import
 from pydantic import (
-    BaseModel,
     ConfigDict,
-    NonNegativeFloat,
-    NonNegativeInt,
-    PositiveInt,
-    field_validator
 )
 
-from .foreign_key import SessionEntry
+from .foreign_key import SessionEntryForeignKeys
 
 
-class Classification(BaseModel):
-    position: PositiveInt
-    is_classified: bool
-    status: NonNegativeInt
-    points: NonNegativeFloat
-    time: dict[str, str | int] | None
-    laps_completed: NonNegativeInt  # TODO: or positive int? What if retire in lap 1?
-    fastest_lap_rank: PositiveInt | None
-    grid: PositiveInt
+class SessionEntryObject(data_import.SessionEntryObject):
+    time: dict[str, str | int] | None = None
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
 
-class ClassificationData(BaseModel):
-    object_type: str = 'SessionEntry'
-    foreign_keys: SessionEntry
-    objects: list[Classification]
+class SessionEntryImport(data_import.SessionEntryImport):
+    object_type: str = "SessionEntry"
+    foreign_keys: SessionEntryForeignKeys
+    objects: list[SessionEntryObject]
 
-    model_config = ConfigDict(extra='forbid')
-
-
-class QualiClassification(BaseModel):
-    position: PositiveInt
-    is_classified: bool
-
-
-class QualiClassificationData(BaseModel):
-    object_type: str = 'SessionEntry'
-    foreign_keys: SessionEntry
-    objects: list[QualiClassification]
-
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
