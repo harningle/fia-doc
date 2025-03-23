@@ -35,7 +35,7 @@ class PitStop(BaseModel):
 
 
 class PitStopData(BaseModel):  # TODO: all xxxData can be combined into one class?
-    object_type: str = 'pit_stop'
+    object_type: str = 'PitStop'
     foreign_keys: PitStopEntry
     objects: list[PitStop]
 

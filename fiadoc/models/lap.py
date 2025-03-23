@@ -23,7 +23,7 @@ class QualiLap(BaseModel):
 
 
 class LapData(BaseModel):
-    object_type: str = 'lap'
+    object_type: str = 'Lap'
     foreign_keys: SessionEntry
     objects: list[Lap | QualiLap]
 

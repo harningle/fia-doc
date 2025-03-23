@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 from pydantic import ValidationError
 import pymupdf
+from jolpica.schemas import data_import
+from typing_extensions import Self
 
 from ._constants import QUALI_DRIVERS
 from .models.classification import(
@@ -22,6 +24,9 @@ from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntry
 from .models.lap import Lap, LapData, QualiLap
 from .models.pit_stop import PitStop, PitStopData
 from .utils import Page, duration_to_millisecond, time_to_timedelta
+from pydantic import BaseModel, ConfigDict, PositiveInt, field_validator, model_validator
+from ._constants import DRIVERS, TEAMS
+
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -29,6 +34,63 @@ pd.set_option('future.no_silent_downcasting', True)
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
 
+class SessionEntryObjectJson(data_import.SessionEntryObject):
+    time: dict[str, str | int]
+
+class PitStopObjectJson(data_import.PitStopObject):
+    duration: dict[str, str | int]
+
+class LapObjectJson(data_import.LapObject):
+    time: dict[str, str | int]
+
+class ValidatorMixin:
+    @field_validator('session')
+    @classmethod
+    def clean_session(cls, session: str) -> str:
+        match session.lower().strip():
+            case 'r' | 'q1' | 'q2' | 'q3' | 'sr' | 'sq1' | 'sq2' | 'sq3' | 'fp1' | 'fp2' | 'fp3':
+                return session.upper()
+            case 'race':  # Some simple mapping
+                return 'R'
+            case 'sprint' | 'sprint_race' | 'sprint race':
+                return 'SR'
+            case _:
+                raise ValueError(f'Invalid session: {session}. Must be one of: "R", "Q1", "Q2",'
+                                 f'"Q3", "SR", "SQ1", "SQ2", "SQ3", "FP1", "FP2", "FP3"')
+
+class PitStopForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
+    pass
+class LapForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
+    pass
+
+class RoundEntryForeignKeys(data_import.RoundEntryForeignKeys):
+    @model_validator(mode='before')
+    def get_team_reference(self) -> Self:
+        if self['year'] in TEAMS:
+            if self['team_reference'] in TEAMS[self['year']]:
+                self['team_reference'] = TEAMS[self['year']][self['team_reference']]
+                return self
+            else:
+                raise ValueError(f"team {self['team_reference']} not found in year "
+                                 f"{self['year']}'s team name mapping. Available teams: "
+                                 f"{TEAMS[self['year']].keys()}")
+        else:
+            raise ValueError(f"year {self['year']} not found in team name mapping. Available "
+                             f'years: {TEAMS.keys()}')
+
+    @model_validator(mode='before')
+    def get_driver_name(self) -> Self:
+        if self['year'] in DRIVERS:
+            if self['driver_reference'] in DRIVERS[self['year']]:
+                self['driver_reference'] = DRIVERS[self['year']][self['driver_reference']]
+                return self
+            else:
+                raise ValueError(f"driver {self['driver_reference']} not found in year "
+                                 f"{self['year']}'s driver name mapping. Available drivers: "
+                                 f"{DRIVERS[self['year']].keys()}")
+        else:
+            raise ValueError(f"year {self['year']} not found in driver name mapping. Available "
+                             f'years: {DRIVERS.keys()}')
 
 class EntryListParser:
     def __init__(
@@ -264,6 +326,7 @@ class EntryListParser:
             for x in df.itertuples():
                 try:
                     drivers.append(DriverData(
+                            object_type="RoundEntry",
                             foreign_keys=RoundEntry(
                                 year=self.year,
                                 round=self.round_no,
@@ -275,7 +338,7 @@ class EntryListParser:
                                     car_number=x.car_no
                                 )
                             ]
-                        ).model_dump())
+                        ).model_dump(exclude_unset=True))
                 except ValidationError as e:
                     warnings.warn(f'Error when parsing driver {x.driver} in '
                                   f'{self.file}: {e}', )
@@ -570,6 +633,7 @@ class RaceParser:
         def to_json() -> list[dict]:
             return df.apply(
                 lambda x: ClassificationData(
+                    object_type="SessionEntry",
                     foreign_keys=SessionEntry(
                         year=self.year,
                         round=self.round_no,
@@ -589,7 +653,7 @@ class RaceParser:
                             # TODO: replace the rank with missing or -1 in self.classification_df
                         )
                     ]
-                ).model_dump(exclude_none=True),
+                ).model_dump(exclude_none=True, exclude_unset=True),
                 axis=1
             ).tolist()
 
@@ -1169,9 +1233,10 @@ class RaceParser:
             )
             return temp.apply(
                 lambda x: LapData(
+                    object_type="Lap",
                     foreign_keys=x.session_entry,
                     objects=x.lap
-                ).model_dump(),
+                ).model_dump(exclude_unset=True),
                 axis=1
             ).tolist()
 
@@ -1568,6 +1633,7 @@ class QualifyingParser:
                 temp['position'] = range(1, len(temp) + 1)
                 temp['classification'] = temp.apply(
                     lambda x: QualiClassificationData(
+                        object_type="SessionEntry",
                         foreign_keys=SessionEntry(
                             year=self.year,
                             round=self.round_no,
@@ -1580,7 +1646,7 @@ class QualifyingParser:
                                 is_classified=(x.finishing_status == 0)
                             )
                         ]
-                    ).model_dump(),
+                    ).model_dump(exclude_unset=True),
                     axis=1
                 )
                 data.extend(temp['classification'].tolist())
@@ -1889,9 +1955,10 @@ class QualifyingParser:
                 )
                 temp['lap_data'] = temp.apply(
                     lambda x: LapData(
+                        object_type="Lap",
                         foreign_keys=x['session_entry'],
                         objects=x['lap']
-                    ).model_dump(),
+                    ).model_dump(exclude_unset=True),
                     axis=1
                 )
                 lap_data.extend(temp['lap_data'].tolist())
@@ -2092,9 +2159,10 @@ class PitStopParser:
             )
             return pit_stop.apply(
                 lambda x: PitStopData(
+                    object_type="PitStop",
                     foreign_keys=x.entry,
                     objects=[x.pit_stop]
-                ).model_dump(),
+                ).model_dump(exclude_unset=True),
                 axis=1
             ).tolist()
 
