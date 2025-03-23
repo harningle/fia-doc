@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
 """Frequently used foreign key models for the data objects"""
-from typing import Literal
 from typing_extensions import Self
 
-from pydantic import BaseModel, ConfigDict, PositiveInt, field_validator, model_validator
+from pydantic import ConfigDict, field_validator, model_validator
 
 from .._constants import DRIVERS, TEAMS
+from jolpica.schemas import data_import
 
-
-class SessionEntryForeignKeys(BaseModel):
-    year: PositiveInt
-    round: PositiveInt
-    session: str = Literal['R', 'Q1', 'Q2', 'Q3', 'SR', 'SQ1', 'SQ2', 'SQ3', 'FP1', 'FP2', 'FP3']
-    car_number: PositiveInt
-
+class SessionValidatorMixin:
     @field_validator('session')
     @classmethod
     def clean_session(cls, session: str) -> str:
@@ -27,16 +21,15 @@ class SessionEntryForeignKeys(BaseModel):
             case _:
                 raise ValueError(f'Invalid session: {session}. Must be one of: "R", "Q1", "Q2",'
                                  f'"Q3", "SR", "SQ1", "SQ2", "SQ3", "FP1", "FP2", "FP3"')
+    
 
+class SessionEntryForeignKeys(data_import.SessionEntryForeignKeys, SessionValidatorMixin):
     model_config = ConfigDict(extra='forbid')
 
+class PitStopForeignKeys(data_import.PitStopForeignKeys, SessionValidatorMixin):
+    model_config = ConfigDict(extra='forbid')
 
-class RoundEntry(BaseModel):
-    year: PositiveInt
-    round: PositiveInt
-    driver_reference: str
-    team_reference: str
-
+class RoundEntry(data_import.RoundEntryForeignKeys):
     @model_validator(mode='before')
     def get_team_reference(self) -> Self:
         if self['year'] in TEAMS:
@@ -68,25 +61,3 @@ class RoundEntry(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
-class PitStopEntry(BaseModel):
-    year: PositiveInt
-    round: PositiveInt
-    session: str = Literal['R', 'SR', 'FP1', 'FP2', 'FP3']
-    car_number: PositiveInt
-    lap: PositiveInt
-
-    @field_validator('session')
-    @classmethod
-    def clean_session(cls, session: str) -> str:
-        match session.lower().strip():
-            case 'r' | 'sr' | 'fp1' | 'fp2' | 'fp3':
-                return session.upper()
-            case 'race':  # Some simple mapping
-                return 'R'
-            case 'sprint' | 'sprint_race' | 'sprint race':
-                return 'SR'
-            case _:
-                raise ValueError(f'Invalid session: {session}. Must be one of: "R", "SR", "FP1", '
-                                 f'"FP2", "FP3"')
-
-    model_config = ConfigDict(extra='forbid')

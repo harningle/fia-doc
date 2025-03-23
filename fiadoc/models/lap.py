@@ -2,29 +2,16 @@
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
 from .foreign_key import SessionEntryForeignKeys
+from jolpica.schemas import data_import
 
 
-class Lap(BaseModel):
-    number: PositiveInt
-    position: PositiveInt
+class LapObject(data_import.LapObject):
     time: dict[str, str | int]
-    is_entry_fastest_lap: bool
-
     model_config = ConfigDict(extra='forbid')
 
 
-class QualiLap(BaseModel):
-    number: PositiveInt
-    time: dict[str, str | int]
-    is_deleted: bool
-    is_entry_fastest_lap: bool
-
-    model_config = ConfigDict(extra='forbid')
-
-
-class LapData(BaseModel):
-    object_type: str = 'Lap'
+class LapImport(data_import.LapImport):
     foreign_keys: SessionEntryForeignKeys
-    objects: list[Lap | QualiLap]
+    objects: list[LapObject]
 
     model_config = ConfigDict(extra='forbid')

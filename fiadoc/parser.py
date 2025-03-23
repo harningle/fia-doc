@@ -9,23 +9,17 @@ import numpy as np
 import pandas as pd
 from pydantic import ValidationError
 import pymupdf
-from jolpica.schemas import data_import
-from typing_extensions import Self
 
 from ._constants import QUALI_DRIVERS
 from .models.classification import(
     SessionEntryObject,
     SessionEntryImport,
-    QualiClassification,
-    QualiClassificationData
 )
-from .models.driver import Driver, DriverData
-from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntryForeignKeys
-from .models.lap import Lap, LapData, QualiLap
-from .models.pit_stop import PitStop, PitStopData
+from .models.driver import RoundEntryObject, RoundEntryImport
+from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
+from .models.lap import LapObject, LapImport
+from .models.pit_stop import PitStopObject, PitStopData
 from .utils import Page, duration_to_millisecond, time_to_timedelta
-from pydantic import BaseModel, ConfigDict, PositiveInt, field_validator, model_validator
-from ._constants import DRIVERS, TEAMS
 
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -33,64 +27,6 @@ pd.set_option('future.no_silent_downcasting', True)
 
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
-
-# class SessionEntryObjectJson(data_import.SessionEntryObject):
-#     time: dict[str, str | int]
-
-# class PitStopObjectJson(data_import.PitStopObject):
-#     duration: dict[str, str | int]
-
-# class LapObjectJson(data_import.LapObject):
-#     time: dict[str, str | int]
-
-# class ValidatorMixin:
-#     @field_validator('session')
-#     @classmethod
-#     def clean_session(cls, session: str) -> str:
-#         match session.lower().strip():
-#             case 'r' | 'q1' | 'q2' | 'q3' | 'sr' | 'sq1' | 'sq2' | 'sq3' | 'fp1' | 'fp2' | 'fp3':
-#                 return session.upper()
-#             case 'race':  # Some simple mapping
-#                 return 'R'
-#             case 'sprint' | 'sprint_race' | 'sprint race':
-#                 return 'SR'
-#             case _:
-#                 raise ValueError(f'Invalid session: {session}. Must be one of: "R", "Q1", "Q2",'
-#                                  f'"Q3", "SR", "SQ1", "SQ2", "SQ3", "FP1", "FP2", "FP3"')
-
-# class PitStopForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
-#     pass
-# class LapForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
-#     pass
-
-# class RoundEntryForeignKeys(data_import.RoundEntryForeignKeys):
-#     @model_validator(mode='before')
-#     def get_team_reference(self) -> Self:
-#         if self['year'] in TEAMS:
-#             if self['team_reference'] in TEAMS[self['year']]:
-#                 self['team_reference'] = TEAMS[self['year']][self['team_reference']]
-#                 return self
-#             else:
-#                 raise ValueError(f"team {self['team_reference']} not found in year "
-#                                  f"{self['year']}'s team name mapping. Available teams: "
-#                                  f"{TEAMS[self['year']].keys()}")
-#         else:
-#             raise ValueError(f"year {self['year']} not found in team name mapping. Available "
-#                              f'years: {TEAMS.keys()}')
-
-#     @model_validator(mode='before')
-#     def get_driver_name(self) -> Self:
-#         if self['year'] in DRIVERS:
-#             if self['driver_reference'] in DRIVERS[self['year']]:
-#                 self['driver_reference'] = DRIVERS[self['year']][self['driver_reference']]
-#                 return self
-#             else:
-#                 raise ValueError(f"driver {self['driver_reference']} not found in year "
-#                                  f"{self['year']}'s driver name mapping. Available drivers: "
-#                                  f"{DRIVERS[self['year']].keys()}")
-#         else:
-#             raise ValueError(f"year {self['year']} not found in driver name mapping. Available "
-#                              f'years: {DRIVERS.keys()}')
 
 class EntryListParser:
     def __init__(
@@ -325,7 +261,7 @@ class EntryListParser:
             drivers = []
             for x in df.itertuples():
                 try:
-                    drivers.append(DriverData(
+                    drivers.append(RoundEntryImport(
                             object_type="RoundEntry",
                             foreign_keys=RoundEntry(
                                 year=self.year,
@@ -334,7 +270,7 @@ class EntryListParser:
                                 driver_reference=x.driver
                             ),
                             objects=[
-                                Driver(
+                                RoundEntryObject(
                                     car_number=x.car_no
                                 )
                             ]
@@ -1214,7 +1150,7 @@ class RaceParser:
         def to_json() -> list[dict]:
             temp = df.copy()
             temp.lap = temp.apply(
-                lambda x: Lap(
+                lambda x: LapObject(
                     number=x.lap,
                     position=x.position,
                     time=duration_to_millisecond(x.lap_time),
@@ -1232,7 +1168,7 @@ class RaceParser:
                 )
             )
             return temp.apply(
-                lambda x: LapData(
+                lambda x: LapImport(
                     object_type="Lap",
                     foreign_keys=x.session_entry,
                     objects=x.lap
@@ -1936,7 +1872,7 @@ class QualifyingParser:
             for q in [1, 2, 3]:
                 temp = lap_times[lap_times.Q == q].copy()
                 temp['lap'] = temp.apply(
-                    lambda x: QualiLap(
+                    lambda x: LapObject(
                         number=x.lap_no,
                         time=x.lap_time,
                         is_deleted=x.lap_time_deleted,
@@ -1954,7 +1890,7 @@ class QualifyingParser:
                     )
                 )
                 temp['lap_data'] = temp.apply(
-                    lambda x: LapData(
+                    lambda x: LapImport(
                         object_type="Lap",
                         foreign_keys=x['session_entry'],
                         objects=x['lap']
@@ -2141,7 +2077,7 @@ class PitStopParser:
         def to_json() -> list[dict]:
             pit_stop = df.copy()
             pit_stop['pit_stop'] = pit_stop.apply(
-                lambda x: PitStop(
+                lambda x: PitStopObject(
                     number=x.stop_no,
                     duration=duration_to_millisecond(x.duration),
                     local_timestamp=x.local_time
@@ -2149,7 +2085,7 @@ class PitStopParser:
                 axis=1
             )
             pit_stop['entry'] = pit_stop.apply(
-                lambda x: PitStopEntry(
+                lambda x: PitStopForeignKeys(
                     year=self.year,
                     round=self.round_no,
                     session=self.session if self.session == 'race' else 'SR',
