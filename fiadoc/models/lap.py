@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
-from .foreign_key import SessionEntry
+from .foreign_key import SessionEntryForeignKeys
 
 
 class Lap(BaseModel):
@@ -24,7 +24,7 @@ class QualiLap(BaseModel):
 
 class LapData(BaseModel):
     object_type: str = 'Lap'
-    foreign_keys: SessionEntry
+    foreign_keys: SessionEntryForeignKeys
     objects: list[Lap | QualiLap]
 
     model_config = ConfigDict(extra='forbid')

@@ -14,13 +14,13 @@ from typing_extensions import Self
 
 from ._constants import QUALI_DRIVERS
 from .models.classification import(
-    Classification,
-    ClassificationData,
+    SessionEntryObject,
+    SessionEntryImport,
     QualiClassification,
     QualiClassificationData
 )
 from .models.driver import Driver, DriverData
-from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntry
+from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntryForeignKeys
 from .models.lap import Lap, LapData, QualiLap
 from .models.pit_stop import PitStop, PitStopData
 from .utils import Page, duration_to_millisecond, time_to_timedelta
@@ -34,63 +34,63 @@ pd.set_option('future.no_silent_downcasting', True)
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
 
-class SessionEntryObjectJson(data_import.SessionEntryObject):
-    time: dict[str, str | int]
+# class SessionEntryObjectJson(data_import.SessionEntryObject):
+#     time: dict[str, str | int]
 
-class PitStopObjectJson(data_import.PitStopObject):
-    duration: dict[str, str | int]
+# class PitStopObjectJson(data_import.PitStopObject):
+#     duration: dict[str, str | int]
 
-class LapObjectJson(data_import.LapObject):
-    time: dict[str, str | int]
+# class LapObjectJson(data_import.LapObject):
+#     time: dict[str, str | int]
 
-class ValidatorMixin:
-    @field_validator('session')
-    @classmethod
-    def clean_session(cls, session: str) -> str:
-        match session.lower().strip():
-            case 'r' | 'q1' | 'q2' | 'q3' | 'sr' | 'sq1' | 'sq2' | 'sq3' | 'fp1' | 'fp2' | 'fp3':
-                return session.upper()
-            case 'race':  # Some simple mapping
-                return 'R'
-            case 'sprint' | 'sprint_race' | 'sprint race':
-                return 'SR'
-            case _:
-                raise ValueError(f'Invalid session: {session}. Must be one of: "R", "Q1", "Q2",'
-                                 f'"Q3", "SR", "SQ1", "SQ2", "SQ3", "FP1", "FP2", "FP3"')
+# class ValidatorMixin:
+#     @field_validator('session')
+#     @classmethod
+#     def clean_session(cls, session: str) -> str:
+#         match session.lower().strip():
+#             case 'r' | 'q1' | 'q2' | 'q3' | 'sr' | 'sq1' | 'sq2' | 'sq3' | 'fp1' | 'fp2' | 'fp3':
+#                 return session.upper()
+#             case 'race':  # Some simple mapping
+#                 return 'R'
+#             case 'sprint' | 'sprint_race' | 'sprint race':
+#                 return 'SR'
+#             case _:
+#                 raise ValueError(f'Invalid session: {session}. Must be one of: "R", "Q1", "Q2",'
+#                                  f'"Q3", "SR", "SQ1", "SQ2", "SQ3", "FP1", "FP2", "FP3"')
 
-class PitStopForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
-    pass
-class LapForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
-    pass
+# class PitStopForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
+#     pass
+# class LapForeignKeys(data_import.PitStopForeignKeys, ValidatorMixin):
+#     pass
 
-class RoundEntryForeignKeys(data_import.RoundEntryForeignKeys):
-    @model_validator(mode='before')
-    def get_team_reference(self) -> Self:
-        if self['year'] in TEAMS:
-            if self['team_reference'] in TEAMS[self['year']]:
-                self['team_reference'] = TEAMS[self['year']][self['team_reference']]
-                return self
-            else:
-                raise ValueError(f"team {self['team_reference']} not found in year "
-                                 f"{self['year']}'s team name mapping. Available teams: "
-                                 f"{TEAMS[self['year']].keys()}")
-        else:
-            raise ValueError(f"year {self['year']} not found in team name mapping. Available "
-                             f'years: {TEAMS.keys()}')
+# class RoundEntryForeignKeys(data_import.RoundEntryForeignKeys):
+#     @model_validator(mode='before')
+#     def get_team_reference(self) -> Self:
+#         if self['year'] in TEAMS:
+#             if self['team_reference'] in TEAMS[self['year']]:
+#                 self['team_reference'] = TEAMS[self['year']][self['team_reference']]
+#                 return self
+#             else:
+#                 raise ValueError(f"team {self['team_reference']} not found in year "
+#                                  f"{self['year']}'s team name mapping. Available teams: "
+#                                  f"{TEAMS[self['year']].keys()}")
+#         else:
+#             raise ValueError(f"year {self['year']} not found in team name mapping. Available "
+#                              f'years: {TEAMS.keys()}')
 
-    @model_validator(mode='before')
-    def get_driver_name(self) -> Self:
-        if self['year'] in DRIVERS:
-            if self['driver_reference'] in DRIVERS[self['year']]:
-                self['driver_reference'] = DRIVERS[self['year']][self['driver_reference']]
-                return self
-            else:
-                raise ValueError(f"driver {self['driver_reference']} not found in year "
-                                 f"{self['year']}'s driver name mapping. Available drivers: "
-                                 f"{DRIVERS[self['year']].keys()}")
-        else:
-            raise ValueError(f"year {self['year']} not found in driver name mapping. Available "
-                             f'years: {DRIVERS.keys()}')
+#     @model_validator(mode='before')
+#     def get_driver_name(self) -> Self:
+#         if self['year'] in DRIVERS:
+#             if self['driver_reference'] in DRIVERS[self['year']]:
+#                 self['driver_reference'] = DRIVERS[self['year']][self['driver_reference']]
+#                 return self
+#             else:
+#                 raise ValueError(f"driver {self['driver_reference']} not found in year "
+#                                  f"{self['year']}'s driver name mapping. Available drivers: "
+#                                  f"{DRIVERS[self['year']].keys()}")
+#         else:
+#             raise ValueError(f"year {self['year']} not found in driver name mapping. Available "
+#                              f'years: {DRIVERS.keys()}')
 
 class EntryListParser:
     def __init__(
@@ -632,16 +632,16 @@ class RaceParser:
 
         def to_json() -> list[dict]:
             return df.apply(
-                lambda x: ClassificationData(
+                lambda x: SessionEntryImport(
                     object_type="SessionEntry",
-                    foreign_keys=SessionEntry(
+                    foreign_keys=SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
                         session=self.session,
                         car_number=x.car_no
                     ),
                     objects=[
-                        Classification(
+                        SessionEntryObject(
                             position=x.finishing_position,
                             is_classified=x.is_classified,
                             status=x.finishing_status,
@@ -1224,7 +1224,7 @@ class RaceParser:
             )
             temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
             temp['session_entry'] = temp.car_no.map(
-                lambda x: SessionEntry(
+                lambda x: SessionEntryForeignKeys(
                     year=self.year,
                     round=self.round_no,
                     session='R' if self.session == 'race' else 'SR',
@@ -1632,16 +1632,16 @@ class QualifyingParser:
                 temp = temp.sort_values(by=['is_dsq', f'Q{q}', 'original_order'])
                 temp['position'] = range(1, len(temp) + 1)
                 temp['classification'] = temp.apply(
-                    lambda x: QualiClassificationData(
+                    lambda x: SessionEntryImport(
                         object_type="SessionEntry",
-                        foreign_keys=SessionEntry(
+                        foreign_keys=SessionEntryForeignKeys(
                             year=self.year,
                             round=self.round_no,
                             session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
                             car_number=x.NO
                         ),
                         objects=[
-                            QualiClassification(
+                            SessionEntryObject(
                                 position=x.position,
                                 is_classified=(x.finishing_status == 0)
                             )
@@ -1946,7 +1946,7 @@ class QualifyingParser:
                 )
                 temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
                 temp['session_entry'] = temp['car_no'].map(
-                    lambda x: SessionEntry(
+                    lambda x: SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
                         session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',

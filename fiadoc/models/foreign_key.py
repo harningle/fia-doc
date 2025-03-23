@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, PositiveInt, field_validator, model_
 from .._constants import DRIVERS, TEAMS
 
 
-class SessionEntry(BaseModel):
+class SessionEntryForeignKeys(BaseModel):
     year: PositiveInt
     round: PositiveInt
     session: str = Literal['R', 'Q1', 'Q2', 'Q3', 'SR', 'SQ1', 'SQ2', 'SQ3', 'FP1', 'FP2', 'FP3']
