@@ -19,22 +19,25 @@
     ]
 }
 """
+
 from datetime import timedelta
 
+from jolpica.schemas import data_import
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
 from .foreign_key import PitStopForeignKeys
-from jolpica.schemas import data_import
 
 
 class PitStopObject(data_import.PitStopObject):
     duration: dict[str, str | int]
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
 
-class PitStopData(data_import.PitStopImport):  # TODO: all xxxData can be combined into one class?
+class PitStopData(
+    data_import.PitStopImport
+):  # TODO: all xxxData can be combined into one class?
     foreign_keys: PitStopForeignKeys
     objects: list[PitStopObject]
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
