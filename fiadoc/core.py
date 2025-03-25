@@ -7,6 +7,7 @@ from string import printable
 import tempfile
 from typing import Literal, Optional
 
+from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -187,13 +188,28 @@ class Page:
                 raise NotImplementedError(f'`option` can only be "text", "words", or "blocks",'
                                           f'when `clip` is specified')
 
+        # Replace grey pixel with white
+        pixmap_arr[np.all(pixmap_arr >= 225, axis=2)] = 255
+        Image.fromarray(pixmap_arr).save(self.tempdir / 'clip.png')
+
         # If there are some black pixels, OCR the clipped area
-        pixmap.pil_save(self.tempdir / 'clip.png')
+        # try:
+        #     i = max([int(i.split('.')[0]) for i in os.listdir('temp')]) + 1
+        # except:
+        #     i = 0
+        # Image.fromarray(pixmap_arr).save(f'temp/{i}.png')
         text = pytesseract.image_to_string(str(self.tempdir / 'clip.png'),
                                            config=f'--psm 7 --dpi 300 -l {lang}')
         text = ''.join([c for c in text.strip() if c in printable])
-        text = re.sub(r'^[\.\-_,|—]+$', '', text)  # Use them as placeholder for empty string in
-        if option == 'text':                       # training
+        text = re.sub(r'^[.\-_,|—]+$', '', text)  # Use them as placeholder for empty string in
+        text = re.sub(r'\|+$', '', text)          # training
+        text = re.sub(r'^\|+', '', text)  # TODO: just `.strip`? No need `re`?
+        text = re.sub(r'-$', '', text)
+        text = re.sub(r'^-+', '', text)
+        text = text.strip()
+        # with open(f'temp/{i}.gt.txt', 'w') as f:
+        #     f.write(f'{text}\n')
+        if option == 'text':
             return text
         elif option == 'words':
             if text:

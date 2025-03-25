@@ -1291,7 +1291,7 @@ class QualifyingParser:
 
         # Car No. should be pure digits
         if not df.NO.str.isnumeric().all():
-            raise ParsingError(f'NO col. in {self.classification_file} is not all numeric: '
+            raise ParsingError(f'NO col. in {self.classification_file} is not all 1 or 2 digits: '
                                f'{df.NO.values}')
         df.NO = df.NO.astype(int)
 
@@ -1566,10 +1566,13 @@ class QualifyingParser:
                          and np.isclose(i['width'], 1, rtol=0.1)
                          and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
                 if not lines:
-                    # Go through the pixel map and find a wide horizontal white strip with 10+ px height
+                    # Go through the pixel map and find a wide horizontal white strip with 10+ px
+                    # height
                     pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
                     l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                    pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+                    pixmap = np.ndarray([b - t, r - l, 3],
+                                        dtype=np.uint8,
+                                        buffer=pixmap.samples_mv)
                     is_white_row = np.all(pixmap == 255, axis=(1, 2))
                     white_strips = []
                     strip_start = None
@@ -1584,10 +1587,11 @@ class QualifyingParser:
                     if strip_start is not None and len(is_white_row) - strip_start >= 10:
                         white_strips.append(strip_start + t)
                     if not white_strips:
-                        raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
-                                         f'or a thick horizontal line in {self.classification_file}')
+                        raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION '
+                                         f'LAP" or a thick horizontal line in '
+                                         f'{self.classification_file}')
                     strip_start = white_strips[0]  # The topmost one is the bottom of the table
-                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
+                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # 1px buffer
                 else:
                     lines.sort(key=lambda x: x['rect'].y0)
                     bottom = [lines[0]['rect']]
@@ -1595,23 +1599,18 @@ class QualifyingParser:
 
             # Use grey and white rectangles to determine the rows again
             t = page.search_for('NOT CLASSIFIED - ')[0].y1
-            # Car No. col. should have car numbers with little vertical gap between them. When we
-            # find a big gap, it's the bottom of the table
-            line_height = max([i[3] - i[1] for i in car_nos])
-            car_nos = []
-            while car_no := page.get_text('blocks',
-                                          clip=(vlines[1], t, vlines[2], t + line_height)):
-                assert len(car_no) == 1, f'Error in detecting rows in the "NOT CLASSIFIED" ' \
-                                         f'table in {self.classification_file}'
-                if not re.match(r'\d+', car_no[0][4].strip()):  # It's a car number so digits.
-                    break                                       # Otherwise, it's an OCR error and
-                car_no = car_no[0]                              # should be empty
-                car_nos.append([car_no[1], car_no[3]])
-                t = car_no[3]
-            hlines = [car_nos[0][0] - 1]
-            for i in range(len(car_nos) - 1):
-                hlines.append((car_nos[i][1] + car_nos[i + 1][0]) / 2)
-            hlines.append(car_nos[-1][1] + 1)
+            rects = []
+            for i in page.get_drawings_in_bbox(bbox=(0, t, w, b)):
+                if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                    rects.append(i['rect'].y0 + 1)
+                    rects.append(i['rect'].y1 - 1)
+            rects.sort()
+            hlines = [t + 1]
+            for i in rects:
+                if i - hlines[-1] > 5:
+                    hlines.append(i)
+            if b - hlines[-1] > 5:
+                hlines.append(b)
             not_classified = self._parse_table_by_grid(page, vlines, hlines)
             # No col. header in NOT CLASSIFIED table. The detected col. header is actually table
             # content, so need to append the col. header to the table
