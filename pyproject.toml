@@ -8,18 +8,23 @@ authors = [
 description = "Parse FIA PDF documents to get race data"
 readme = "README.md"
 
-requires-python = ">=3.10,<3.13"  # 3.10 should work but older versions may also be fine
+requires-python = ">=3.12,<3.13"  # jolpica-schemas requires 3.12+
 dependencies = [
   "camelot-py[base]>=1.0.0,<2.0.0",
+  "matplotlib>=3.4.0,<4.0.0",
   "pandas>=2.0.0,<3.0.0",
   "pydantic>=2.0.0,<3.0.0",
   "pymupdf==1.25.1",  # Seems related to pymupdf/PyMuPDF#4206? Check `assert option in formats`
-  "requests>=2.28.0,<3.0.0"
+  "requests>=2.28.0,<3.0.0",
+  "jolpica-schemas @ git+https://github.com/jolpica/jolpica-f1@71f12b1c9637aa838926abcb6f4840fbfac4d87c#egg=jolpica-schemas&subdirectory=jolpica/schemas",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 ignore-vcs = true

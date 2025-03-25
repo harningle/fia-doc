@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
 """Driver entry models"""
+
+from jolpica.schemas import data_import
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
 from .foreign_key import RoundEntry
 
 
-class Driver(BaseModel):
-    car_number: PositiveInt
-
-    model_config = ConfigDict(extra='forbid')
+class RoundEntryObject(data_import.RoundEntryObject):
+    model_config = ConfigDict(extra="forbid")
 
 
-class DriverData(BaseModel):
-    object_type: str = 'RoundEntry'
+class RoundEntryImport(data_import.RoundEntryImport):
     foreign_keys: RoundEntry
+    objects: list[RoundEntryObject]
 
-    objects: list[Driver]
-
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")

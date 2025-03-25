@@ -2,10 +2,24 @@ import os
 import re
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymupdf
 import requests
+
+rc = {'figure.figsize': (4, 3),
+      'axes.facecolor': 'white',  # Remove background colour
+      'axes.grid': False,         # Turn on grid
+      'axes.linewidth': '0.2',
+      'axes.edgecolor': '0',      # Set axes edge color to be black
+      'font.size': 2,
+      'xtick.major.size': 1,
+      'xtick.major.width': 0.2,
+      'ytick.major.size': 1,
+      'ytick.major.width': 0.2}
+plt.rcdefaults()
+plt.rcParams.update(rc)
 
 
 def duration_to_millisecond(s: str) -> Optional[dict[str, str | int]]:
@@ -91,4 +105,3 @@ def download_pdf(url: str, out_path: str | os.PathLike) -> None:
     with open(out_path, 'wb') as f:
         f.write(resp.content)
     return
-

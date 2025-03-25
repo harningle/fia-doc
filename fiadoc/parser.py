@@ -8,28 +8,22 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from pydantic import ValidationError
 import pymupdf
+from pydantic import ValidationError
 
 from ._constants import QUALI_DRIVERS
 from .core import Page, ParsingError
-from .models.classification import (
-    Classification,
-    ClassificationData,
-    QualiClassification,
-    QualiClassificationData
-)
-from .models.driver import Driver, DriverData
-from .models.foreign_key import PitStopEntry, RoundEntry, SessionEntry
-from .models.lap import Lap, LapData, QualiLap
-from .models.pit_stop import PitStop, PitStopData
+from .models.classification import SessionEntryImport, SessionEntryObject
+from .models.driver import RoundEntryImport, RoundEntryObject
+from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
+from .models.lap import LapImport, LapObject
+from .models.pit_stop import PitStopData, PitStopObject
 from .utils import duration_to_millisecond, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
 
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
-
 
 class EntryListParser:
     def __init__(
@@ -264,7 +258,8 @@ class EntryListParser:
             drivers = []
             for x in df.itertuples():
                 try:
-                    drivers.append(DriverData(
+                    drivers.append(RoundEntryImport(
+                            object_type="RoundEntry",
                             foreign_keys=RoundEntry(
                                 year=self.year,
                                 round=self.round_no,
@@ -272,11 +267,11 @@ class EntryListParser:
                                 driver_reference=x.driver
                             ),
                             objects=[
-                                Driver(
+                                RoundEntryObject(
                                     car_number=x.car_no
                                 )
                             ]
-                        ).model_dump())
+                        ).model_dump(exclude_unset=True))
                 except ValidationError as e:
                     warnings.warn(f'Error when parsing driver {x.driver} in '
                                   f'{self.file}: {e}', )
@@ -570,15 +565,16 @@ class RaceParser:
 
         def to_json() -> list[dict]:
             return df.apply(
-                lambda x: ClassificationData(
-                    foreign_keys=SessionEntry(
+                lambda x: SessionEntryImport(
+                    object_type="SessionEntry",
+                    foreign_keys=SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
                         session=self.session,
                         car_number=x.car_no
                     ),
                     objects=[
-                        Classification(
+                        SessionEntryObject(
                             position=x.finishing_position,
                             is_classified=x.is_classified,
                             status=x.finishing_status,
@@ -590,7 +586,7 @@ class RaceParser:
                             # TODO: replace the rank with missing or -1 in self.classification_df
                         )
                     ]
-                ).model_dump(exclude_none=True),
+                ).model_dump(exclude_none=True, exclude_unset=True),
                 axis=1
             ).tolist()
 
@@ -1151,7 +1147,7 @@ class RaceParser:
         def to_json() -> list[dict]:
             temp = df.copy()
             temp.lap = temp.apply(
-                lambda x: Lap(
+                lambda x: LapObject(
                     number=x.lap,
                     position=x.position,
                     time=duration_to_millisecond(x.lap_time),
@@ -1161,7 +1157,7 @@ class RaceParser:
             )
             temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
             temp['session_entry'] = temp.car_no.map(
-                lambda x: SessionEntry(
+                lambda x: SessionEntryForeignKeys(
                     year=self.year,
                     round=self.round_no,
                     session='R' if self.session == 'race' else 'SR',
@@ -1169,10 +1165,11 @@ class RaceParser:
                 )
             )
             return temp.apply(
-                lambda x: LapData(
+                lambda x: LapImport(
+                    object_type="Lap",
                     foreign_keys=x.session_entry,
                     objects=x.lap
-                ).model_dump(),
+                ).model_dump(exclude_unset=True),
                 axis=1
             ).tolist()
 
@@ -1245,15 +1242,21 @@ class QualifyingParser:
                 l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
                 cell = page.get_text('blocks', clip=(l, t, r, b))
                 if cell:
-                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
-                                           f'{self.classification_file}. Found {len(cell)}'
+                    # Usually, one cell is one line of text. The only exception is Andrea Kimi
+                    # Antonelli. His name is too long and thus wrapped into two lines
+                    if len(cell) > 1:
+                        if len(cell) == 2 and cell[0][4].strip() == 'Andrea Kimi':
+                            text = cell[0][4].strip() + ' ' + cell[1][4].strip()
+                        else:
+                            raise Exception(f'Expected exactly one cell in row {i}, col {j} in '
+                                            f'{self.classification_file}. Found {cell}')
                     cell = cell[0]
                     if cell[4].strip():
                         bbox = cell[0:4]
                         if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
                                 or bbox[1] < t - tol or bbox[3] > b + tol:
                             raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
-                                             f'{self.classification_file}')
+                                             f'{self.classification_file}: {cell}')
                         text = cell[4].strip()
                 row.append(text)
             cells.append(row)
@@ -1499,17 +1502,20 @@ class QualifyingParser:
             vlines.insert(headers.index('%') + 2,
                           1.4 * cols['Q1_TIME'][0] - 0.4 * cols['Q1_TIME'][1])
 
-        # Get the row positions. We have car numbers in "NO" col., so the top and bottom of them
-        # are the top and bottom of their rows
-        car_nos = page.get_text('blocks', clip=(cols['NO'][0] - 1, b_header, cols['NO'][1] + 1, b))
+        # Get the row positions. The rows are coloured in grey, white, grey, white, ... So we just
+        # need to get the top and bottom positions of the grey rectangles
+        rects = []
+        for i in page.get_drawings_in_bbox(bbox=(0, b_header - 2, w, b)):
+            if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                rects.append(i['rect'].y0 + 1)
+                rects.append(i['rect'].y1 - 1)
+        rects.sort()
         hlines: list[float] = [y, b_header]
-        for i, car_no in enumerate(car_nos):
-            assert re.match(r'\d+', car_no[4].strip()), \
-                f'Expected car number (pure digits) in "NO" col. in {self.classification_file}. ' \
-                f'Found "{car_no}"'
-            if i < len(car_nos) - 1:
-                hlines.append((car_no[3] + car_nos[i + 1][1]) / 2)
-        hlines.append(b)
+        for i in rects:
+            if i - hlines[-1] > 5:
+                hlines.append(i)
+        if b - hlines[-1] > 5:
+            hlines.append(b)
 
         # Get the table
         df = self._parse_table_by_grid(page, vlines, hlines)
@@ -1531,6 +1537,7 @@ class QualifyingParser:
         df.columns = headers
         df['finishing_status'] = 0
         df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
+        df = df[(df.position != '') & df.position.notna()]
 
         # Sanitise the table cells
         """
@@ -1542,6 +1549,51 @@ class QualifyingParser:
 
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
+            # Locate the bottom of the table
+            # TODO: refactor this. This is a copy of the above code
+            """
+            The bottom of "NOT CLASSIFIED" table is usually "POLE POSITION LAP", but some PDFs do
+            not have it, e.g. 2023 Australian. For these PDFs, we use a thick horizontal line,
+            which is the top of "POLE POSITION LAP" table, as the bottom of the "NOT CLASSIFIED"
+            table.
+            """
+            bottom = page.search_for('POLE POSITION LAP')
+            if not bottom:
+                lines = page.get_drawings_in_bbox((0, hlines[-1], w, page.bound()[3]))
+                lines = [i for i in lines
+                         if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
+                         and i['width'] is not None
+                         and np.isclose(i['width'], 1, rtol=0.1)
+                         and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
+                if not lines:
+                    # Go through the pixel map and find a wide horizontal white strip with 10+ px height
+                    pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
+                    l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+                    pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+                    is_white_row = np.all(pixmap == 255, axis=(1, 2))
+                    white_strips = []
+                    strip_start = None
+                    for i, is_white in enumerate(is_white_row):
+                        if is_white and strip_start is None:
+                            strip_start = i
+                        elif not is_white and strip_start is not None:
+                            if i - strip_start >= 10:  # At least 10 rows of white
+                                white_strips.append(strip_start + t)
+                            strip_start = None
+                    # If the strip is at the bottom. Shouldn't happen but just in case
+                    if strip_start is not None and len(is_white_row) - strip_start >= 10:
+                        white_strips.append(strip_start + t)
+                    if not white_strips:
+                        raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
+                                         f'or a thick horizontal line in {self.classification_file}')
+                    strip_start = white_strips[0]  # The topmost one is the bottom of the table
+                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
+                else:
+                    lines.sort(key=lambda x: x['rect'].y0)
+                    bottom = [lines[0]['rect']]
+            b = bottom[0].y0
+
+            # Use grey and white rectangles to determine the rows again
             t = page.search_for('NOT CLASSIFIED - ')[0].y1
             # Car No. col. should have car numbers with little vertical gap between them. When we
             # find a big gap, it's the bottom of the table
@@ -1564,6 +1616,8 @@ class QualifyingParser:
             # No col. header in NOT CLASSIFIED table. The detected col. header is actually table
             # content, so need to append the col. header to the table
             not_classified.loc[-1] = not_classified.columns
+            not_classified = not_classified[(not_classified.position != '')
+                                            & not_classified.position.notna()]
             not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
             not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
@@ -1611,20 +1665,21 @@ class QualifyingParser:
                 temp = temp.sort_values(by=['is_dsq', f'Q{q}', 'original_order'])
                 temp['position'] = range(1, len(temp) + 1)
                 temp['classification'] = temp.apply(
-                    lambda x: QualiClassificationData(
-                        foreign_keys=SessionEntry(
+                    lambda x: SessionEntryImport(
+                        object_type="SessionEntry",
+                        foreign_keys=SessionEntryForeignKeys(
                             year=self.year,
                             round=self.round_no,
                             session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
                             car_number=x.NO
                         ),
                         objects=[
-                            QualiClassification(
+                            SessionEntryObject(
                                 position=x.position,
                                 is_classified=(x.finishing_status == 0)
                             )
                         ]
-                    ).model_dump(),
+                    ).model_dump(exclude_unset=True),
                     axis=1
                 )
                 data.extend(temp['classification'].tolist())
@@ -1914,7 +1969,7 @@ class QualifyingParser:
             for q in [1, 2, 3]:
                 temp = lap_times[lap_times.Q == q].copy()
                 temp['lap'] = temp.apply(
-                    lambda x: QualiLap(
+                    lambda x: LapObject(
                         number=x.lap_no,
                         time=x.lap_time,
                         is_deleted=x.lap_time_deleted,
@@ -1924,7 +1979,7 @@ class QualifyingParser:
                 )
                 temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
                 temp['session_entry'] = temp['car_no'].map(
-                    lambda x: SessionEntry(
+                    lambda x: SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
                         session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
@@ -1932,10 +1987,11 @@ class QualifyingParser:
                     )
                 )
                 temp['lap_data'] = temp.apply(
-                    lambda x: LapData(
+                    lambda x: LapImport(
+                        object_type="Lap",
                         foreign_keys=x['session_entry'],
                         objects=x['lap']
-                    ).model_dump(),
+                    ).model_dump(exclude_unset=True),
                     axis=1
                 )
                 lap_data.extend(temp['lap_data'].tolist())
@@ -1972,21 +2028,132 @@ class PitStopParser:
                              f'Valid sessions are {get_args(RaceSessionT)}')
         return
 
+    # TODO: refactor. Have too many parse table by grid, in utils, in quali. parser, here, and in
+    #       entry list
+    def _parse_table_by_grid(
+            self,
+            page: Page,
+            vlines: list[float],
+            hlines: list[float],
+            tol: float = 2
+    ) -> pd.DataFrame:
+        """Manually parse the table cell by cell, defined by lines separating the columns and rows
+
+        See `EntryListParser._parse_table_by_grid()` for detailed explanation.
+
+        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
+                       boundaries need to be included
+        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
+                       boundaries need to be included
+        :param tol: tolerance for bbox. of text. Default is 2 pixels
+        """
+        cells = []
+        for i in range(len(hlines) - 1):
+            row = []
+            for j in range(len(vlines) - 1):
+                text = ''
+                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
+                cell = page.get_text('blocks', clip=(l, t, r, b))
+                if cell:
+                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
+                                           f'{self.file}. Found: {cell}'
+                    cell = cell[0]
+                    if cell[4].strip():
+                        bbox = cell[0:4]
+                        if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
+                                or bbox[1] < t - tol or bbox[3] > b + tol:
+                            raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
+                                             f'{self.file}')
+                        text = cell[4].strip()
+                row.append(text)
+            cells.append(row)
+        return pd.DataFrame(cells[1:], columns=cells[0])
+
     def _parse(self) -> pd.DataFrame:
         doc = pymupdf.open(self.file)
         df = []
         # TODO: would be nice to add a test for page numbers: if more than one page, we should have
         #       "page x of xx" at the bottom right of each page
         for page in doc:  # Can have multiple pages, though usually only one. E.g., 2023 Dutch
-
             # Get the position of the table
-            t = page.search_for('DRIVER')[0].y0      # "DRIVER" gives the top of the table
-            w, h = page.bound()[2], page.bound()[3]  # Page right and bottom boundaries are the
-                                                     # table's as well
+            page = Page(page)
+            driver = page.search_for('DRIVER')
+            assert len(driver) == 1, f'Expected exactly one "DRIVER" in {self.file}. Found: ' \
+                                     f'{driver}'
+            driver = driver[0]
+            t = driver.y0 - 1    # "DRIVER" gives the top of the table
+            w = page.bound()[2]  # The right of the page
+
+            # Find the vertical lines separating the cols
+            no = page.search_for('NO', clip=(0, t, w, driver.y1))
+            assert len(no) == 1, f'Expected exactly one "NO" in the header row in {self.file}. ' \
+                                 f'Found: {no}'
+            no = no[0]
+            b_header = no.y1 + 1  # Bottom of the header row
+            # Find the positions of the col. headers
+            headers = ('NO', 'DRIVER', 'ENTRANT', 'LAP', 'TIME OF DAY', 'STOP', 'DURATION',
+                       'TOTAL TIME')  # The col. names
+            cols: dict[str, tuple[float, float]] = {}
+            l = no.x0 - 1
+            for col in headers:
+                col_name = col
+                col = page.search_for(col, clip=(l, t, w, b_header))
+                assert len(col) == 1, f'Expected exactly one "{col}" in the header row in ' \
+                                      f'{self.file}. Found: {col}'
+                col = col[0]
+                cols[col_name] = (col.x0, col.x1)
+            # Now the vertical line seps. are the left and right point of each col. header
+            vlines = [
+                cols['NO'][0] - 1,                        # Left of "NO"
+                (cols['NO'][1] + cols['DRIVER'][0]) / 2,  # Between "NO" and "DRIVER"
+                cols['ENTRANT'][0] - 1,                   # Left of "ENTRANT"
+                cols['LAP'][0] - 1,                       # Left of "LAP"
+                cols['LAP'][1] + 1,                       # Right of "LAP"
+                cols['TIME OF DAY'][1],                   # Right of "TIME OF DAY"
+                cols['STOP'][1],                          # Right of "STOP"
+                cols['DURATION'][1],                      # Left of "TOTAL TIME"
+                cols['TOTAL TIME'][1]                     # Right of "TOTAL TIME"
+            ]
+
+            # Get the bottom of the table. We identify page bottom by a white blank strip
+            pixmap = page.get_pixmap(clip=(0, t + 10, w, page.bound()[3]))
+            l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+            pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+            is_white_row = np.all(pixmap == 255, axis=(1, 2))
+            white_strips = []
+            strip_start = None
+            for i, is_white in enumerate(is_white_row):
+                if is_white and strip_start is None:
+                    strip_start = i
+                elif not is_white and strip_start is not None:
+                    if i - strip_start >= 10:  # At least 10 rows of white
+                        white_strips.append(strip_start + t)
+                    strip_start = None
+            # If the strip is at the bottom. Shouldn't happen but just in case
+            if strip_start is not None and len(is_white_row) - strip_start >= 10:
+                white_strips.append(strip_start + t)
+            if not white_strips:
+                raise ValueError(f'Could not find a blank white strip in {self.file}')
+            b = white_strips[0] + 1
+
+            # Get the row positions. The rows are coloured in grey, white, grey, white, so get the
+            # top and bottom positions of the grey rectangles
+            rects = []
+            for i in page.get_drawings_in_bbox(bbox=(0, b_header - 1, w, b)):
+                if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                    rects.append(i['rect'].y0 + 1)
+                    rects.append(i['rect'].y1 - 1)
+            rects.sort()
+            hlines: list[float] = [no.y0 - 1, b_header]
+            for i in rects:
+                if i - hlines[-1] > 5:
+                    hlines.append(i)
+            if b - hlines[-1] > 5:
+                hlines.append(b)
+
             # Parse
-            tab = page.find_tables(clip=(0, t, w, h), strategy='lines')
-            assert len(tab.tables) == 1, f'Expected one table, got {len(df.tables)} in {self.file}'
-            df.append(tab[0].to_pandas())
+            tab = self._parse_table_by_grid(page, vlines, hlines)
+            df.append(tab)
 
         # Clean up the table
         df = pd.concat(df, ignore_index=True)
@@ -2007,7 +2174,7 @@ class PitStopParser:
         def to_json() -> list[dict]:
             pit_stop = df.copy()
             pit_stop['pit_stop'] = pit_stop.apply(
-                lambda x: PitStop(
+                lambda x: PitStopObject(
                     number=x.stop_no,
                     duration=duration_to_millisecond(x.duration),
                     local_timestamp=x.local_time
@@ -2015,7 +2182,7 @@ class PitStopParser:
                 axis=1
             )
             pit_stop['entry'] = pit_stop.apply(
-                lambda x: PitStopEntry(
+                lambda x: PitStopForeignKeys(
                     year=self.year,
                     round=self.round_no,
                     session=self.session if self.session == 'race' else 'SR',
@@ -2025,9 +2192,10 @@ class PitStopParser:
             )
             return pit_stop.apply(
                 lambda x: PitStopData(
+                    object_type="PitStop",
                     foreign_keys=x.entry,
                     objects=[x.pit_stop]
-                ).model_dump(),
+                ).model_dump(exclude_unset=True),
                 axis=1
             ).tolist()
 

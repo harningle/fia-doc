@@ -1,6 +1,6 @@
 [
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -67,7 +67,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -127,7 +127,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -166,7 +166,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -226,7 +226,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -293,7 +293,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -339,7 +339,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -406,7 +406,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -452,7 +452,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -498,7 +498,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -558,7 +558,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -611,7 +611,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -650,7 +650,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -710,7 +710,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -756,7 +756,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -795,7 +795,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -841,7 +841,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -880,7 +880,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -919,7 +919,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -986,7 +986,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1039,7 +1039,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1078,7 +1078,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1131,7 +1131,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1170,7 +1170,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1209,7 +1209,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1248,7 +1248,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1287,7 +1287,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1319,7 +1319,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1386,7 +1386,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1453,7 +1453,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1485,7 +1485,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1552,7 +1552,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1605,7 +1605,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1644,7 +1644,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1690,7 +1690,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1757,7 +1757,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1803,7 +1803,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1870,7 +1870,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1902,7 +1902,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -1969,7 +1969,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -2015,7 +2015,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -2089,7 +2089,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -2149,7 +2149,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -2216,7 +2216,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,
@@ -2283,7 +2283,7 @@
         ]
     },
     {
-        "object_type": "lap",
+        "object_type": "Lap",
         "foreign_keys": {
             "year": 2024,
             "round": 22,

@@ -1,0 +1,22 @@
+[
+    {
+        "object_type": "PitStop",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 2,
+            "session": "SR",
+            "car_number": 55,
+            "lap": 11
+        },
+        "objects": [
+            {
+                "number": 1,
+                "duration": {
+                    "_type": "timedelta",
+                    "milliseconds": 22400
+                },
+                "local_timestamp": "11:21:57"
+            }
+        ]
+    }
+]

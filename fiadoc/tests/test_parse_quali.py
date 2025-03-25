@@ -109,6 +109,16 @@ race_list = [
         'quali',
         '2025_1_quali_final_classification.json',
         '2025_1_quali_lap_times.json'
+    ),
+    (
+        # Antonelli's name wrapped in two lines...
+        'https://www.fia.com/system/files/decision-document/2025_chinese_grand_prix_-_final_sprint_qualifying_classification.pdf',
+        '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
+        2025,
+        2,
+        'sprint_quali',
+        '2025_2_sprint_quali_final_classification.json',
+        '2025_2_sprint_quali_lap_times.json'
     )
 ]
 
