@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import warnings
 from pathlib import Path
 from string import printable
@@ -18,23 +19,23 @@ class Page:
         self.ocr_page = None
         self.drawings = page.get_drawings()
         self.crossed_out_text = self.get_strikeout_text()
+        self.tempdir = Path(tempfile.mkdtemp('fiadoc'))
 
     def __getattr__(self, name: str):
         return getattr(self._pymupdf_page, name)
 
-    def save_ocr(self, path: Path = Path(tempfile.mkdtemp('fiadoc'))) -> Path:
+    def save_ocr(self) -> Path:
         """Save the OCR-ed page to a PDF file
 
-        :param path: Folder to save the file. Default is a temporary directory
         :return: Path to the saved file
         """
         if self.ocr_page is None:
-            self.get_pixmap(dpi=300).pil_save(path / 'page.png')
-            with open(path / 'page.pdf', 'wb') as f:
-                f.write(pytesseract.image_to_pdf_or_hocr(str(path / 'page.png'),
+            self.get_pixmap(dpi=300).pil_save(self.tempdir / 'page.png')
+            with open(self.tempdir / 'page.pdf', 'wb') as f:
+                f.write(pytesseract.image_to_pdf_or_hocr(str(self.tempdir / 'page.png'),
                                                          config='--dpi 300'))
-            self.ocr_page = pymupdf.open(path / 'page.pdf')[0]  # Memory safe?
-        return path / 'page.pdf'
+            self.ocr_page = pymupdf.open(self.tempdir / 'page.pdf')[0]  # Memory safe?
+        return self.tempdir / 'page.pdf'
 
     def search_for_header(self, keyword: str) -> Optional[pymupdf.Rect]:
         """Return the page header location (like "Qualifying Session Final Classification")
@@ -89,6 +90,7 @@ class Page:
             self,
             option: str = 'text',
             clip: Optional[tuple[float, float, float, float]] = None,
+            lang: Optional[Literal['f1', 'eng']] = 'f1',
             **kwargs
     ) -> str | list | dict | None:
         """`pymupdf.Page.get_text`, with OCR
@@ -108,6 +110,10 @@ class Page:
         (10, 20) can be in (11, 19) after OCR.
 
         :param option: When `clip` is specified, `option` can only be "text", "words", or "blocks"
+        :param clip: (x0, y0, x1, y1)
+        :param lang: Which tesseract language to use for OCR. Default is our own fine-tuned model
+                     "f1" which is better for small clipped area. The other option is tesseract's
+                     default English "eng".
         """
         # Try simple search first
         if text := self._pymupdf_page.get_text(option, clip=clip, **kwargs):
@@ -141,8 +147,6 @@ class Page:
            
         TODO: fine-tune tesseract later
         """
-        # tempdir = Path(tempfile.mkdtemp('fiadoc'))
-        tempdir = Path('temp')
         pixmap = self.get_pixmap(clip=clip, dpi=300)
         pixmap_arr = np.ndarray([pixmap.height, pixmap.width, 3], dtype=np.uint8,
                                 buffer=pixmap.samples_mv)
@@ -158,18 +162,12 @@ class Page:
                                           f'when `clip` is specified')
 
         # If there are some black pixels, OCR the clipped area
-        # pixmap.pil_save(tempdir / 'clip.png')
-        if os.listdir(tempdir):
-            i = max([int(i.removesuffix('.png')) for i in os.listdir(tempdir) if i.endswith('.png')]) + 1
-        else:
-            i = 0
-        pixmap.pil_save(tempdir / f'{i}.png')
-        # text = pytesseract.image_to_string(str(tempdir / 'clip.png'), config='--psm 7 --dpi 300')
-        text = pytesseract.image_to_string(str(tempdir / f'{i}.png'), config='--psm 7 --dpi 300')
-        with open('text.csv', 'a+') as f:
-            f.write(f'{i},{text}\n')
-
-        if option == 'text':
+        pixmap.pil_save(self.tempdir / 'clip.png')
+        text = pytesseract.image_to_string(str(self.tempdir / 'clip.png'),
+                                           config=f'--psm 7 --dpi 300 -l {lang}')
+        text = ''.join([c for c in text.strip() if c in printable])
+        text = re.sub(r'^[\.\-_,|—]+$', '', text)  # Use them as placeholder for empty string in
+        if option == 'text':                       # training
             return text
         elif option == 'words':
             if text:
@@ -186,7 +184,7 @@ class Page:
         """Get all drawings in the given bounding box
 
         :param bbox: (x0, y0, x1, y1)
-        :param tol: tolerance in pixels. If a drawing is outside of the bbox by only `tol` pixels,
+        :param tol: tolerance in pixels. If a drawing is outside the bbox by only `tol` pixels,
                     it will be included. Default is one pixel
         :return: A list of drawings
         """

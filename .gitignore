@@ -160,8 +160,9 @@ cython_debug/
 .idea/
 
 # Data files
-data
+data/
 *.pkl
+temp/
 
 # Mac shit
 .DS_Store

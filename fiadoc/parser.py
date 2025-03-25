@@ -13,7 +13,7 @@ import pymupdf
 
 from ._constants import QUALI_DRIVERS
 from .core import Page, ParsingError
-from .models.classification import(
+from .models.classification import (
     Classification,
     ClassificationData,
     QualiClassification,
@@ -1260,14 +1260,18 @@ class QualifyingParser:
         cells[0][0] = 'position'  # Finishing order col. has no col. name in PDF
         return pd.DataFrame(cells[1:], columns=cells[0])
 
-    def _clean_up_classification_table(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _clean_up_classification_table(self, df: pd.DataFrame, is_not_classified: bool = False) \
+            -> pd.DataFrame:
         """Clean wrong chars. from OCR"""
         for col in df:
             if df[col].dtype == 'object':
+                df[col] = df[col].str.strip()
                 # Drop invisible chars.
                 df[col] = df[col].apply(lambda x: ''.join([c for c in x if c in printable]))
-                # Table/col. border/sep. mistakenly OCR-ed as "|"
-                df[col] = df[col].str.removeprefix('|').str.removesuffix('|').str.strip()
+                # "-" as placeholder for empty string in our tesseract model. So replace "-" as
+                # well as some other common errors
+                df[col] = df[col].replace(r'^[\.\-_,|]+$', '', regex=True)
+                # TODO: already in `Page.get_text`, so maybe remove here?
 
         # Finishing position col. should either be a number or "DQ". It can also be empty if it's
         # the NOT CLASSIFIED table
@@ -1279,56 +1283,59 @@ class QualifyingParser:
         df.position = df.position.str.replace('q', '9')  # Some common OCR errors
         mask = df.position.str.fullmatch(r'\d{1,2}|DQ|DSQ') | (df.position == '')
         if not mask.all():
-            digits = df[~mask].position.str.extract(r'(\d+)')
-            digits = digits.astype(int)
-            row_above = df.loc[digits.index - 1, 'position'].astype(int)
-            row_below = df.loc[digits.index + 1, 'position'].astype(int)
-            if not ((digits.values == row_above.values + 1)
-                    & (digits.values == row_below.values - 1)):
-                raise ParsingError(f'Position col. in {self.classification_file} is not all '
-                                   f'numeric or "DQ": {df[~mask].position}')
-            else:
-                df.loc[~mask, 'position'] = digits
+            raise ParsingError(f'Position col. in {self.classification_file} is not all numeric '
+                               f'or "DQ": {df.position.values}')
 
         # Car No. should be pure digits
         if not df.NO.str.isnumeric().all():
-            raise ParsingError(f'NO col. in {self.classification_file} is not all numeric or "DQ"')
+            raise ParsingError(f'NO col. in {self.classification_file} is not all numeric: '
+                               f'{df.NO.values}')
         df.NO = df.NO.astype(int)
 
         # Don't care about driver name, nationality, or team name
 
         # Q1, Q2, Q3 should be either a time or empty
         """
-        If it does not match the time format, then the cell should be empty. However, OCR may get a
-        "." or "_" or whatever instead of an empty cell. But in any case, it should only be one to
-        three chars. long. If so, we replace it with an empty string
+        Even if we fine tune our own tesseract model, the accuracy is not 100%. Most OCR mistakes
+        happen when the cell is empty. So here only check the non-empty cells, and replace the rest
+        with empty string manually. We know Q1 has 20 drivers, Q2, 15, and Q3, 10. So only need to
+        check these 20 + 15 + 10 cells.
         """
-        pat = r'\d:\d{2}\.\d{3}|DNF|DNS|DSQ|DQ'
+        pat = re.compile(r'\d:\d{2}\.\d{3}|DNF|DNS|DSQ|DQ')
         for col in ['Q1', 'Q2', 'Q3']:
-            df[col] = df[col].str.extract(f'({pat})')[0].fillna(df[col])
-            mask = df[col].str.fullmatch(pat) | (df[col].str.len() <= 3)
+            if is_not_classified and col in ['Q2', 'Q3']:  # Is empty for "NOT CLASSIFIED" table
+                continue
+            n_drivers = QUALI_DRIVERS[self.year][int(col[1])]
+            temp = df.loc[:n_drivers - 1, col]  # Pandas `.loc` slice is both inclusive
+            mask = temp.str.fullmatch(pat) | (temp == '')
             if not mask.all():
                 raise ParsingError(f'{col} col. in {self.classification_file} is not all time or '
-                                   f'empty: {df[~mask][col]}')
-            df.loc[(~df[col].str.fullmatch(pat)) & (df[col].str.len() <= 3), col] = ''
+                                   f'empty: {df[col].values}')
+            df.loc[n_drivers:, col] = ''
 
         # The same holds for the calendar time col.
-        pat = r'\d{1,2}:\d{2}:\d{2}'
-        for col in ['Q1_TIME', 'Q2_TIME', 'Q3_TIME']:
-            df[col] = df[col].str.extract(f'({pat})')[0].fillna(df[col])
-            mask = df[col].str.fullmatch(pat) | (df[col].str.len() <= 3)
-            if not mask.all():
-                raise ParsingError(f'TIME col. in {self.classification_file} is not all time or '
-                                   f'empty: {df[~mask][col]}')
-            df.loc[(~df[col].str.fullmatch(pat)) & (df[col].str.len() <= 3), col] = ''
+        if is_not_classified is False:
+            pat = re.compile(r'\d{1,2}:\d{2}:\d{2}')
+            for col in ['Q1_TIME', 'Q2_TIME', 'Q3_TIME']:
+                n_drivers = QUALI_DRIVERS[self.year][int(col[1])]
+                temp = df.loc[:n_drivers - 1, col]
+                mask = temp.str.fullmatch(pat) | (temp == '')
+                if not mask.all():
+                    raise ParsingError(f'TIME col. in {self.classification_file} is not all time '
+                                       f'or empty: {df[col].values}')
+                df.loc[n_drivers:, col] = ''
 
         # Laps completed should be a number or empty
         for col in ['Q1_LAPS', 'Q2_LAPS', 'Q3_LAPS']:
-            mask = df[col].str.isnumeric() | (df[col].str.len() <= 3)
+            if is_not_classified and col in ['Q2_LAPS', 'Q3_LAPS']:
+                continue
+            n_drivers = QUALI_DRIVERS[self.year][int(col[1])]
+            temp = df.loc[:n_drivers - 1, col]
+            mask = temp.str.isnumeric() | (temp == '')
             if not mask.all():
                 raise ParsingError(f'LAPS col. in {self.classification_file} is not all numeric '
-                                   f'or empty: {df[~mask][col]}')
-            df.loc[(~df[col].str.isnumeric()) & (df[col].str.len() <= 3), col] = ''
+                                   f'or empty: {df[col].values}')
+            df.loc[n_drivers:, col] = ''
         return df
 
     def _search_for_table_bottom(self, page: Page, y: float) -> tuple[float, bool]:
@@ -1561,7 +1568,8 @@ class QualifyingParser:
             not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns.drop('original_order')
-            not_classified = self._clean_up_classification_table(not_classified)
+            not_classified = self._clean_up_classification_table(not_classified,
+                                                                 is_not_classified=True)
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
             n = len(df)
             not_classified['original_order'] = range(n + 1, n + len(not_classified) + 1)
