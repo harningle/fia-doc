@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
+import importlib.resources
 import os
-import re
-import warnings
 from pathlib import Path
+import re
 from string import printable
 import tempfile
 from typing import Literal, Optional
+import warnings
 
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -152,9 +153,9 @@ class Page:
                 temp = ''.join([c for c in text if c in printable]).strip()
                 if any(temp):
                     return temp
-            elif isinstance(text, dict):
-                # warnings.warn('OCR is not supported for `option` being "dict". Returning the '
-                #               'original pymupdf result')
+            else:
+                warnings.warn(f'OCR is not supported for `option` being "{option}". Returning the '
+                              f'original pymupdf result')
                 return text
 
         # If `clip` is not provided, we OCR the whole page
@@ -198,8 +199,16 @@ class Page:
         # except:
         #     i = 0
         # Image.fromarray(pixmap_arr).save(f'temp/{i}.png')
-        text = pytesseract.image_to_string(str(self.tempdir / 'clip.png'),
-                                           config=f'--psm 7 --dpi 300 -l {lang}')
+        if lang == 'f1':
+            tessdata_dir_config = f'--tessdata-dir "{importlib.resources.files('fiadoc')}"'
+        elif lang == 'eng':
+            tessdata_dir_config = None
+        else:
+            raise ValueError(f'`lang` can only be "f1" or "eng", but got "{lang}"')
+        text = pytesseract.image_to_string(
+            str(self.tempdir / 'clip.png'),
+            config=f'--psm 7 --dpi 300 -l {lang} {tessdata_dir_config}'
+        )
         text = ''.join([c for c in text.strip() if c in printable])
         text = re.sub(r'^[.\-_,|—]+$', '', text)  # Use them as placeholder for empty string in
         text = re.sub(r'\|+$', '', text)          # training
