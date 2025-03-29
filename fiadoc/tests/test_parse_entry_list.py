@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 import json
+import os
 
 import pytest
 
@@ -57,8 +58,8 @@ race_list = [
         nullcontext()
     )
 ]
-# Not going to test year 2023 for entry list, as the PDF format changed, and we are not interested
-# in retrospectively parsing old entry list PDFs
+# Not going to test year 2023 for entry list, as their PDF format is different, and we are not
+# interested in retrospectively parsing old entry list PDFs
 
 
 @pytest.fixture(params=race_list)
@@ -87,3 +88,16 @@ def prepare_entry_list_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
 def test_parse_entry_list(prepare_entry_list_data):
     data, expected_data = prepare_entry_list_data
     assert data == expected_data
+
+
+@pytest.mark.full
+@pytest.mark.parametrize('year, round_no', [(2024, i) for i in range(1, 25)])
+def test_parse_entry_list_full(year: int, round_no: int):
+    pdfs = [f'data/pdf/{i}' for i in os.listdir('data/pdf')
+           if i.startswith(f'{year}_{round_no}_') and i.endswith('_entry_list.pdf')]
+    if len(pdfs) == 0:
+        raise FileNotFoundError(f"Entry list PDF for {year} round {round_no} doesn't existed")
+    for pdf in pdfs:
+        parser = EntryListParser(pdf, 2024, round_no)
+        parser.df.to_json()
+    return
