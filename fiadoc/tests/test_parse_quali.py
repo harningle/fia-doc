@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -213,3 +214,39 @@ def test_parse_quali(prepare_quali_data):
                         f"Driver {driver}'s lap {expected_lap['number']} in {session} time " \
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
+
+
+@pytest.mark.full
+@pytest.mark.parametrize('year, round_no', [(2024, i) for i in range(1, 25)])
+def test_parse_quali_full(year: int, round_no: int):
+    classification_pdf = f'data/pdf/{year}_{round_no}_quali_provisional_classification.pdf'
+    lap_times_pdf = f'data/pdf/{year}_{round_no}_quali_lap_times.pdf'
+    if not os.path.exists(classification_pdf):
+        raise FileNotFoundError(f"Quali. classification PDF for {year} round {round_no} doesn't "
+                                f"exist")
+    if not os.path.exists(lap_times_pdf):
+        raise FileNotFoundError(f"Quali. lap times PDF for {year} round {round_no} doesn't exist")
+    parser = QualifyingParser(classification_pdf, lap_times_pdf, year, round_no, 'quali')
+    parser.classification_df.to_json()
+    parser.lap_times_df.to_json()
+    return
+
+
+@pytest.mark.full
+@pytest.mark.parametrize('year, round_no', [(2024, i) for i in [5, 6, 19, 21, 23]])
+# @pytest.mark.parametrize('year, round_no', [(2024, i) for i in [5, 6, 11, 19, 21, 23]])
+# Skip 2024 Austrian as no sprint lap time PDF available on FIA website
+# TODO: see #47. Need to add it back or even include it in the usual test above
+def test_parse_sprint_quali(year: int, round_no: int):
+    classification_pdf = f'data/pdf/{year}_{round_no}_sprint_quali_provisional_classification.pdf'
+    lap_times_pdf = f'data/pdf/{year}_{round_no}_sprint_quali_lap_times.pdf'
+    if not os.path.exists(classification_pdf):
+        raise FileNotFoundError(f"Sprint quali. classification PDF for {year} round {round_no} "
+                                f"doesn't exist")
+    if not os.path.exists(lap_times_pdf):
+        raise FileNotFoundError(f"Sprint quali. lap times PDF for {year} round {round_no} doesn't "
+                                f"exist")
+    parser = QualifyingParser(classification_pdf, lap_times_pdf, year, round_no, 'sprint_quali')
+    parser.classification_df.to_json()
+    parser.lap_times_df.to_json()
+    return
