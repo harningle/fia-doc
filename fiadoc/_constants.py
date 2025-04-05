@@ -61,6 +61,7 @@ DRIVERS = {
         'Liam Lawson': 'lawson',
         'George Russell': 'russell',
         'Andrea Kimi Antonelli': 'antonelli',
+        'Kimi Antonelli': 'antonelli',
         'Lance Stroll': 'stroll',
         'Fernando Alonso': 'alonso',
         'Pierre Gasly': 'gasly',
