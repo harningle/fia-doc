@@ -62,7 +62,7 @@ class EntryListParser:
         vgap = vlines[1] - vlines[0]  # Usual gap between two vertical lines
         for i in range(len(hlines) - 1):
             row = []
-            has_superscript = False
+            superscripts = []
             for j in range(len(vlines) - 1):
 
                 # Check if there is an unusual gap between two horizontal lines. If so, then we are
@@ -113,24 +113,47 @@ class EntryListParser:
                 # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-
                 # font-characteristics for font flags
                 match len(spans):
-                    case 1:
+                    case 1:  # Only one text so no superscript
                         row.append(spans[0]['text'].strip())
-                    case 2:
+                    case 2:  # One text and one superscript
+                        n_superscripts = 0
                         for span in spans:
                             match span['flags']:
                                 case 0:
-                                    row.append(span['text'].strip())
+                                    regular_text = span['text'].strip()
                                 case 1:
-                                    has_superscript = True
                                     superscript = span['text'].strip()
+                                    n_superscripts += 1
                                 case _:
                                     raise ValueError(f'Unknown error when parsing row {i}, col '
                                                      f'{j} in {self.file}')
+                        # If we found two regular text above, then have to decide which is the
+                        # superscript using font size
+                        if n_superscripts == 2:
+                            temp = (spans[0]['size'] + spans[1]['size']) / 2
+                            if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:
+                                superscript = spans[1]['text'].strip()
+                                regular_text = spans[0]['text'].strip()
+                            elif (spans[1]['size'] - spans[0]['size']) / temp > 0.2:
+                                superscript = spans[0]['text'].strip()
+                                regular_text = spans[1]['text'].strip()
+                            # In principle superscript font size should be sufficiently smaller
+                            # than the regular text. If the diff. is less than 20% raise an error
+                            else:
+                                raise ValueError(f'Cannot determine which text is superscript in '
+                                                 f'row {i}, col {j} in {self.file}: {cell}')
+                        row.append(regular_text)
+                        superscripts.append(superscript)
                     case _:
                         raise ValueError(f'Unknown error when parsing row {i}, col {j} in '
-                                         f'{self.file}')
-            if has_superscript:
-                row.append(superscript)
+                                         f'{self.file}: {cell}')
+
+            # Only the first cell can have superscript, so after processing all cells in the
+            # row, should only get one single superscript
+            if len(superscripts) > 1:
+                raise ValueError(f'Found multiple superscripts in row {i}, col {j} in '
+                                 f'{self.file}: {cell}')
+            row.append(superscripts[0] if superscripts else None)
             cells.append(row)
 
         # Convert to df.
@@ -156,16 +179,15 @@ class EntryListParser:
                 # having a reserve driver, e.g. copy-paste error 2024, round 5
                 df.loc[df.reserve == i, 'reserve'] = None
                 warnings.warn(
-                    f'Driver {temp.driver.iloc[0]} is indicated as being or '
-                    f'having a reserve driver but no associated driver was '
-                    f'found!'
+                    f'Driver {temp.driver.iloc[0]} is indicated as being or having a reserve '
+                    f'driver but no associated driver was found!'
                 )
                 continue
 
             assert len(temp) == 2, f'Expected 2 rows for superscript {i}, got {len(temp)}'
             assert temp.car_no.nunique() == 2, \
                 f'Expected 2 different drivers for superscript {i}, got {temp.car_no.nunique()}'
-            df.loc[df[df.reserve == i].index[1], 'reserve_for'] = temp['driver'].iloc[0]
+            df.loc[df[df.reserve == i].index[1], 'reserve_for'] = temp.car_no.iloc[0]
         df.reserve = df['reserve_for'].notnull()
         return df
 
@@ -275,9 +297,7 @@ class EntryListParser:
                             ]
                         ).model_dump(exclude_unset=True))
                 except ValidationError as e:
-                    warnings.warn(f'Error when parsing driver {x.driver} in '
-                                  f'{self.file}: {e}', )
-
+                    warnings.warn(f'Error when parsing driver {x.driver} in {self.file}: {e}')
             return drivers
 
         def to_pkl(filename: str | os.PathLike) -> None:

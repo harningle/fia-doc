@@ -55,6 +55,14 @@ race_list = [
         1,
         '2025_1_entry_list.json',
         nullcontext()
+    ),
+    (
+        # Weird PDF page margin (#33)
+        '2025_japanese_grand_prix_-_entry_list.pdf',
+        2025,
+        3,
+        '2025_3_entry_list.json',
+        pytest.warns(UserWarning, match='Error when parsing driver Ryo Hirakawa')
     )
 ]
 # Not going to test year 2023 for entry list, as the PDF format changed, and we are not interested
