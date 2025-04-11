@@ -63,6 +63,14 @@ race_list = [
         3,
         '2025_3_entry_list.json',
         pytest.warns(UserWarning, match='Error when parsing driver Ryo Hirakawa')
+    ),
+    (
+        # Car No. superscripts shown as regular text
+        '2025_bahrain_grand_prix_-_entry_list.pdf',
+        2025,
+        4,
+        '2025_4_entry_list.json',
+        pytest.warns(UserWarning, match='Error when parsing driver Ryo Hirakawa')
     )
 ]
 # Not going to test year 2023 for entry list, as the PDF format changed, and we are not interested
