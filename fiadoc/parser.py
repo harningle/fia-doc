@@ -23,9 +23,9 @@ from .utils import Page, duration_to_millisecond, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
 
-
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
+
 
 class EntryListParser:
     def __init__(
@@ -112,15 +112,18 @@ class EntryListParser:
                 # Check if any superscript
                 # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-
                 # font-characteristics for font flags
+                superscript = None
                 match len(spans):
                     case 1:  # Only one text so no superscript
                         row.append(spans[0]['text'].strip())
                     case 2:  # One text and one superscript
                         n_superscripts = 0
+                        n_regular_text = 0
                         for span in spans:
                             match span['flags']:
                                 case 0:
                                     regular_text = span['text'].strip()
+                                    n_regular_text += 1
                                 case 1:
                                     superscript = span['text'].strip()
                                     n_superscripts += 1
@@ -129,7 +132,7 @@ class EntryListParser:
                                                      f'{j} in {self.file}')
                         # If we found two regular text above, then have to decide which is the
                         # superscript using font size
-                        if n_superscripts == 2:
+                        if n_superscripts == 2 or n_regular_text == 2 or n_regular_text == 0:
                             temp = (spans[0]['size'] + spans[1]['size']) / 2
                             if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:
                                 superscript = spans[1]['text'].strip()
