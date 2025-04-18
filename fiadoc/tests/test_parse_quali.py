@@ -108,7 +108,7 @@ race_list = [
         '2024_3_quali_lap_times.json'
     ),
     (
-        # Antonelli's name wrapped in two lines...
+        # Antonelli's name wrapped in two lines
         # DNF drivers in quali.
         'https://www.fia.com/system/files/decision-document/2025_chinese_grand_prix_-_final_sprint_qualifying_classification.pdf',
         '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
