@@ -1340,7 +1340,7 @@ class QualifyingParser:
                 # Go though the pixel map and find a wide horizontal white strip with 10+ px height
                 pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
                 l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
                 is_white_row = np.all(pixmap == 255, axis=(1, 2))
                 white_strips = []
                 strip_start = None
@@ -1492,10 +1492,10 @@ class QualifyingParser:
                          and np.isclose(i['width'], 1, rtol=0.1)
                          and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
                 if not lines:
-                    # Go through the pixel map and find a wide horizontal white strip with 10+ px height
+                    # Go through the pixmap and find a wide white strip with 10+ px height
                     pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
                     l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                    pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+                    pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
                     is_white_row = np.all(pixmap == 255, axis=(1, 2))
                     white_strips = []
                     strip_start = None
@@ -1569,25 +1569,43 @@ class QualifyingParser:
         # Overwrite `.to_json()` and `.to_pkl()` methods
         # TODO: bad practice
         def to_json() -> list[dict]:
+            """
+            We want to get the drivers and results in each session. E.g., for Q2, this means two
+            things: (1) the top 15 drivers, and (2) other drivers that get non-empty laps in Q2.
+            (1) and (2) are not necessarily the same. E.g., one driver can be in Q2 but doesn't do
+            any lap (maybe to save tyre for the race), so his "LAPS" is empty in the PDF. Or a
+            driver can do some laps in Q2 but he is outside top 15, e.g. 2025 Bahrain Hulkenberg
+            went through Q1 and did some laps in Q2, but during the quali. his Q1 fastest lap was
+            deleted, so he was not classified in Q2 so ranked 16th (#50).
+            """
             data = []
             for q in [1, 2, 3]:
                 n_drivers = QUALI_DRIVERS[self.year][q]
-                temp = df[df.original_order <= n_drivers].copy()
+                temp = pd.concat([df[df.original_order <= n_drivers],
+                                  df[(df.original_order > n_drivers) & df[f'Q{q}_LAPS'].notna()]])
                 # Clean up DNS/DNF/DSQ drivers
                 temp.loc[temp[f'Q{q}'].isin(['DQ', 'DSQ']), 'finishing_status'] = 20
                 temp.loc[temp[f'Q{q}'] == 'DNF', 'finishing_status'] = 11
                 temp.loc[temp[f'Q{q}'] == 'DNS', 'finishing_status'] = 30
                 temp.loc[temp[f'Q{q}'].isin(['DNS', 'DNF']), f'Q{q}'] = 'Z'
                 temp['is_dsq'] = (temp.finishing_status == 20)
+                temp['is_dnq'] = (temp.original_order > n_drivers)
+                temp.loc[temp.is_dnq, 'finishing_status'] = 40
+                if q == 2:
+                    print(temp[[f'Q{q}', 'finishing_status']])
                 """
-                Drivers finishing normally, incl. DNF or DNS, are ranked first. Then DSQ drivers
-                are at the bottom. For normal drivers, we order them by quali. lap time. DNF or DNS
-                drivers will have lap time being replaced by "Z" above, so they will be ranked
-                after normal finishing drivers. And their relative order will be the same as their
-                original order in the PDF. DSQ drivers are ranked first by their lap time, if not
-                missing, and if missing then by their original order in the PDF
+                There are four types of drivers: (1) finishing normally, (2) DNF or DNS, (3) DSQ,
+                and (4) DNQ. (1) will come first, and within (1) we sort by their fastest lap time.
+                (2) are drivers who participate the session normally, but do not get a lap time,
+                e.g. all lap times get deleted. They come immediately after (1), and among them the
+                finishing order is their original order in the PDF. (3) are DSQ drivers, whose
+                entire quali. results are cancelled, e.g. rear wing technical infringement. They
+                are the last and again among them the finishing order is the original order in the
+                PDF. (4) are drivers whose results in *some* sessions are cancelled, e.g. 2025
+                Bahrain Q2 Hulkenberg. They are placed between (2) and (3) and the order also
+                follows the order in the PDF.
                 """
-                temp = temp.sort_values(by=['is_dsq', f'Q{q}', 'original_order'])
+                temp = temp.sort_values(by=['is_dsq', 'is_dnq', f'Q{q}', 'original_order'])
                 temp['position'] = range(1, len(temp) + 1)
                 temp['classification'] = temp.apply(
                     lambda x: SessionEntryImport(
@@ -1601,7 +1619,8 @@ class QualifyingParser:
                         objects=[
                             SessionEntryObject(
                                 position=x.position,
-                                is_classified=(x.finishing_status == 0)
+                                is_classified=(x.finishing_status == 0),
+                                status=x.finishing_status
                             )
                         ]
                     ).model_dump(exclude_unset=True),
@@ -1623,6 +1642,7 @@ class QualifyingParser:
     def _assign_session_to_lap(classification: pd.DataFrame, lap_times: pd.DataFrame) \
             -> pd.DataFrame:
         """TODO: probably need to refactor this later... To tedious now"""
+        # TODO: this can be wrong. See #51
         # Assign session to lap No. in lap times, e.g. lap 8 is in Q2, using final classification
         classification = classification.copy()  # TODO: not the best practice?
         classification.Q1_LAPS = classification.Q1_LAPS.astype(float)
@@ -2043,7 +2063,7 @@ class PitStopParser:
             # Get the bottom of the table. We identify page bottom by a white blank strip
             pixmap = page.get_pixmap(clip=(0, t + 10, w, page.bound()[3]))
             l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-            pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+            pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
             is_white_row = np.all(pixmap == 255, axis=(1, 2))
             white_strips = []
             strip_start = None

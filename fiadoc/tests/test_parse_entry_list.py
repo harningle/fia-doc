@@ -36,7 +36,7 @@ race_list = [
         '2024%20Japanese%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         4,
-        '2024_04_entry_list.json',
+        '2024_4_entry_list.json',
         pytest.warns(UserWarning, match='Error when parsing driver Ayumu')
     ),
     (
@@ -45,7 +45,7 @@ race_list = [
         '2024%20Chinese%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         5,
-        '2024_05_entry_list.json',
+        '2024_5_entry_list.json',
         pytest.warns(UserWarning, match='Ricciardo is indicated as')
     ),
     (
