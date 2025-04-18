@@ -1472,6 +1472,7 @@ class QualifyingParser:
         df['finishing_status'] = 0
         df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
         df = df[(df.position != '') & df.position.notna()]
+        df['is_classified'] = True
 
         # Do the same for the "NOT CLASSIFIED" table
         if has_not_classified:
@@ -1542,11 +1543,18 @@ class QualifyingParser:
             not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
             not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
-            not_classified.columns = df.columns.drop('original_order')
+            not_classified.columns = df.columns.drop(['original_order', 'is_classified'])
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
             n = len(df)
             not_classified['original_order'] = range(n + 1, n + len(not_classified) + 1)
+            not_classified['is_classified'] = False
             df = pd.concat([df, not_classified], ignore_index=True)
+        """
+        `is_classified` here is simply a flag to indicate whether the driver belongs to the "NOT
+        CLASSIFIED" table. It doesn't mean a driver is classified or not. Basically everyone in
+        "NOT CLASSIFIED" table is not classified, and in addition, those who receive DSQ or DNQ are
+        not classified either.
+        """
 
         # Fill in the position for DNF and DSQ drivers. See `QualifyingParser` for details
         df = df.replace({'': None})
@@ -1591,8 +1599,22 @@ class QualifyingParser:
                 temp['is_dsq'] = (temp.finishing_status == 20)
                 temp['is_dnq'] = (temp.original_order > n_drivers)
                 temp.loc[temp.is_dnq, 'finishing_status'] = 40
-                if q == 2:
-                    print(temp[[f'Q{q}', 'finishing_status']])
+                """
+                `is_classified` is defined following 2025 Formula 1 Sporting Regulations 39.4 b),
+                published on 2025/02/26, available at https://www.fia.com/system/files/documents.
+                A driver is not classified if any of the following is true:
+                
+                1. 107% rule not met, i.e. he is in the "NOT CLASSIFIED" table
+                2. DSQ
+                3. no valid lap is done, e.g. all laps are deleted for exceeding track limits
+                
+                1. is already done above when we parsing "NOT CLASSIFIED" table. 2. can be detected
+                by looking at the finishing status. 3. is done by checking if the driver has a
+                lap time in the table: if the lap time col. is not a time but something else, e.g.
+                DNF, the driver does not set a valid time so he is not classified.
+                """
+                temp.loc[(temp.finishing_status != 0) & (temp.is_classified == True),
+                         'is_classified'] = False
                 """
                 There are four types of drivers: (1) finishing normally, (2) DNF or DNS, (3) DSQ,
                 and (4) DNQ. (1) will come first, and within (1) we sort by their fastest lap time.
@@ -1619,7 +1641,7 @@ class QualifyingParser:
                         objects=[
                             SessionEntryObject(
                                 position=x.position,
-                                is_classified=(x.finishing_status == 0),
+                                is_classified=x.is_classified,
                                 status=x.finishing_status
                             )
                         ]
