@@ -7,15 +7,17 @@ from fiadoc.utils import download_pdf
 
 race_list = [
     (
+        # Normal quali.
         '2024_22_usa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2024_22_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
         22,
         'quali',
-        '2024_22_quali_provisional_classification.json',
+        '2024_22_quali_classification.json',
         '2024_22_quali_lap_times.json'
     ),
     (
+        # Normal quali.
         'doc_20_-_2023_united_states_grand_prix_-_final_qualifying_classification.pdf',
         '2023_19_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2023,
@@ -25,6 +27,7 @@ race_list = [
         '2023_18_quali_lap_times.json'
     ),
     (
+        # No "POLE POSITION" in quali. classification
         'doc_32_-_2023_united_states_grand_prix_-_final_sprint_shootout_classification.pdf',
         '2023_19_usa_f1_sq0_timing_sprintshootoutsessionlaptimes_v01.pdf',
         2023,
@@ -34,15 +37,17 @@ race_list = [
         '2023_18_sprint_quali_lap_times.json'
     ),
     (
+        # Title is image rather than string
         'doc_53_-_2024_chinese_grand_prix_-_final_qualifying_classification.pdf',
         '2024_05_chn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
         5,
         'quali',
-        '2024_05_quali_classification.json',
-        '2024_05_quali_lap_times.json'
+        '2024_5_quali_classification.json',
+        '2024_5_quali_lap_times.json'
     ),
     (
+        # DNF drivers in quali.
         '2024_02_ksa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2024_02_ksa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -52,6 +57,7 @@ race_list = [
         '2024_2_quali_lap_times.json'
     ),
     (
+        # DNF drivers in quali.
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionprovisionalclassification_v01.pdf',
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -61,6 +67,7 @@ race_list = [
         '2024_21_sprint_quali_lap_times.json'
     ),
     (
+        # No "POLE POSITION" in quali. classification
         'doc_37_-_2023_spanish_grand_prix_-_final_qualifying_classification.pdf',
         '2023_08_esp_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2023,
@@ -70,7 +77,8 @@ race_list = [
         '2023_7_quali_lap_times.json'
     ),
     (
-        # New quali. parser due to Antonelli's name being long
+        # Antonelli's name being long, which breaks the older parser
+        # DNS drivers in quali.
         '2025_01_aus_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2025,
@@ -101,6 +109,7 @@ race_list = [
     ),
     (
         # Antonelli's name wrapped in two lines...
+        # DNF drivers in quali.
         'https://www.fia.com/system/files/decision-document/2025_chinese_grand_prix_-_final_sprint_qualifying_classification.pdf',
         '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
         2025,
@@ -108,6 +117,16 @@ race_list = [
         'sprint_quali',
         '2025_2_sprint_quali_final_classification.json',
         '2025_2_sprint_quali_lap_times.json'
+    ),
+    (
+        # DNQ drivers in quali. (#50)
+        '2025_04_brn_f1_q0_timing_qualifyingsessionfinalclassification_v01.pdf',
+        '2025_04_brn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2025,
+        4,
+        'quali',
+        '2025_4_quali_classification.json',
+        '2025_4_quali_lap_times.json'
     )
 ]
 

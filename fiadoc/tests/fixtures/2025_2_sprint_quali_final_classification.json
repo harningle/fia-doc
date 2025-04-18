@@ -10,7 +10,8 @@
         "objects": [
             {
                 "position": 1,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -25,7 +26,8 @@
         "objects": [
             {
                 "position": 2,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -40,7 +42,8 @@
         "objects": [
             {
                 "position": 3,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -55,7 +58,8 @@
         "objects": [
             {
                 "position": 4,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -70,7 +74,8 @@
         "objects": [
             {
                 "position": 5,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -85,7 +90,8 @@
         "objects": [
             {
                 "position": 6,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -100,7 +106,8 @@
         "objects": [
             {
                 "position": 7,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -115,7 +122,8 @@
         "objects": [
             {
                 "position": 8,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -130,7 +138,8 @@
         "objects": [
             {
                 "position": 9,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -145,7 +154,8 @@
         "objects": [
             {
                 "position": 10,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -160,7 +170,8 @@
         "objects": [
             {
                 "position": 11,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -175,7 +186,8 @@
         "objects": [
             {
                 "position": 12,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -190,7 +202,8 @@
         "objects": [
             {
                 "position": 13,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -205,7 +218,8 @@
         "objects": [
             {
                 "position": 14,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -220,7 +234,8 @@
         "objects": [
             {
                 "position": 15,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -235,7 +250,8 @@
         "objects": [
             {
                 "position": 16,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -250,7 +266,8 @@
         "objects": [
             {
                 "position": 17,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -265,7 +282,8 @@
         "objects": [
             {
                 "position": 18,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -280,7 +298,8 @@
         "objects": [
             {
                 "position": 19,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -295,7 +314,8 @@
         "objects": [
             {
                 "position": 20,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -310,7 +330,8 @@
         "objects": [
             {
                 "position": 1,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -325,7 +346,8 @@
         "objects": [
             {
                 "position": 2,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -340,7 +362,8 @@
         "objects": [
             {
                 "position": 3,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -355,7 +378,8 @@
         "objects": [
             {
                 "position": 4,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -370,7 +394,8 @@
         "objects": [
             {
                 "position": 5,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -385,7 +410,8 @@
         "objects": [
             {
                 "position": 6,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -400,7 +426,8 @@
         "objects": [
             {
                 "position": 7,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -415,7 +442,8 @@
         "objects": [
             {
                 "position": 8,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -430,7 +458,8 @@
         "objects": [
             {
                 "position": 9,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -445,7 +474,8 @@
         "objects": [
             {
                 "position": 10,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -460,7 +490,8 @@
         "objects": [
             {
                 "position": 11,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -475,7 +506,8 @@
         "objects": [
             {
                 "position": 12,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -490,7 +522,8 @@
         "objects": [
             {
                 "position": 13,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -505,7 +538,8 @@
         "objects": [
             {
                 "position": 14,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -520,7 +554,8 @@
         "objects": [
             {
                 "position": 15,
-                "is_classified": false
+                "is_classified": false,
+                "status": 11
             }
         ]
     },
@@ -535,7 +570,8 @@
         "objects": [
             {
                 "position": 1,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -550,7 +586,8 @@
         "objects": [
             {
                 "position": 2,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -565,7 +602,8 @@
         "objects": [
             {
                 "position": 3,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -580,7 +618,8 @@
         "objects": [
             {
                 "position": 4,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -595,7 +634,8 @@
         "objects": [
             {
                 "position": 5,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -610,7 +650,8 @@
         "objects": [
             {
                 "position": 6,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -625,7 +666,8 @@
         "objects": [
             {
                 "position": 7,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -640,7 +682,8 @@
         "objects": [
             {
                 "position": 8,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -655,7 +698,8 @@
         "objects": [
             {
                 "position": 9,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
@@ -670,7 +714,8 @@
         "objects": [
             {
                 "position": 10,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     }

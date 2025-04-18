@@ -33,4 +33,4 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest
+          pytest -n auto
