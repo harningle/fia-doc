@@ -1,6 +1,5 @@
 import os
 import re
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,15 +21,15 @@ plt.rcdefaults()
 plt.rcParams.update(rc)
 
 
-def duration_to_millisecond(s: str) -> Optional[dict[str, str | int]]:
+def duration_to_millisecond(s: str | None) -> dict[str, str | int] | None:
     """Convert a time duration string to milliseconds
 
     >>> duration_to_millisecond('1:36:48.076')
-    5808076
+    {'_type': 'timedelta', 'milliseconds': 5808076}
     >>> duration_to_millisecond('17:39.564')
-    1059564
+    {'_type': 'timedelta', 'milliseconds': 1059564}
     >>> duration_to_millisecond('12.345')
-    12345
+    {'_type': 'timedelta', 'milliseconds': 12345}
     """
     if s is None:
         return None
@@ -85,7 +84,7 @@ def time_to_timedelta(d: str) -> pd.Timedelta:
     2. mm:ss.SSS, e.g. 1:24.160. This is the lap time
     """
     n_colon = d.count(':')
-    if n_colon == 2:
+    if n_colon == 2:  # noqa: PLR2004
         h, m, s = d.split(':')
         return pd.Timedelta(hours=int(h), minutes=int(m), seconds=int(s))
     elif n_colon == 1:
@@ -112,6 +111,9 @@ class Page:
         self._pymupdf_page = page
         self.drawings = page.get_drawings()
         self.crossed_out_text = self.get_strikeout_text()
+
+        self.header_min_height = 10  # The header image should have a height between 10 and 50px
+        self.header_max_height = 50
 
     def __getattr__(self, name: str):
         return getattr(self._pymupdf_page, name)
@@ -269,7 +271,7 @@ class Page:
         df = pd.DataFrame(cells, columns=None, index=None)
         return df, superscripts, crossed_out
 
-    def get_image_header(self) -> Optional[pymupdf.Rect]:
+    def get_image_header(self) -> pymupdf.Rect | None:
         """Find if any image is the header. See #26.
 
         Basically we go through all svg images on the page, and filter in the ones that are very
@@ -281,7 +283,7 @@ class Page:
         images = []
         for img in self.drawings:
             if img['rect'].width > self.bound()[2] * 0.8 \
-                    and 10 < img['rect'].height < 50 \
+                    and self.header_min_height < img['rect'].height < self.header_max_height \
                     and np.isclose(img['fill'], [0.72, 0.72, 0.72], rtol=0.1).all():
                 images.append(img)
         assert len(images) <= 1, f'found more than one header image on page {self.number} in ' \

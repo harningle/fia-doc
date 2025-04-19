@@ -26,6 +26,9 @@ pd.set_option('future.no_silent_downcasting', True)
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
 
+WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
+LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
+                   # considered to be the same line
 
 class EntryListParser:
     def __init__(
@@ -70,14 +73,13 @@ class EntryListParser:
                 if hlines[i + 1] - hlines[i] < vgap + 5:
                     t = hlines[i]
                     b = hlines[i + 1]
-                else:
-                    if i >= 1:  # The zero-th row is always fine
-                        if hlines[i] - hlines[i - 1] < vgap + 5:  # The unusual big gap is below,
-                            t = hlines[i]                         # so we are at the main table
-                            b = hlines[i] + vgap + tol
-                        else:  # The unusual big gap is above, so now at the reserve driver table
-                            t = hlines[i + 1] - vgap - tol
-                            b = hlines[i + 1]
+                elif i >= 1:  # The zero-th row is always fine
+                    if hlines[i] - hlines[i - 1] < vgap + 5:  # The unusual big gap is below,
+                        t = hlines[i]                         # so we are at the main table
+                        b = hlines[i] + vgap + tol
+                    else:  # The unusual big gap is above, so now at the reserve driver table
+                        t = hlines[i + 1] - vgap - tol
+                        b = hlines[i + 1]
 
                 # Get text in the cell
                 # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
@@ -132,12 +134,12 @@ class EntryListParser:
                                                      f'{j} in {self.file}')
                         # If we found two regular text above, then have to decide which is the
                         # superscript using font size
-                        if n_superscripts == 2 or n_regular_text == 2 or n_regular_text == 0:
+                        if n_superscripts == 2 or n_regular_text == 2 or n_regular_text == 0:  # noqa: PLR2004
                             temp = (spans[0]['size'] + spans[1]['size']) / 2
-                            if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:
+                            if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:  # noqa: PLR2004
                                 superscript = spans[1]['text'].strip()
                                 regular_text = spans[0]['text'].strip()
-                            elif (spans[1]['size'] - spans[0]['size']) / temp > 0.2:
+                            elif (spans[1]['size'] - spans[0]['size']) / temp > 0.2:  # noqa: PLR2004
                                 superscript = spans[0]['text'].strip()
                                 regular_text = spans[1]['text'].strip()
                             # In principle superscript font size should be sufficiently smaller
@@ -161,9 +163,9 @@ class EntryListParser:
 
         # Convert to df.
         df = pd.DataFrame(cells)
-        if df.shape[1] == 5:
+        if df.shape[1] == 5:    # noqa: PLR2004
             df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
-        elif df.shape[1] == 6:
+        elif df.shape[1] == 6:  # noqa: PLR2004
             df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor', 'reserve']
         else:
             raise ValueError(f'Expected 5 or 6 columns, got {df.shape[1]} in {self.file}')
@@ -187,11 +189,11 @@ class EntryListParser:
                 )
                 continue
 
-            assert len(temp) == 2, f'Expected 2 rows for superscript {i}, got {len(temp)}'
+            assert len(temp) == 2, f'Expected 2 rows for superscript {i}, got {len(temp)}'  # noqa: PLR2004
             assert temp.car_no.nunique() == 2, \
-                f'Expected 2 different drivers for superscript {i}, got {temp.car_no.nunique()}'
+                f'Expected 2 different drivers for superscript {i}, got {temp.car_no.nunique()}'  # noqa: PLR2004
             df.loc[df[df.reserve == i].index[1], 'reserve_for'] = temp.car_no.iloc[0]
-        df.reserve = df['reserve_for'].notnull()
+        df.reserve = df['reserve_for'].notna()
         return df
 
     def _parse(self) -> pd.DataFrame:
@@ -243,7 +245,7 @@ class EntryListParser:
         delineating the bottom of the table. Below the table, we have stewards' name, so we can't
         use the bottom of the page as the bottom of the table either. So instead, we search for
         digits below "No.". The last car No.'s position is the the bottom of the table.
-        
+
         When we say "the table", there can actually be two tables: the usual table for drivers, and
         the reserve driver table. Regardless of the existence of the reserve driver table, the
         above method always identifies the bottom correctly. `self._parse_table_by_grid()` will
@@ -278,7 +280,7 @@ class EntryListParser:
         aux_hlines.append(2 * aux_hlines[-1] - aux_hlines[-2])
 
         # Get the table
-        tol = 2 if l > 40 else 3
+        tol = 2 if l > 40 else 3  # noqa: PLR2004
         df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, tol)
 
         def to_json() -> list[dict]:
@@ -473,7 +475,7 @@ class RaceParser:
         # Parse the table using the grid above
         df = self._parse_table_by_grid(page, vlines, hlines)
         assert df.shape[1] == 13, \
-            f'Expected 13 columns, got {df.shape[1]} in {self.classification_file}'
+            f'Expected 13 cols, got {df.shape[1]} in {self.classification_file}'  # noqa: PLR2004
 
         # Do the same for the "NOT CLASSIFIED" table. See `QualifyingParser._parse_classification`
         if has_not_classified:
@@ -496,8 +498,8 @@ class RaceParser:
             not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
             not_classified = not_classified.sort_index().reset_index(drop=True)
             assert not_classified.shape[1] == 13, \
-                f'Expected 13 columns for "NOT CLASSIFIED" table , got ' \
-                f'{not_classified.shape[1]} in {self.classification_file}'
+                (f'Expected 13 columns for "NOT CLASSIFIED" table , got '  # noqa: PLR2004
+                 f'{not_classified.shape[1]} in {self.classification_file}')
             not_classified.columns = df.columns
 
         else:
@@ -562,7 +564,7 @@ class RaceParser:
         # Rank fastest laps
         """
         TODO: these need some serious cleaning.
-        
+
         1. handling missing values, e.g. crash on/before finishing lap 1, so there is no fastest
            lap time to begin with
         2. proper ranking: currently we rank by lap time. If same, then rank by lap No. What if
@@ -578,10 +580,7 @@ class RaceParser:
             .ngroup() + 1
 
         # Fill in some default values
-        df.fillna({
-            'points': 0,
-            'finishing_status': 0
-        }, inplace=True)
+        df = df.fillna({'points': 0, 'finishing_status': 0})
         df.finishing_status = df.finishing_status.astype(int)
 
         # Merge in starting grid from lap chart PDF
@@ -672,7 +671,7 @@ class RaceParser:
                 # The row order/index is meaningful: it's the order/positions of the cars
                 # Need extra care for lapped cars; see harningle/fia-doc#19
                 # TODO: is this true for all cases? E.g. retirements?
-                temp.reset_index(drop=False, names=['position'], inplace=True)
+                temp = temp.reset_index(drop=False, names=['position'])
                 temp['position'] += 1  # 1-indexed
                 df.append(temp)
 
@@ -717,8 +716,7 @@ class RaceParser:
         df.lap = df.lap - df.gap.apply(
             lambda x: int(re.findall(r'\d+', x)[0]) if 'LAP' in x else 0
         )
-        df.reset_index(drop=False, inplace=True)
-        df.sort_values(by=['car_no', 'lap', 'index'], inplace=True)
+        df = df.reset_index(drop=False).sort_values(by=['car_no', 'lap', 'index'])
         df.loc[(df.car_no == df.car_no.shift(-1)) & (df.lap == df.lap.shift(-1)), 'lap'] -= 1
         df.loc[(df.car_no == df.car_no.shift(1)) & (df.lap == df.lap.shift(1) + 2), 'lap'] -= 1
         del df['index']
@@ -786,7 +784,7 @@ class RaceParser:
             row_seps.append(b)
 
             # Parse the table
-            page = Page(page)
+            page = Page(page)  # noqa: PLW2901
             tab, superscript, cross_out = page.parse_table_by_grid(
                 vlines=[(col_seps[i], col_seps[i + 1]) for i in range(len(col_seps) - 1)],
                 hlines=[(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
@@ -813,7 +811,7 @@ class RaceParser:
             tab = tab[tab.POS != 'GRID']
             tab.POS = tab.POS.str.removeprefix('LAP ').astype(int)
             tab = tab.set_index('POS').stack().reset_index(name='car_no')
-            tab.rename(columns={'POS': 'lap', 0: 'position'}, inplace=True)
+            tab = tab.rename(columns={'POS': 'lap', 0: 'position'})
             tab = tab[tab.car_no != '']
             tab.position = tab.position.astype(int)
             tab.car_no = tab.car_no.astype(int)
@@ -842,9 +840,12 @@ class RaceParser:
 
             # If it's race, then only three drivers (or less) on one page. And all of them should
             # start from the same y-coord. and have the same y-coord. for "LAP" and "TIME"
+            # noqa: PLR2004
             if self.session == 'race':
-                assert len(laps) <= 6, f'Expected at most 6 "LAP" on p.{page.number} in ' \
-                                       f'{self.lap_analysis_file}. Found {len(laps)}'
+                assert len(laps) <= 6, (  # noqa: PLR2004
+                    f'Expected at most 6 "LAP" on p.{page.number} in {self.lap_analysis_file}. '
+                    f'Found {len(laps)}'
+                )
                 for i in range(len(laps) - 1):
                     assert np.isclose(laps[i].y1, laps[i + 1].y1, atol=1) and \
                               np.isclose(times[i].y1, times[i + 1].y1, atol=1), \
@@ -889,7 +890,7 @@ class RaceParser:
                     #       or Leclerc DNS in 2023 Brazil
 
                     # Find the horizontal lines under which the tables are located
-                    page = Page(page)
+                    page = Page(page)  # noqa: PLW2901
                     t = max([i.y1 for i in laps] + [i.y1 for i in times])
                     lines = [i for i in page.get_drawings_in_bbox((l, t, r, t + 10))
                              if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)]
@@ -940,12 +941,12 @@ class RaceParser:
                     # coloured/filled in either white or grey, so we can get the row's top and
                     # bottom y-positions from these rectangles
                     rects = [i for i in page.get_drawings_in_bbox((l, t, r, b))
-                             if i['rect'].y1 - i['rect'].y0 > 10]
+                             if i['rect'].y1 - i['rect'].y0 > LINE_MIN_VGAP]
                     ys = [j for i in rects for j in [i['rect'].y0, i['rect'].y1]]
                     ys.sort()
                     row_seps = [ys[0]]
                     for y in ys[1:]:
-                        if y - row_seps[-1] > 10:
+                        if y - row_seps[-1] > LINE_MIN_VGAP:
                             row_seps.append(y)
                     row_seps = [(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
 
@@ -955,16 +956,18 @@ class RaceParser:
                         tab, superscript, cross_out = page.parse_table_by_grid(
                             vlines=cols, hlines=row_seps
                         )
-                        assert (len(superscript) == 0) and len(cross_out) == 0, \
-                            f'Some superscript(s) or crossed out text(s) found in table at ' \
-                            f'({cols[0][0]:.1f}, {row_seps[0][0]:.1f}, {cols[2][1]:.1f}, ' \
-                            f'{row_seps[-1][1]:.1f}) in page {page.number} in ' \
+                        assert (len(superscript) == 0) and (len(cross_out) == 0), (
+                            f'Some superscript(s) or crossed out text(s) found in table at '
+                            f'({cols[0][0]:.1f}, {row_seps[0][0]:.1f}, {cols[2][1]:.1f}, '
+                            f'{row_seps[-1][1]:.1f}) in page {page.number} in '
                             f'{self.history_chart_file}. But we expect none'
-                        assert tab.shape[1] == 3, \
-                            f'Expected three columns (LAP, pit or not, lap time) in table at ' \
-                            f'({cols[0][0]:.1f}, {row_seps[0][0]:.1f}, {cols[2][1]:.1f}, ' \
-                            f'{row_seps[-1][1]:.1f}) in page {page.number} in ' \
+                        )
+                        assert tab.shape[1] == 3, (  # noqa: PLR2004
+                            f'Expected three columns (LAP, pit or not, lap time) in table at '
+                            f'({cols[0][0]:.1f}, {row_seps[0][0]:.1f}, {cols[2][1]:.1f}, '
+                            f'{row_seps[-1][1]:.1f}) in page {page.number} in '
                             f'{self.history_chart_file}. Found {len(tab)}'
+                        )
                         tab.columns = ['lap', 'pit', 'lap_time']
 
                         # Drop empty row
@@ -990,12 +993,12 @@ class RaceParser:
             # side by side
             else:
                 # y-coords. of "LAP" and "TIME". They are the top of each table
-                page = Page(page)
+                page = Page(page)  # noqa: PLW2901
                 ys = [i.y1 for i in laps]
                 ys.sort()  # Sort these "LAP"'s from top to bottom
                 top_pos = [ys[0]]
                 for y in ys[1:]:
-                    if y - top_pos[-1] > 10:
+                    if y - top_pos[-1] > LINE_MIN_VGAP:
                         top_pos.append(y)
 
                 # Bottom of the table is the next "NO TIME", or the bottom of the page
@@ -1003,7 +1006,7 @@ class RaceParser:
                 ys.sort()
                 bottom_pos = [ys[0]]
                 for y in ys[1:]:
-                    if y - bottom_pos[-1] > 10:
+                    if y - bottom_pos[-1] > LINE_MIN_VGAP:
                         bottom_pos.append(y)
                 b = page.bound()[3]
                 bottom_pos.append(b)
@@ -1085,16 +1088,16 @@ class RaceParser:
                                 ((line[0] + line[2]) / 2 - 5, line[2])
                             ])
 
-                        # Find the white and grey rectangles under the top lines. Each row is either
-                        # coloured/filled in white or grey, so we can get the row's top and bottom
-                        # y-positions from these rectangles
+                        # Find the white and grey rectangles under the top lines. Each row is
+                        # either coloured/filled in white or grey, so we can get the row's top and
+                        # bottom y-positions from these rectangles
                         rects = [i for i in page.get_drawings_in_bbox(bbox)
-                                 if i['rect'].y1 - i['rect'].y0 > 10]
+                                 if i['rect'].y1 - i['rect'].y0 > LINE_MIN_VGAP]
                         ys = [j for i in rects for j in [i['rect'].y0, i['rect'].y1]]
                         ys.sort()
                         row_seps = [ys[0]]
                         for y in ys[1:]:
-                            if y - row_seps[-1] > 10:
+                            if y - row_seps[-1] > LINE_MIN_VGAP:
                                 row_seps.append(y)
                         row_seps = [(row_seps[i], row_seps[i + 1])
                                     for i in range(len(row_seps) - 1)]
@@ -1118,7 +1121,7 @@ class RaceParser:
                         temp = pd.concat(temp, ignore_index=True)
                         temp['car_no'] = car_no
                         temp['driver'] = driver
-                        temp.rename(columns={0: 'lap', 1: 'pit', 2: 'lap_time'}, inplace=True)
+                        temp = temp.rename(columns={0: 'lap', 1: 'pit', 2: 'lap_time'})
                         df.append(temp)
 
         df = pd.concat(df, ignore_index=True)
@@ -1272,7 +1275,7 @@ class QualifyingParser:
                     # Usually, one cell is one line of text. The only exception is Andrea Kimi
                     # Antonelli. His name is too long and thus wrapped into two lines
                     if len(cell) > 1:
-                        if len(cell) == 2 and cell[0][4].strip() == 'Andrea Kimi':
+                        if len(cell) == 2 and cell[0][4].strip() == 'Andrea Kimi':  # noqa: PLR2004
                             text = cell[0][4].strip() + ' ' + cell[1][4].strip()
                         else:
                             raise Exception(f'Expected exactly one cell in row {i}, col {j} in '
@@ -1341,18 +1344,19 @@ class QualifyingParser:
                 pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
                 l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
                 pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-                is_white_row = np.all(pixmap == 255, axis=(1, 2))
+                is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
                 white_strips = []
                 strip_start = None
                 for i, is_white in enumerate(is_white_row):
                     if is_white and strip_start is None:
                         strip_start = i
                     elif not is_white and strip_start is not None:
-                        if i - strip_start >= 10:  # At least 10 rows of white
+                        if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows of white
                             white_strips.append(strip_start + t)
                         strip_start = None
                 # If the strip is at the bottom. Shouldn't happen but just in case
-                if strip_start is not None and len(is_white_row) - strip_start >= 10:
+                if (strip_start is not None
+                        and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
                     white_strips.append(strip_start + t)
                 if not white_strips:
                     raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
@@ -1379,25 +1383,24 @@ class QualifyingParser:
         cols: dict[str, tuple[float, float]] = {}
         l = no.x0 - 1
         q = 1
-        for col in headers:
-            col_name = col
-            col = page.search_for(col, clip=(l, y, w, b_header))
+        for col_name in headers:
+            col = page.search_for(col_name, clip=(l, y, w, b_header))
             # These col. names are unique
             if col_name not in ['LAPS', 'TIME']:
-                assert len(col) == 1, f'Expected exactly one "{col}" in the header row in ' \
-                                      f'{self.classification_file}. Found {len(col)}'
+                assert len(col) == 1, (f'Expected exactly one "{col_name}" in the header row in '
+                                       f'{self.classification_file}. Found {len(col)}')
+                cols[col_name] = (col[0].x0, col[0].x1)
             # We will have three "LAPS" and "TIME" for Q1, Q2, and Q3
             else:
-                assert len(col) == 4 - q, f'Expected {4 - q} "{col}" in the header row after ' \
-                                          f'Q{q} (incl.) in {self.classification_file}. Found ' \
-                                          f'{len(col)}'
+                assert len(col) == 4 - q, (
+                    f'Expected {4 - q} "{col_name}" in the header row after Q{q} (incl.) in '
+                    f'{self.classification_file}. Found {len(col)}'
+                )
                 col.sort(key=lambda x: x.x0)
-                col_name = f'Q{q}_{col_name}'
-            col = col[0]
-            cols[col_name] = (col.x0, col.x1)
+                cols[f'Q{q}_{col_name}'] = (col[0].x0, col[0].x1)
             # Update the new leftmost x-coord. for the next col. I.e., instead of starting from the
             # very left of the page, start from the right of the current col.
-            l = col.x1
+            l = col[0].x1
             # Update the session if necessary
             if 'Q2' in col_name:  # Captures both "Q2" and "SQ2"
                 q = 2
@@ -1446,9 +1449,9 @@ class QualifyingParser:
         rects.sort()
         hlines: list[float] = [y, b_header]
         for i in rects:
-            if i - hlines[-1] > 5:
+            if i - hlines[-1] > LINE_MIN_VGAP:
                 hlines.append(i)
-        if b - hlines[-1] > 5:
+        if b - hlines[-1] > LINE_MIN_VGAP:
             hlines.append(b)
 
         # Get the table
@@ -1497,24 +1500,27 @@ class QualifyingParser:
                     pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
                     l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
                     pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-                    is_white_row = np.all(pixmap == 255, axis=(1, 2))
+                    is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
                     white_strips = []
                     strip_start = None
                     for i, is_white in enumerate(is_white_row):
                         if is_white and strip_start is None:
                             strip_start = i
                         elif not is_white and strip_start is not None:
-                            if i - strip_start >= 10:  # At least 10 rows of white
+                            if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:
                                 white_strips.append(strip_start + t)
                             strip_start = None
                     # If the strip is at the bottom. Shouldn't happen but just in case
-                    if strip_start is not None and len(is_white_row) - strip_start >= 10:
+                    if (strip_start is not None
+                            and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
                         white_strips.append(strip_start + t)
                     if not white_strips:
-                        raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
-                                         f'or a thick horizontal line in {self.classification_file}')
+                        raise ValueError(
+                            f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a '
+                            f'thick horizontal line in {self.classification_file}'
+                        )
                     strip_start = white_strips[0]  # The topmost one is the bottom of the table
-                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
+                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # 1px buffer
                 else:
                     lines.sort(key=lambda x: x['rect'].y0)
                     bottom = [lines[0]['rect']]
@@ -1530,9 +1536,9 @@ class QualifyingParser:
             rects.sort()
             hlines = [t + 1]
             for i in rects:
-                if i - hlines[-1] > 5:
+                if i - hlines[-1] > LINE_MIN_VGAP:
                     hlines.append(i)
-            if b - hlines[-1] > 5:
+            if b - hlines[-1] > LINE_MIN_VGAP:
                 hlines.append(b)
             not_classified = self._parse_table_by_grid(page, vlines, hlines)
             # No col. header in NOT CLASSIFIED table. The detected col. header is actually table
@@ -1544,7 +1550,7 @@ class QualifyingParser:
             not_classified = not_classified.sort_index().reset_index(drop=True)
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns.drop(['original_order', 'is_classified'])
-            not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isnull()]
+            not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isna()]
             n = len(df)
             not_classified['original_order'] = range(n + 1, n + len(not_classified) + 1)
             not_classified['is_classified'] = False
@@ -1596,24 +1602,24 @@ class QualifyingParser:
                 temp.loc[temp[f'Q{q}'] == 'DNF', 'finishing_status'] = 11
                 temp.loc[temp[f'Q{q}'] == 'DNS', 'finishing_status'] = 30
                 temp.loc[temp[f'Q{q}'].isin(['DNS', 'DNF']), f'Q{q}'] = 'Z'
-                temp['is_dsq'] = (temp.finishing_status == 20)
+                temp['is_dsq'] = (temp.finishing_status == 20)  # noqa: PLR2004
                 temp['is_dnq'] = (temp.original_order > n_drivers)
                 temp.loc[temp.is_dnq, 'finishing_status'] = 40
                 """
                 `is_classified` is defined following 2025 Formula 1 Sporting Regulations 39.4 b),
                 published on 2025/02/26, available at https://www.fia.com/system/files/documents.
                 A driver is not classified if any of the following is true:
-                
+
                 1. 107% rule not met, i.e. he is in the "NOT CLASSIFIED" table
                 2. DSQ
                 3. no valid lap is done, e.g. all laps are deleted for exceeding track limits
-                
+
                 1. is already done above when we parsing "NOT CLASSIFIED" table. 2. can be detected
                 by looking at the finishing status. 3. is done by checking if the driver has a
                 lap time in the table: if the lap time col. is not a time but something else, e.g.
                 DNF, the driver does not set a valid time so he is not classified.
                 """
-                temp.loc[(temp.finishing_status != 0) & (temp.is_classified == True),
+                temp.loc[(temp.finishing_status != 0) & temp.is_classified,
                          'is_classified'] = False
                 """
                 There are four types of drivers: (1) finishing normally, (2) DNF or DNS, (3) DSQ,
@@ -1725,21 +1731,21 @@ class QualifyingParser:
                                         how='left',
                                         suffixes=('', '_y'))
             del lap_times['NO'], lap_times['temp']
-            lap_times.fillna({f'Q{q}_TIME': lap_times[f'Q{q}_TIME_y']}, inplace=True)
+            lap_times = lap_times.fillna({f'Q{q}_TIME': lap_times[f'Q{q}_TIME_y']})
             del lap_times[f'Q{q}_TIME_y']
 
             # Check if all drivers in the final classification are merged
             temp = classification[['NO', f'Q{q}_TIME']].merge(
-                lap_times[lap_times[f'Q{q}_TIME'].notnull()][['car_no']],
+                lap_times[lap_times[f'Q{q}_TIME'].notna()][['car_no']],
                 left_on='NO',
                 right_on='car_no',
                 indicator=True
             )
-            temp.dropna(subset=f'Q{q}_TIME', inplace=True)
+            temp = temp.dropna(subset=f'Q{q}_TIME')
             assert (temp['_merge'] == 'both').all(), \
                 f"Some drivers' fastest laps in Q{q} cannot be found in lap times PDF: " \
                 f"{', '.join([str(i) for i in temp[temp._merge != 'both']['NO']])}"
-            lap_times.loc[lap_times[f'Q{q}_TIME'].notnull(), 'is_fastest_lap'] = True
+            lap_times.loc[lap_times[f'Q{q}_TIME'].notna(), 'is_fastest_lap'] = True
             del lap_times[f'Q{q}_TIME']
         return lap_times
 
@@ -1749,7 +1755,7 @@ class QualifyingParser:
         df = []
         for page in doc:
             # Page width
-            page = Page(page)
+            page = Page(page)  # noqa: PLW2901
             w = page.bound()[2]
 
             # Positions of "NO" and "TIME". They are the top of each table. One driver may have
@@ -1766,7 +1772,7 @@ class QualifyingParser:
                 # and six "NO"'s are vertically at the same y-position). We only need those at
                 # different/unique y-positions. If there is a 10+ px vertical gap, we take it as a
                 # "NO" at a lower y-position
-                if y - top_pos[-1] > 10:
+                if y - top_pos[-1] > LINE_MIN_VGAP:
                     top_pos.append(y)
 
             # Bottom of the table is the next "NO TIME", or the bottom of the page
@@ -1774,7 +1780,7 @@ class QualifyingParser:
             ys.sort()
             bottom_pos = [ys[0]]
             for y in ys[1:]:
-                if y - bottom_pos[-1] > 10:
+                if y - bottom_pos[-1] > LINE_MIN_VGAP:
                     bottom_pos.append(y)
             b = page.bound()[3]
             bottom_pos.append(b)
@@ -1857,7 +1863,7 @@ class QualifyingParser:
                     that's roughly at the mid point of top line. Then from the mid point to the
                     right end is the "TIME" column. In practice, we use mid point - 5 as the right
                     boundary for the pit column.
-                    
+
                     Below, `col_seps` is a list of column separators for each table. That is,
                     `col_seps[1]` gives the column separators for the second table in this row.
                     """
@@ -1877,12 +1883,12 @@ class QualifyingParser:
                     # coloured/filled in white or grey, so we can get the row's top and bottom
                     # y-positions from these rectangles
                     rects = [i for i in page.get_drawings_in_bbox(bbox)
-                             if i['rect'].y1 - i['rect'].y0 > 10]
+                             if i['rect'].y1 - i['rect'].y0 > LINE_MIN_VGAP]
                     ys = [j for i in rects for j in [i['rect'].y0, i['rect'].y1]]
                     ys.sort()
                     row_seps = [ys[0]]
                     for y in ys[1:]:
-                        if y - row_seps[-1] > 10:
+                        if y - row_seps[-1] > LINE_MIN_VGAP:
                             row_seps.append(y)
                     row_seps = [(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
 
@@ -1918,11 +1924,11 @@ class QualifyingParser:
         df = pd.concat(df, ignore_index=True)
         if 'lap_time_deleted' not in df.columns:
             df['lap_time_deleted'] = False
-        df.fillna({'lap_time_deleted': False}, inplace=True)
-        df.rename(columns={0: 'lap_no', 1: 'pit', 2: 'lap_time'}, inplace=True)
+        df = (df.fillna({'lap_time_deleted': False})
+              .rename(columns={0: 'lap_no', 1: 'pit', 2: 'lap_time'}))
         df.lap_no = df.lap_no.astype(int)
         df.car_no = df.car_no.astype(int)
-        df.replace('', None, inplace=True)
+        df = df.replace('', None)
         df.pit = (df.pit == 'P').astype(bool)
         df = self._assign_session_to_lap(self.classification_df, df)
 
@@ -1931,7 +1937,7 @@ class QualifyingParser:
         def to_json() -> list[dict]:
             lap_data = []
             # TODO: first lap's lap time is calendar time, not lap time, so drop to
-            lap_times = df[df.lap_no >= 2].copy()
+            lap_times = df[df.lap_no >= 2].copy()  # noqa: PLR2004
             lap_times.lap_time = lap_times.lap_time.apply(duration_to_millisecond)
             for q in [1, 2, 3]:
                 temp = lap_times[lap_times.Q == q].copy()
@@ -2043,7 +2049,7 @@ class PitStopParser:
         #       "page x of xx" at the bottom right of each page
         for page in doc:  # Can have multiple pages, though usually only one. E.g., 2023 Dutch
             # Get the position of the table
-            page = Page(page)
+            page = Page(page)  # noqa: PLW2901
             driver = page.search_for('DRIVER')
             assert len(driver) == 1, f'Expected exactly one "DRIVER" in {self.file}. Found: ' \
                                      f'{driver}'
@@ -2062,13 +2068,11 @@ class PitStopParser:
                        'TOTAL TIME')  # The col. names
             cols: dict[str, tuple[float, float]] = {}
             l = no.x0 - 1
-            for col in headers:
-                col_name = col
-                col = page.search_for(col, clip=(l, t, w, b_header))
+            for col_name in headers:
+                col = page.search_for(col_name, clip=(l, t, w, b_header))
                 assert len(col) == 1, f'Expected exactly one "{col}" in the header row in ' \
                                       f'{self.file}. Found: {col}'
-                col = col[0]
-                cols[col_name] = (col.x0, col.x1)
+                cols[col_name] = (col[0].x0, col[0].x1)
             # Now the vertical line seps. are the left and right point of each col. header
             vlines = [
                 cols['NO'][0] - 1,                        # Left of "NO"
@@ -2086,18 +2090,19 @@ class PitStopParser:
             pixmap = page.get_pixmap(clip=(0, t + 10, w, page.bound()[3]))
             l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
             pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-            is_white_row = np.all(pixmap == 255, axis=(1, 2))
+            is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
             white_strips = []
             strip_start = None
             for i, is_white in enumerate(is_white_row):
                 if is_white and strip_start is None:
                     strip_start = i
                 elif not is_white and strip_start is not None:
-                    if i - strip_start >= 10:  # At least 10 rows of white
+                    if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows of white
                         white_strips.append(strip_start + t)
                     strip_start = None
             # If the strip is at the bottom. Shouldn't happen but just in case
-            if strip_start is not None and len(is_white_row) - strip_start >= 10:
+            if (strip_start is not None
+                    and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
                 white_strips.append(strip_start + t)
             if not white_strips:
                 raise ValueError(f'Could not find a blank white strip in {self.file}')
@@ -2113,9 +2118,9 @@ class PitStopParser:
             rects.sort()
             hlines: list[float] = [no.y0 - 1, b_header]
             for i in rects:
-                if i - hlines[-1] > 5:
+                if i - hlines[-1] > LINE_MIN_VGAP:
                     hlines.append(i)
-            if b - hlines[-1] > 5:
+            if b - hlines[-1] > LINE_MIN_VGAP:
                 hlines.append(b)
 
             # Parse
@@ -2123,17 +2128,16 @@ class PitStopParser:
             df.append(tab)
 
         # Clean up the table
-        df = pd.concat(df, ignore_index=True)
-        df.dropna(subset=['NO'], inplace=True)  # Drop empty rows, if any
+        df = pd.concat(df, ignore_index=True).dropna(subset='NO')  # Drop empty rows, if any
         df = df[df.NO != '']
         df = df[['NO', 'LAP', 'TIME OF DAY', 'STOP', 'DURATION']].reset_index(drop=True)
-        df.rename(columns={
+        df = df.rename(columns={
             'NO': 'car_no',
             'LAP': 'lap',
             'TIME OF DAY': 'local_time',
             'STOP': 'stop_no',
             'DURATION': 'duration'
-        }, inplace=True)
+        })
         df.car_no = df.car_no.astype(int)
         df.lap = df.lap.astype(int)
         df.stop_no = df.stop_no.astype(int)
