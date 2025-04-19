@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from jolpica.schemas import data_import
-from pydantic import BaseModel, ConfigDict, PositiveInt
+from pydantic import ConfigDict
 
 from .foreign_key import SessionEntryForeignKeys
 

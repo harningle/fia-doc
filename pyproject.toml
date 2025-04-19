@@ -47,3 +47,35 @@ minversion = "6.0"
 testpaths = [
     "fiadoc/tests"
 ]
+
+[tool.ruff]
+line-length = 99
+exclude = [
+  "fiadoc/tests",
+  "parse_event_note.py",
+  "notebook"
+]
+
+[tool.ruff.lint]
+select = [
+  "I",
+  "PD",
+  "N",
+  "E",
+  "W",
+  "F",
+  "PL",
+  "UP",
+  "FURB"
+]
+ignore = [
+  "PD013",    # I still like `df.stack` more than `df.melt`
+  "PD901",    # Fine if `df` as a var. name
+  "E741",     # Don't care about ambiguous var. name. We have comments
+  "PLR1711",  # I prefer explicit `return` even if returns nothing
+  "PLR0912",  # Skip too many branches or statements or func. args. for now. Need to refactor
+  "PLR0915",
+  "PLR0913",
+  "PLR1714",  # Write out all comparisons for readability
+  "UP009",    # UTF-8 encoding
+]

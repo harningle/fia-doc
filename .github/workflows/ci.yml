@@ -34,3 +34,6 @@ jobs:
       - name: Run tests
         run: |
           pytest -n auto
+
+      - name: Linting
+        run: ruff check
