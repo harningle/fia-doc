@@ -533,6 +533,7 @@ class RaceParser:
 
         # Clean up finishing status, e.g. is lapped? Is DSQ?
         df.loc[df.gap.fillna('').str.contains('LAP', regex=False), 'finishing_status'] = 1
+        df.loc[(df.finishing_position == 'DNF') | (df.gap == 'DNF'), 'finishing_status'] = 11
         df.loc[(df.finishing_position == 'DQ') | (df.gap == 'DQ'), 'finishing_status'] = 20
         df.loc[(df.finishing_position == 'DNS') | (df.gap == 'DNS'), 'finishing_status'] = 30
         # TODO: clean up the coding
