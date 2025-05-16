@@ -74,7 +74,8 @@ DRIVERS = {
         'Carlos Sainz': 'sainz',
         'Nico Hulkenberg': 'hulkenberg',
         'Gabriel Bortoleto': 'bortoleto',
-        'Garbiel Bortoleto': 'bortoleto'  # Typo in entry list in 2025 Australian
+        'Garbiel Bortoleto': 'bortoleto',  # Typo in entry list in 2025 Australian
+        'Franco Colapinto': 'colapinto'
     }
 }
 TEAMS = {
