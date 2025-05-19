@@ -3,7 +3,8 @@ import os
 import pickle
 import re
 import warnings
-from typing import Literal, get_args
+from functools import cached_property
+from typing import Literal, Optional, get_args
 
 import numpy as np
 import pandas as pd
@@ -11,10 +12,7 @@ import pymupdf
 from pydantic import ValidationError
 
 from ._constants import QUALI_DRIVERS
-from .models.classification import (
-    SessionEntryImport,
-    SessionEntryObject,
-)
+from .models.classification import SessionEntryImport, SessionEntryObject
 from .models.driver import RoundEntryImport, RoundEntryObject
 from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
 from .models.lap import LapImport, LapObject
@@ -29,6 +27,7 @@ QualiSessionT = Literal['quali', 'sprint_quali']
 WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
 LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
                    # considered to be the same line
+
 
 class EntryListParser:
     def __init__(
@@ -318,9 +317,9 @@ class RaceParser:
     def __init__(
             self,
             classification_file: str | os.PathLike,
-            lap_analysis_file: str | os.PathLike,
-            history_chart_file: str | os.PathLike,
-            lap_chart_file: str | os.PathLike,
+            lap_analysis_file: Optional[str | os.PathLike],
+            history_chart_file: Optional[str | os.PathLike],
+            lap_chart_file: Optional[str | os.PathLike],
             year: int,
             round_no: int,
             session: RaceSessionT
@@ -333,10 +332,43 @@ class RaceParser:
         self.year = year
         self.round_no = round_no
         self._check_session()
-        self.classification_df = self._parse_classification()
-        self.starting_grid = None  # By `_parse_lap_chart` in `self._parse_lap_times()`
-        self.lap_times_df = self._parse_lap_times()
         # self._cross_validate()
+
+    @cached_property
+    def is_pdf_complete(self) -> bool:
+        """Check if we have all lap times PDFs. If not, won't be able to get lap times df"""
+        if (self.lap_analysis_file is None or self.history_chart_file is None
+                or self.lap_chart_file is None):
+            return False
+        return True
+
+    @cached_property
+    def classification_df(self) -> pd.DataFrame:
+        return self._parse_classification()
+
+    @cached_property
+    def starting_grid(self) -> pd.DataFrame:
+        """
+        A bit confusing here. We get the starting grid from lap chart PDF. And we need the same PDF
+        for lap times. So need to parse lap chart PDF twice, which is slow. To save time, we only
+        parse it once in `self._parse_lap_times()`, and in this method we save the starting grid
+        to the attribute `self.starting_grid`. There is something wrong/redundant here. Not fixed
+
+        TODO: refactor
+        """
+        if self.is_pdf_complete is False:
+            raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
+                                    "parse starting grid or lap times")
+        _ = self.lap_times_df
+        return self.starting_grid
+
+    @cached_property
+    def lap_times_df(self) -> pd.DataFrame:
+        if self.is_pdf_complete is False:
+            raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
+                                    "parse starting grid or lap times")
+        self.starting_grid = None
+        return self._parse_lap_times()
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
@@ -584,8 +616,10 @@ class RaceParser:
         df.finishing_status = df.finishing_status.astype(int)
 
         # Merge in starting grid from lap chart PDF
-        self._parse_lap_chart()
-        df = df.merge(self.starting_grid, on='car_no', how='left')
+        if self.is_pdf_complete:
+            df = df.merge(self.starting_grid, on='car_no', how='left')
+        else:
+            df['starting_grid'] = None
 
         def to_json() -> list[dict]:
             return df.apply(
@@ -1224,7 +1258,7 @@ class QualifyingParser:
     def __init__(
             self,
             classification_file: str | os.PathLike,
-            lap_times_file: str | os.PathLike,
+            lap_times_file: Optional[str | os.PathLike],
             year: int,
             round_no: int,
             session: QualiSessionT
@@ -1235,9 +1269,23 @@ class QualifyingParser:
         self.year = year
         self.round_no = round_no
         self._check_session()
-        self.classification_df = self._parse_classification()
-        self.lap_times_df = self._parse_lap_times()
         # self._cross_validate()
+
+    @cached_property
+    def is_pdf_complete(self) -> bool:
+        if self.lap_times_file is None:
+            return False
+        return True
+
+    @cached_property
+    def classification_df(self) -> pd.DataFrame:
+        return self._parse_classification()
+
+    @cached_property
+    def lap_times_df(self) -> pd.DataFrame:
+        if self.is_pdf_complete is False:
+            raise FileNotFoundError("Lap times PDF is missing. Can't parse lap times")
+        return self._parse_lap_times()
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
