@@ -1,0 +1,282 @@
+[
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "piastri",
+            "team_reference": "mclaren",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 81
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "norris",
+            "team_reference": "mclaren",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 4
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "leclerc",
+            "team_reference": "ferrari",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 16
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "hamilton",
+            "team_reference": "ferrari",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 44
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "max_verstappen",
+            "team_reference": "red_bull",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 1
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "tsunoda",
+            "team_reference": "red_bull",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 22
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "russell",
+            "team_reference": "mercedes",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 63
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "antonelli",
+            "team_reference": "mercedes",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 12
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "stroll",
+            "team_reference": "aston_martin",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 18
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "alonso",
+            "team_reference": "aston_martin",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 14
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "gasly",
+            "team_reference": "alpine",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 10
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "colapinto",
+            "team_reference": "alpine",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 43
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "ocon",
+            "team_reference": "haas",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 31
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "bearman",
+            "team_reference": "haas",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 87
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "hadjar",
+            "team_reference": "rb",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 6
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "lawson",
+            "team_reference": "rb",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 30
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "albon",
+            "team_reference": "williams",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 23
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "sainz",
+            "team_reference": "williams",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 55
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "hulkenberg",
+            "team_reference": "sauber",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 27
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "bortoleto",
+            "team_reference": "sauber",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 5
+            }
+        ]
+    }
+]
