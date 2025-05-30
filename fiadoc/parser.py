@@ -46,6 +46,7 @@ class EntryListParser:
             page: pymupdf.Page,
             vlines: list[float],
             hlines: list[float],
+            line_height: float,
             tol: float = 2
     ) -> pd.DataFrame:
         """Manually parse the table cell by cell, defined by lines separating the columns and rows
@@ -61,24 +62,19 @@ class EntryListParser:
         :param tol: tolerance for bbox. of text. Default is 2 pixels. See #33
         """
         cells = []
-        vgap = vlines[1] - vlines[0]  # Usual gap between two vertical lines
         for i in range(len(hlines) - 1):
             row = []
             superscripts = []
             for j in range(len(vlines) - 1):
 
-                # Check if there is an unusual gap between two horizontal lines. If so, then we are
-                # now at the gap between the main table and the reserve driver table
-                if hlines[i + 1] - hlines[i] < vgap + 5:
+                # Check if there is an unusual gap between two consecutive horizontal lines. If so,
+                # then we are now at the gap between the main table and the reserve driver table
+                if hlines[i + 1] - hlines[i] < line_height * 1.5:
                     t = hlines[i]
                     b = hlines[i + 1]
-                elif i >= 1:  # The zero-th row is always fine
-                    if hlines[i] - hlines[i - 1] < vgap + 5:  # The unusual big gap is below,
-                        t = hlines[i]                         # so we are at the main table
-                        b = hlines[i] + vgap + tol
-                    else:  # The unusual big gap is above, so now at the reserve driver table
-                        t = hlines[i + 1] - vgap - tol
-                        b = hlines[i + 1]
+                # If we are at the gap, then simply skip it
+                else:
+                    break
 
                 # Get text in the cell
                 # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
@@ -157,8 +153,9 @@ class EntryListParser:
             if len(superscripts) > 1:
                 raise ValueError(f'Found multiple superscripts in row {i}, col {j} in '
                                  f'{self.file}: {cell}')
-            row.append(superscripts[0] if superscripts else None)
-            cells.append(row)
+            if row:  # Will be empty iff. we are the gap between the main and reserve driver table
+                row.append(superscripts[0] if superscripts else None)
+                cells.append(row)
 
         # Convert to df.
         df = pd.DataFrame(cells)
@@ -241,7 +238,7 @@ class EntryListParser:
         # Bottom of the table
         """
         It's slightly more difficult to determine the bottom of the table, as there is no line
-        delineating the bottom of the table. Below the table, we have stewards' name, so we can't
+        delineating the bottom of the table. Below the table, we have stewards' names, so we can't
         use the bottom of the page as the bottom of the table either. So instead, we search for
         digits below "No.". The last car No.'s position is the the bottom of the table.
 
@@ -271,16 +268,56 @@ class EntryListParser:
             r
         ]
 
-        # Lines separating the rows, which are the midpoints of the car No. texts
-        aux_hlines = [(car_nos[i][3] + car_nos[i + 1][1]) / 2 for i in range(len(car_nos) - 1)]
-        # Line vertically between "No." and the first car No.
-        aux_hlines.insert(0, (headers['no'].y1 + car_nos[0][1]) / 2)
-        # Line below the last car, which is last line + line gap (= last - 2nd last)
-        aux_hlines.append(2 * aux_hlines[-1] - aux_hlines[-2])
+        # Line gap and height
+        """
+        Line gap defined as the gap between the bottom of a car No. and the top of the next car No.
+        If we have ten drivers, then there are nine line gaps. We take the second largest of these
+        gaps as a usual line gap. There is an usually big gap between the main table and the
+        reserve driver table, which is the largest gap and we want to skip it, so use the second
+        largest.
+        """
+        line_gap = sorted([abs(car_nos[i + 1][1] - car_nos[i][3])
+                           for i in range(len(car_nos) - 1)])[-2]
+        """
+        The `abs` is not redundant! Some PDFs will have "overlapping" rows. E.g., the first car No.
+        spans from y = 10 to y = 20, and the second car No. spans from y = 19 to y = 30. In this
+        case, 19 - 20 needs an `abs`. E.g., 2024 Belgian.
+        """
+        line_height = np.mean([i[3] - i[1] for i in car_nos])
+        assert line_gap < line_height / 2, (
+            f'Line gap {line_gap} is too big relative to line height {line_height} in {self.file}'
+        )
+
+        # Lines separating the rows
+        """
+        These row separators are usually the midpoints of a car No. and the next car No. However,
+        if we are at the last row of the main table, or the first row of the reserve driver table,
+        such midpoints are not row separators, but rather the midpoint of bottom of the main table
+        and the top of the reserve driver table. So we need to handle these cases separately, using
+        `line_gap` above.
+        """
+        # Zero-th row separator is between "No." and the top of the first car No.
+        aux_hlines = [(headers['no'].y1 + car_nos[0][1]) / 2]
+        # The rest are midpoints or determined by the line height and gap as specified above
+        for i, _ in enumerate(car_nos[:-1]):
+            curr_line_gap = car_nos[i + 1][1] - car_nos[i][3]
+            # If the current row and the next row are sufficiently close, then they belong to the
+            # same table, so use the midpoint
+            if curr_line_gap < line_gap * 2:  # Zero-th row is always fine as above
+                aux_hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
+            # If they are vertically too far from each other, then the current row is the last row
+            # of the main table, so use the bottom of the current row + line gap. Also
+            # need to append the top of the next row, which is the first row of the reserve driver
+            # table
+            else:
+                aux_hlines.append(car_nos[i][3] + line_gap)
+                aux_hlines.append(car_nos[i + 1][1] - line_gap)
+        # The last row's bottom is the bottom of the last row + line gap
+        aux_hlines.append(car_nos[-1][3] + line_gap)
 
         # Get the table
         tol = 2 if l > 40 else 3  # noqa: PLR2004
-        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, tol)
+        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, line_height, tol)
 
         def to_json() -> list[dict]:
             drivers = []

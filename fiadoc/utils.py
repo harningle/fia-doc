@@ -118,7 +118,7 @@ class Page:
     def __getattr__(self, name: str):
         return getattr(self._pymupdf_page, name)
 
-    def show_page(self):
+    def show_page(self) -> None:
         """May not working well. For debug process only
 
         See https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/table-analysis/show_image.py
@@ -128,7 +128,7 @@ class Page:
         plt.figure(dpi=300)
         plt.imshow(img, extent=(0, pix.w * 72 / 300, pix.h * 72 / 300, 0))
         plt.show()
-        pass
+        return
 
     def get_drawings_in_bbox(self, bbox: tuple[float, float, float, float], tol: float = 1) \
             -> list:
