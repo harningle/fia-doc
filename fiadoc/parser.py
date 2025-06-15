@@ -2017,8 +2017,110 @@ class QualifyingParser:
         df.pit = (df.pit == 'P').astype(bool)
         df = self._assign_session_to_lap(self.classification_df, df)
 
-        # Overwrite `.to_json()` and `.to_pkl()` methods
+        # Check if any fastest laps are wrong
+        invalid_fastest_lap_drivers = set()
+        def is_fastest_lap_valid() -> bool:
+            """Check whether the fastest laps in lap times PDF match the ones in classification PDF
+
+            This function checks, for each driver in each quali. session, whether his fastest lap
+            time in lap times PDF is the same as the one in classification PDF. This is a necessary
+            and sufficient condition to ensure that the fastest lap times are correct. However, it
+            is necessary but not sufficient to guarantee that all lap times are correct/all laps
+            are correctly matched to their quali. sessions.
+
+            This partially fixes #51: when we get `False`here, there must be something wrong with
+            linking laps to quali. sessions. In such case, we will have to use the fastest lap time
+            from classification as fallback to ensure the fastest lap times are correct.
+            """
+            classification_df = self.classification_df[['NO', 'Q1', 'Q2', 'Q3']]
+            lap_times_df = df[['car_no', 'lap_no', 'Q', 'lap_time', 'is_fastest_lap']]
+            is_valid = True
+
+            # Whether there is at most one fastest lap for each given driver in each given session
+            """
+            May have no fastest lap, e.g. a usual out lap, starting the flying lap, abort the lap, into
+            pit. Two laps in total, but neither of them is a fastest lap. So here we check if #. of
+            fastest laps per driver per session <= 1.
+            """
+            temp = (lap_times_df.groupby(['Q', 'car_no'])
+                    .is_fastest_lap
+                    .sum()
+                    .reset_index(name='n_fastest_laps'))
+            temp = temp[temp.n_fastest_laps > 1]
+            if not temp.empty:
+                is_valid = False
+                invalid_fastest_lap_drivers.update(temp.car_no.unique())
+                # TODO: should get a warning here
+                # raise ValueError(f'Found {len(temp)} driver(s) with more than one fastest lap in '
+                #                  f'{self.lap_times_file}:\n{temp}')
+
+            # Compare the fastest lap times in lap times and classification PDFs
+            lap_times_df = lap_times_df[
+                lap_times_df.is_fastest_lap
+                & (~lap_times_df.car_no.isin(invalid_fastest_lap_drivers))
+            ]
+            for q in [1, 2, 3]:
+                temp = lap_times_df[lap_times_df.Q == q].merge(
+                    classification_df,
+                    left_on='car_no',
+                    right_on='NO',
+                    how='left',
+                    validate='1:1'
+                )
+                temp = temp[temp.lap_time != temp[f'Q{q}']]
+                if not temp.empty:
+                    is_valid = False
+                    invalid_fastest_lap_drivers.update(temp.car_no.unique())
+
+                # TODO: should get a warning here
+                # assert (temp.lap_time == temp[f'Q{q}']).all(), (
+                #     f'Fastest lap time in {self.lap_times_file} does not match the one in '
+                #     f'{self.classification_file} for Q{q}:\n{temp[temp.lap_time != temp[f"Q{q}"]]}'
+                # )
+            return is_valid
+
+        def apply_fallback_fastest_laps() -> pd.DataFrame:
+            """
+            Purge all lap times for drivers with invalid fastest laps and re-assign the fastest
+            laps only.
+
+            E.g., a driver has 5 laps in Q1, 6 laps in Q2, and does not make into Q3, and his Q1
+            fastest lap is invalid, i.e. is not equal to the Q1 fastest lap time in classification
+            PDF. We then drop all his 11 laps in both Q1 and Q2 from lap times df., and insert two
+            new laps with the Q1 and Q2 fastest lap times from the classification PDF. The lap No.
+            will be 99 as a placeholder. This fallback does discard all other laps, but this is
+            intended, as the entire lap-session match is not reliable for this driver.
+            """
+            valid_laps = df[~df.car_no.isin(invalid_fastest_lap_drivers)]
+
+            # Get fastest lap times from classification PDF for drivers with invalid fastest laps
+            invalid_laps = []
+            for car_no in invalid_fastest_lap_drivers:
+                for q in [1, 2, 3]:
+                    fastest_lap = self.classification_df.loc[
+                        self.classification_df.NO == car_no, f'Q{q}'
+                    ].values[0]
+                    if pd.isna(fastest_lap):
+                        continue
+                    # Add a new lap with the fastest lap time
+                    invalid_laps.append({
+                        'car_no': car_no,
+                        'lap_no': 99,  # Placeholder lap No.
+                        'pit': False,
+                        'lap_time': fastest_lap,
+                        'lap_time_deleted': False,
+                        'Q': q,
+                        'is_fastest_lap': True
+                    })
+
+            invalid_laps = pd.DataFrame(invalid_laps)
+            return pd.concat([valid_laps, invalid_laps], ignore_index=True)
+
+        if not is_fastest_lap_valid():
+            df = apply_fallback_fastest_laps()
+
         # TODO: bad practice
+        # Overwrite `.to_json()` method
         def to_json() -> list[dict]:
             lap_data = []
             # TODO: first lap's lap time is calendar time, not lap time, so drop to
@@ -2055,15 +2157,8 @@ class QualifyingParser:
                 lap_data.extend(temp['lap_data'].tolist())
             return lap_data
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(to_json(), f)
-            return
-
         df.to_json = to_json
-        df.to_pkl = to_pkl
         return df
-
 
 class PitStopParser:
     def __init__(
