@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 import json
+from typing import Optional
 
 import pytest
 
@@ -142,7 +143,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Without lap times PDF
+        # Without lap times PDF (#47)
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
         None,
         2025,
@@ -151,19 +152,31 @@ race_list = [
         '2025_7_quali_classification.json',
         None,
         pytest.raises(FileNotFoundError, match='Lap times PDF is missing')
+    ),
+    (
+        # Lap times are incorrectly matched with quali. sessions (#51)
+        'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
+        '2025_07_ita_f1_q0_timing_qualifyingsessionlaptimes_v01_0.pdf',
+        2025,
+        7,
+        'quali',
+        '2025_7_quali_classification.json',
+        '2025_7_quali_lap_times_fallback.json',
+        nullcontext()
     )
 ]
 
 
 @pytest.fixture(params=race_list)
-def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+def prepare_quali_data(request, tmp_path) \
+        -> tuple[list[dict], Optional[list[dict]], list[dict], Optional[list[dict]]]:
     # Download and parse quali. classification and lap times PDF
     url_classification, url_lap_time, year, round_no, session, expected_classification, \
         expected_lap_times, context = request.param
     if 'https://' not in url_classification:  # TODO: clean this up
         url_classification = 'https://www.fia.com/sites/default/files/' + url_classification
     download_pdf(url_classification, tmp_path / 'classification.pdf')
-    if url_lap_time:
+    if url_lap_time:  # Whether lap times PDF is provided
         download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
                      tmp_path / 'lap_times.pdf')
         parser = QualifyingParser(tmp_path / 'classification.pdf', tmp_path / 'lap_times.pdf',
@@ -211,8 +224,8 @@ def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[
 
 
 def test_parse_quali(prepare_quali_data):
-    classification_data, lap_times_data, expected_classification, expected_lap_times \
-        = prepare_quali_data
+    classification_data, lap_times_data, expected_classification, expected_lap_times = \
+        prepare_quali_data
     assert classification_data == expected_classification
 
     # Skip lap times testing if lap times PDF is missing
@@ -259,3 +272,4 @@ def test_parse_quali(prepare_quali_data):
                         f"Driver {driver}'s lap {expected_lap['number']} in {session} time " \
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
+    return
