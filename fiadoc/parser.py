@@ -2038,9 +2038,9 @@ class QualifyingParser:
 
             # Whether there is at most one fastest lap for each given driver in each given session
             """
-            May have no fastest lap, e.g. a usual out lap, starting the flying lap, abort the lap, into
-            pit. Two laps in total, but neither of them is a fastest lap. So here we check if #. of
-            fastest laps per driver per session <= 1.
+            May have no fastest lap, e.g. a usual out lap, starting the flying lap, abort the lap,
+            into pit. Two laps in total, but neither of them is a fastest lap. So here we check if
+            #. of fastest laps per driver per session <= 1.
             """
             temp = (lap_times_df.groupby(['Q', 'car_no'])
                     .is_fastest_lap
@@ -2051,8 +2051,6 @@ class QualifyingParser:
                 is_valid = False
                 invalid_fastest_lap_drivers.update(temp.car_no.unique())
                 # TODO: should get a warning here
-                # raise ValueError(f'Found {len(temp)} driver(s) with more than one fastest lap in '
-                #                  f'{self.lap_times_file}:\n{temp}')
 
             # Compare the fastest lap times in lap times and classification PDFs
             lap_times_df = lap_times_df[
@@ -2071,12 +2069,7 @@ class QualifyingParser:
                 if not temp.empty:
                     is_valid = False
                     invalid_fastest_lap_drivers.update(temp.car_no.unique())
-
                 # TODO: should get a warning here
-                # assert (temp.lap_time == temp[f'Q{q}']).all(), (
-                #     f'Fastest lap time in {self.lap_times_file} does not match the one in '
-                #     f'{self.classification_file} for Q{q}:\n{temp[temp.lap_time != temp[f"Q{q}"]]}'
-                # )
             return is_valid
 
         def apply_fallback_fastest_laps() -> pd.DataFrame:
@@ -2099,7 +2092,7 @@ class QualifyingParser:
                 for q in [1, 2, 3]:
                     fastest_lap = self.classification_df.loc[
                         self.classification_df.NO == car_no, f'Q{q}'
-                    ].values[0]
+                    ].to_numpy()[0]
                     if pd.isna(fastest_lap):
                         continue
                     # Add a new lap with the fastest lap time
