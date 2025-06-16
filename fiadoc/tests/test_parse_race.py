@@ -61,6 +61,19 @@ race_list = [
         'race',
         '2023_9_race_classification.json',
         '2023_9_race_lap_times.json'
+    ),
+    (
+        # DNF but classified, e.g., crashed in final lap, but finished 90%+ of the race
+        # (jolpica/jolpica-f1#223, jolpica/jolpica-f1#246)
+        'https://www.fia.com/system/files/decision-document/2025_canadian_grand_prix_-_final_race_classification.pdf',
+        '2025_10_can_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2025_10_can_f1_r0_timing_racehistorychart_v01.pdf',
+        '2025_10_can_f1_r0_timing_racelapchart_v01.pdf',
+        2025,
+        10,
+        'race',
+        '2025_10_race_classification.json',
+        '2025_10_race_lap_times.json'
     )
 ]
 
@@ -70,8 +83,9 @@ def prepare_race_data(request, tmp_path) -> tuple[list[dict], list[dict], list[d
     # Download and parse race classification and lap times PDFs
     url_classification, url_lap_analysis, url_history_chart, url_lap_chart, year, round_no, \
         session, expected_classification, expected_lap_times = request.param
-    download_pdf('https://www.fia.com/sites/default/files/' + url_classification,
-                 tmp_path / 'classification.pdf')
+    if 'https://' not in url_classification:  # TODO: clean this up
+        url_classification = 'https://www.fia.com/sites/default/files/' + url_classification
+    download_pdf(url_classification, tmp_path / 'classification.pdf')
     download_pdf('https://www.fia.com/sites/default/files/' + url_lap_analysis,
                  tmp_path / 'lap_analysis.pdf')
     download_pdf('https://www.fia.com/sites/default/files/' + url_history_chart,
