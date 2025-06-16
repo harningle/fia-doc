@@ -36,4 +36,4 @@ jobs:
           pytest -n auto
 
       - name: Linting
-        run: ruff check
+        run: ruff check --output-format=github .

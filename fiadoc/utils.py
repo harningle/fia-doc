@@ -7,6 +7,9 @@ import pandas as pd
 import pymupdf
 import requests
 
+from .models.foreign_key import SessionEntryForeignKeys
+from .models.lap import LapImport, LapObject
+
 rc = {'figure.figsize': (4, 3),
       'axes.facecolor': 'white',  # Remove background colour
       'axes.grid': False,         # Turn on grid
@@ -106,6 +109,43 @@ def download_pdf(url: str, out_path: str | os.PathLike) -> None:
     return
 
 
+def quali_lap_times_to_json(df, year, round_no, session) -> list[dict]:
+    lap_data = []
+    # TODO: first lap's lap time is calendar time, not lap time, so drop it
+    df = df[df.lap_no >= 2].copy()  # noqa: PLR2004
+    df.lap_time = df.lap_time.apply(duration_to_millisecond)
+    for q in [1, 2, 3]:
+        temp = df[df.Q == q].copy()
+        temp['lap'] = temp.apply(
+            lambda x: LapObject(
+                number=x.lap_no,
+                time=x.lap_time,
+                is_deleted=x.lap_time_deleted,
+                is_entry_fastest_lap=x.is_fastest_lap
+            ),
+            axis=1
+        )
+        temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
+        temp['session_entry'] = temp['car_no'].map(
+            lambda x: SessionEntryForeignKeys(
+                year=year,
+                round=round_no,
+                session=f'Q{q}' if session == 'quali' else f'SQ{q}',
+                car_number=x
+            )
+        )
+        temp['lap_data'] = temp.apply(
+            lambda x: LapImport(
+                object_type="Lap",
+                foreign_keys=x['session_entry'],
+                objects=x['lap']
+            ).model_dump(exclude_unset=True),
+            axis=1
+        )
+        lap_data.extend(temp['lap_data'].tolist())
+    return lap_data
+
+
 class Page:
     def __init__(self, page: pymupdf.Page):
         self._pymupdf_page = page
@@ -118,7 +158,7 @@ class Page:
     def __getattr__(self, name: str):
         return getattr(self._pymupdf_page, name)
 
-    def show_page(self):
+    def show_page(self) -> None:
         """May not working well. For debug process only
 
         See https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/table-analysis/show_image.py
@@ -128,7 +168,7 @@ class Page:
         plt.figure(dpi=300)
         plt.imshow(img, extent=(0, pix.w * 72 / 300, pix.h * 72 / 300, 0))
         plt.show()
-        pass
+        return
 
     def get_drawings_in_bbox(self, bbox: tuple[float, float, float, float], tol: float = 1) \
             -> list:
@@ -292,3 +332,4 @@ class Page:
             return images[0]['rect']
         else:
             return None
+

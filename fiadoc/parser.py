@@ -3,7 +3,8 @@ import os
 import pickle
 import re
 import warnings
-from typing import Literal, get_args
+from functools import cached_property, partial
+from typing import Literal, Optional, get_args
 
 import numpy as np
 import pandas as pd
@@ -11,15 +12,12 @@ import pymupdf
 from pydantic import ValidationError
 
 from ._constants import QUALI_DRIVERS
-from .models.classification import (
-    SessionEntryImport,
-    SessionEntryObject,
-)
+from .models.classification import SessionEntryImport, SessionEntryObject
 from .models.driver import RoundEntryImport, RoundEntryObject
 from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
 from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
-from .utils import Page, duration_to_millisecond, time_to_timedelta
+from .utils import Page, duration_to_millisecond, time_to_timedelta, quali_lap_times_to_json
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -29,6 +27,7 @@ QualiSessionT = Literal['quali', 'sprint_quali']
 WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
 LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
                    # considered to be the same line
+
 
 class EntryListParser:
     def __init__(
@@ -47,6 +46,7 @@ class EntryListParser:
             page: pymupdf.Page,
             vlines: list[float],
             hlines: list[float],
+            line_height: float,
             tol: float = 2
     ) -> pd.DataFrame:
         """Manually parse the table cell by cell, defined by lines separating the columns and rows
@@ -62,24 +62,19 @@ class EntryListParser:
         :param tol: tolerance for bbox. of text. Default is 2 pixels. See #33
         """
         cells = []
-        vgap = vlines[1] - vlines[0]  # Usual gap between two vertical lines
         for i in range(len(hlines) - 1):
             row = []
             superscripts = []
             for j in range(len(vlines) - 1):
 
-                # Check if there is an unusual gap between two horizontal lines. If so, then we are
-                # now at the gap between the main table and the reserve driver table
-                if hlines[i + 1] - hlines[i] < vgap + 5:
+                # Check if there is an unusual gap between two consecutive horizontal lines. If so,
+                # then we are now at the gap between the main table and the reserve driver table
+                if hlines[i + 1] - hlines[i] < line_height * 1.5:
                     t = hlines[i]
                     b = hlines[i + 1]
-                elif i >= 1:  # The zero-th row is always fine
-                    if hlines[i] - hlines[i - 1] < vgap + 5:  # The unusual big gap is below,
-                        t = hlines[i]                         # so we are at the main table
-                        b = hlines[i] + vgap + tol
-                    else:  # The unusual big gap is above, so now at the reserve driver table
-                        t = hlines[i + 1] - vgap - tol
-                        b = hlines[i + 1]
+                # If we are at the gap, then simply skip it
+                else:
+                    break
 
                 # Get text in the cell
                 # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
@@ -158,8 +153,9 @@ class EntryListParser:
             if len(superscripts) > 1:
                 raise ValueError(f'Found multiple superscripts in row {i}, col {j} in '
                                  f'{self.file}: {cell}')
-            row.append(superscripts[0] if superscripts else None)
-            cells.append(row)
+            if row:  # Will be empty iff. we are the gap between the main and reserve driver table
+                row.append(superscripts[0] if superscripts else None)
+                cells.append(row)
 
         # Convert to df.
         df = pd.DataFrame(cells)
@@ -242,7 +238,7 @@ class EntryListParser:
         # Bottom of the table
         """
         It's slightly more difficult to determine the bottom of the table, as there is no line
-        delineating the bottom of the table. Below the table, we have stewards' name, so we can't
+        delineating the bottom of the table. Below the table, we have stewards' names, so we can't
         use the bottom of the page as the bottom of the table either. So instead, we search for
         digits below "No.". The last car No.'s position is the the bottom of the table.
 
@@ -272,16 +268,56 @@ class EntryListParser:
             r
         ]
 
-        # Lines separating the rows, which are the midpoints of the car No. texts
-        aux_hlines = [(car_nos[i][3] + car_nos[i + 1][1]) / 2 for i in range(len(car_nos) - 1)]
-        # Line vertically between "No." and the first car No.
-        aux_hlines.insert(0, (headers['no'].y1 + car_nos[0][1]) / 2)
-        # Line below the last car, which is last line + line gap (= last - 2nd last)
-        aux_hlines.append(2 * aux_hlines[-1] - aux_hlines[-2])
+        # Line gap and height
+        """
+        Line gap defined as the gap between the bottom of a car No. and the top of the next car No.
+        If we have ten drivers, then there are nine line gaps. We take the second largest of these
+        gaps as a usual line gap. There is an usually big gap between the main table and the
+        reserve driver table, which is the largest gap and we want to skip it, so use the second
+        largest.
+        """
+        line_gap = sorted([abs(car_nos[i + 1][1] - car_nos[i][3])
+                           for i in range(len(car_nos) - 1)])[-2]
+        """
+        The `abs` is not redundant! Some PDFs will have "overlapping" rows. E.g., the first car No.
+        spans from y = 10 to y = 20, and the second car No. spans from y = 19 to y = 30. In this
+        case, 19 - 20 needs an `abs`. E.g., 2024 Belgian.
+        """
+        line_height = np.mean([i[3] - i[1] for i in car_nos])
+        assert line_gap < line_height / 2, (
+            f'Line gap {line_gap} is too big relative to line height {line_height} in {self.file}'
+        )
+
+        # Lines separating the rows
+        """
+        These row separators are usually the midpoints of a car No. and the next car No. However,
+        if we are at the last row of the main table, or the first row of the reserve driver table,
+        such midpoints are not row separators, but rather the midpoint of bottom of the main table
+        and the top of the reserve driver table. So we need to handle these cases separately, using
+        `line_gap` above.
+        """
+        # Zero-th row separator is between "No." and the top of the first car No.
+        aux_hlines = [(headers['no'].y1 + car_nos[0][1]) / 2]
+        # The rest are midpoints or determined by the line height and gap as specified above
+        for i, _ in enumerate(car_nos[:-1]):
+            curr_line_gap = car_nos[i + 1][1] - car_nos[i][3]
+            # If the current row and the next row are sufficiently close, then they belong to the
+            # same table, so use the midpoint
+            if curr_line_gap < line_gap * 2:  # Zero-th row is always fine as above
+                aux_hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
+            # If they are vertically too far from each other, then the current row is the last row
+            # of the main table, so use the bottom of the current row + line gap. Also
+            # need to append the top of the next row, which is the first row of the reserve driver
+            # table
+            else:
+                aux_hlines.append(car_nos[i][3] + line_gap)
+                aux_hlines.append(car_nos[i + 1][1] - line_gap)
+        # The last row's bottom is the bottom of the last row + line gap
+        aux_hlines.append(car_nos[-1][3] + line_gap)
 
         # Get the table
         tol = 2 if l > 40 else 3  # noqa: PLR2004
-        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, tol)
+        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, line_height, tol)
 
         def to_json() -> list[dict]:
             drivers = []
@@ -318,9 +354,9 @@ class RaceParser:
     def __init__(
             self,
             classification_file: str | os.PathLike,
-            lap_analysis_file: str | os.PathLike,
-            history_chart_file: str | os.PathLike,
-            lap_chart_file: str | os.PathLike,
+            lap_analysis_file: Optional[str | os.PathLike],
+            history_chart_file: Optional[str | os.PathLike],
+            lap_chart_file: Optional[str | os.PathLike],
             year: int,
             round_no: int,
             session: RaceSessionT
@@ -333,10 +369,43 @@ class RaceParser:
         self.year = year
         self.round_no = round_no
         self._check_session()
-        self.classification_df = self._parse_classification()
-        self.starting_grid = None  # By `_parse_lap_chart` in `self._parse_lap_times()`
-        self.lap_times_df = self._parse_lap_times()
         # self._cross_validate()
+
+    @cached_property
+    def is_pdf_complete(self) -> bool:
+        """Check if we have all lap times PDFs. If not, won't be able to get lap times df"""
+        if (self.lap_analysis_file is None or self.history_chart_file is None
+                or self.lap_chart_file is None):
+            return False
+        return True
+
+    @cached_property
+    def classification_df(self) -> pd.DataFrame:
+        return self._parse_classification()
+
+    @cached_property
+    def starting_grid(self) -> pd.DataFrame:
+        """
+        A bit confusing here. We get the starting grid from lap chart PDF. And we need the same PDF
+        for lap times. So need to parse lap chart PDF twice, which is slow. To save time, we only
+        parse it once in `self._parse_lap_times()`, and in this method we save the starting grid
+        to the attribute `self.starting_grid`. There is something wrong/redundant here. Not fixed
+
+        TODO: refactor
+        """
+        if self.is_pdf_complete is False:
+            raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
+                                    "parse starting grid or lap times")
+        _ = self.lap_times_df
+        return self.starting_grid
+
+    @cached_property
+    def lap_times_df(self) -> pd.DataFrame:
+        if self.is_pdf_complete is False:
+            raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
+                                    "parse starting grid or lap times")
+        self.starting_grid = None
+        return self._parse_lap_times()
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
@@ -409,7 +478,6 @@ class RaceParser:
                 found = page.get_image_header()
                 if found:
                     found = [found]
-                    warnings.warn('Found an image header, instead of strings')
                     break
         if not found:
             doc.close()
@@ -585,8 +653,10 @@ class RaceParser:
         df.finishing_status = df.finishing_status.astype(int)
 
         # Merge in starting grid from lap chart PDF
-        self._parse_lap_chart()
-        df = df.merge(self.starting_grid, on='car_no', how='left')
+        if self.is_pdf_complete:
+            df = df.merge(self.starting_grid, on='car_no', how='left')
+        else:
+            df['starting_grid'] = None
 
         def to_json() -> list[dict]:
             return df.apply(
@@ -615,13 +685,7 @@ class RaceParser:
                 axis=1
             ).tolist()
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(df.to_json(), f)
-            return
-
         df.to_json = to_json
-        df.to_pkl = to_pkl
         return df
 
     def _parse_history_chart(self) -> pd.DataFrame:
@@ -1216,16 +1280,12 @@ class RaceParser:
 
 
 class QualifyingParser:
-    """
-    TODO: need better docstring
-    TODO: probably need to refactor this. Not clean
-    Quali. sessions have to be parsed using multiple PDFs jointly. Otherwise, we don't know which
-    lap is in which quali. session
-    """
+    # TODO: need better docstring
+    # TODO: probably need to refactor this. Not clean
     def __init__(
             self,
             classification_file: str | os.PathLike,
-            lap_times_file: str | os.PathLike,
+            lap_times_file: Optional[str | os.PathLike],
             year: int,
             round_no: int,
             session: QualiSessionT
@@ -1236,16 +1296,36 @@ class QualifyingParser:
         self.year = year
         self.round_no = round_no
         self._check_session()
-        self.classification_df = self._parse_classification()
-        self.lap_times_df = self._parse_lap_times()
         # self._cross_validate()
+
+    @cached_property
+    def is_pdf_complete(self) -> bool:
+        if self.lap_times_file is None:
+            return False
+        return True
+
+    @cached_property
+    def classification_df(self) -> pd.DataFrame:
+        return self._parse_classification()
+
+    @cached_property
+    def lap_times_df(self) -> pd.DataFrame:
+        if self.is_pdf_complete is False:
+            warnings.warn('Lap times PDF is missing. Can get fastest laps only from the '
+                          'classification PDF')
+            df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[[-1]]),
+                                                   self.classification_df.NO.unique())
+            df.to_json = partial(quali_lap_times_to_json, df=df,
+                                 year=self.year, round_no=self.round_no, session=self.session)
+            return df
+        else:
+            return self._parse_lap_times()
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
         if self.session not in get_args(QualiSessionT):
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {get_args(QualiSessionT)}"')
-        # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
         return
 
     def _parse_table_by_grid(
@@ -1311,7 +1391,6 @@ class QualifyingParser:
                 found = page.get_image_header()
                 if found:
                     found = [found]
-                    warnings.warn('Found an image header, instead of strings')
                     break
         if not found:
             doc.close()  # TODO: check docs. Do we need to manually close it? Memory safe?
@@ -1933,52 +2012,109 @@ class QualifyingParser:
         df.pit = (df.pit == 'P').astype(bool)
         df = self._assign_session_to_lap(self.classification_df, df)
 
-        # Overwrite `.to_json()` and `.to_pkl()` methods
-        # TODO: bad practice
-        def to_json() -> list[dict]:
-            lap_data = []
-            # TODO: first lap's lap time is calendar time, not lap time, so drop to
-            lap_times = df[df.lap_no >= 2].copy()  # noqa: PLR2004
-            lap_times.lap_time = lap_times.lap_time.apply(duration_to_millisecond)
+        # Check if any fastest laps are wrong
+        invalid_fastest_lap_drivers = set()
+        def is_fastest_lap_valid() -> bool:
+            """Check whether the fastest laps in lap times PDF match the ones in classification PDF
+
+            This function checks, for each driver in each quali. session, whether his fastest lap
+            time in lap times PDF is the same as the one in classification PDF. This is a necessary
+            and sufficient condition to ensure that the fastest lap times are correct. However, it
+            is necessary but not sufficient to guarantee that all lap times are correct/all laps
+            are correctly matched to their quali. sessions.
+
+            This partially fixes #51: when we get `False`here, there must be something wrong with
+            linking laps to quali. sessions. In such case, we will have to use the fastest lap time
+            from classification as fallback to ensure the fastest lap times are correct.
+            """
+            classification_df = self.classification_df[['NO', 'Q1', 'Q2', 'Q3']]
+            lap_times_df = df[['car_no', 'lap_no', 'Q', 'lap_time', 'is_fastest_lap']]
+            is_valid = True
+
+            # Whether there is at most one fastest lap for each given driver in each given session
+            """
+            May have no fastest lap, e.g. a usual out lap, starting the flying lap, abort the lap,
+            into pit. Two laps in total, but neither of them is a fastest lap. So here we check if
+            #. of fastest laps per driver per session <= 1.
+            """
+            temp = (lap_times_df.groupby(['Q', 'car_no'])
+                    .is_fastest_lap
+                    .sum()
+                    .reset_index(name='n_fastest_laps'))
+            temp = temp[temp.n_fastest_laps > 1]
+            if not temp.empty:
+                is_valid = False
+                invalid_fastest_lap_drivers.update(temp.car_no.unique())
+                # TODO: should get a warning here
+
+            # Compare the fastest lap times in lap times and classification PDFs
+            lap_times_df = lap_times_df[
+                lap_times_df.is_fastest_lap
+                & (~lap_times_df.car_no.isin(invalid_fastest_lap_drivers))
+            ]
             for q in [1, 2, 3]:
-                temp = lap_times[lap_times.Q == q].copy()
-                temp['lap'] = temp.apply(
-                    lambda x: LapObject(
-                        number=x.lap_no,
-                        time=x.lap_time,
-                        is_deleted=x.lap_time_deleted,
-                        is_entry_fastest_lap=x.is_fastest_lap
-                    ),
-                    axis=1
+                temp = lap_times_df[lap_times_df.Q == q].merge(
+                    classification_df,
+                    left_on='car_no',
+                    right_on='NO',
+                    how='left',
+                    validate='1:1'
                 )
-                temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
-                temp['session_entry'] = temp['car_no'].map(
-                    lambda x: SessionEntryForeignKeys(
-                        year=self.year,
-                        round=self.round_no,
-                        session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
-                        car_number=x
-                    )
-                )
-                temp['lap_data'] = temp.apply(
-                    lambda x: LapImport(
-                        object_type="Lap",
-                        foreign_keys=x['session_entry'],
-                        objects=x['lap']
-                    ).model_dump(exclude_unset=True),
-                    axis=1
-                )
-                lap_data.extend(temp['lap_data'].tolist())
-            return lap_data
+                temp = temp[temp.lap_time != temp[f'Q{q}']]
+                if not temp.empty:
+                    is_valid = False
+                    invalid_fastest_lap_drivers.update(temp.car_no.unique())
+                # TODO: should get a warning here
+            return is_valid
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(to_json(), f)
-            return
+        if not is_fastest_lap_valid():
+            df = self._apply_fallback_fastest_laps(df, invalid_fastest_lap_drivers)
 
-        df.to_json = to_json
-        df.to_pkl = to_pkl
+        # TODO: bad practice
+        df.to_json = partial(quali_lap_times_to_json,
+                             df=df, year=self.year, round_no=self.round_no, session=self.session)
         return df
+
+    def _apply_fallback_fastest_laps(
+            self,
+            lap_times_df: pd.DataFrame,
+            drivers_with_invalid_fastest_laps: set[int]
+    ) -> pd.DataFrame:
+        """
+        Purge all lap times for drivers with invalid fastest laps and re-assign the fastest
+        laps only.
+
+        E.g., a driver has 5 laps in Q1, 6 laps in Q2, and does not make into Q3, and his Q1
+        fastest lap is invalid, i.e. is not equal to the Q1 fastest lap time in classification
+        PDF. We then drop all his 11 laps in both Q1 and Q2 from lap times df., and insert two
+        new laps with the Q1 and Q2 fastest lap times from the classification PDF. The lap No.
+        will be 99 as a placeholder. This fallback does discard all other laps, but this is
+        intended, as the entire lap-session match is not reliable for this driver.
+        """
+        valid_laps = lap_times_df[~lap_times_df.car_no.isin(drivers_with_invalid_fastest_laps)]
+
+        # Get fastest lap times from classification PDF for drivers with invalid fastest laps
+        invalid_laps = []
+        for car_no in drivers_with_invalid_fastest_laps:
+            for q in [1, 2, 3]:
+                fastest_lap = self.classification_df.loc[
+                    self.classification_df.NO == car_no, f'Q{q}'
+                ].to_numpy()[0]
+                if pd.isna(fastest_lap) or (fastest_lap in ('DNF', 'DQ', 'DSQ', 'DNS')):
+                    continue
+                # Add a new lap with the fastest lap time
+                invalid_laps.append({
+                    'car_no': car_no,
+                    'lap_no': 99,  # Placeholder lap No.
+                    'pit': False,
+                    'lap_time': fastest_lap,
+                    'lap_time_deleted': False,
+                    'Q': q,
+                    'is_fastest_lap': True
+                })
+
+        invalid_laps = pd.DataFrame(invalid_laps)
+        return pd.concat([valid_laps, invalid_laps], ignore_index=True)
 
 
 class PitStopParser:

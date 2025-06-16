@@ -1,4 +1,6 @@
+from contextlib import nullcontext
 import json
+from typing import Optional
 
 import pytest
 
@@ -14,7 +16,8 @@ race_list = [
         22,
         'quali',
         '2024_22_quali_classification.json',
-        '2024_22_quali_lap_times.json'
+        '2024_22_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # Normal quali.
@@ -24,7 +27,8 @@ race_list = [
         18,
         'quali',
         '2023_18_quali_classification.json',
-        '2023_18_quali_lap_times.json'
+        '2023_18_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # No "POLE POSITION" in quali. classification
@@ -34,7 +38,8 @@ race_list = [
         18,
         'sprint_quali',
         '2023_18_sprint_quali_classification.json',
-        '2023_18_sprint_quali_lap_times.json'
+        '2023_18_sprint_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # Title is image rather than string
@@ -44,7 +49,8 @@ race_list = [
         5,
         'quali',
         '2024_5_quali_classification.json',
-        '2024_5_quali_lap_times.json'
+        '2024_5_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # DNF drivers in quali.
@@ -54,7 +60,8 @@ race_list = [
         2,
         'quali',
         '2024_2_quali_classification.json',
-        '2024_2_quali_lap_times.json'
+        '2024_2_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # DNF drivers in quali.
@@ -64,7 +71,8 @@ race_list = [
         21,
         'sprint_quali',
         '2024_21_sprint_quali_classification.json',
-        '2024_21_sprint_quali_lap_times.json'
+        '2024_21_sprint_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # No "POLE POSITION" in quali. classification
@@ -74,7 +82,8 @@ race_list = [
         7,
         'quali',
         '2023_7_quali_classification.json',
-        '2023_7_quali_lap_times.json'
+        '2023_7_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # Antonelli's name being long, which breaks the older parser
@@ -85,7 +94,8 @@ race_list = [
         1,
         'quali',
         '2025_1_quali_provisional_classification.json',
-        '2025_1_quali_lap_times.json'
+        '2025_1_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # DSQ drivers in quali.
@@ -95,7 +105,8 @@ race_list = [
         8,
         'quali',
         '2024_8_quali_classification.json',
-        '2024_8_quali_lap_times.json'
+        '2024_8_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # No "POLE POSITION" in quali. classification
@@ -105,7 +116,8 @@ race_list = [
         3,
         'quali',
         '2024_3_quali_classification.json',
-        '2024_3_quali_lap_times.json'
+        '2024_3_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # Antonelli's name wrapped in two lines
@@ -116,7 +128,8 @@ race_list = [
         2,
         'sprint_quali',
         '2025_2_sprint_quali_final_classification.json',
-        '2025_2_sprint_quali_lap_times.json'
+        '2025_2_sprint_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # DNQ drivers in quali. (#50)
@@ -126,26 +139,54 @@ race_list = [
         4,
         'quali',
         '2025_4_quali_classification.json',
-        '2025_4_quali_lap_times.json'
+        '2025_4_quali_lap_times.json',
+        nullcontext()
+    ),
+    (
+        # Without lap times PDF (#47)
+        'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        2025,
+        7,
+        'quali',
+        '2025_7_quali_classification.json',
+        '2025_7_quali_lap_times_lap_times_pdf_unavailable.json',
+        pytest.warns(UserWarning, match='Lap times PDF is missing')
+    ),
+    (
+        # Lap times are incorrectly matched with quali. sessions (#51)
+        'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
+        '2025_07_ita_f1_q0_timing_qualifyingsessionlaptimes_v01_0.pdf',
+        2025,
+        7,
+        'quali',
+        '2025_7_quali_classification.json',
+        '2025_7_quali_lap_times_fallback.json',
+        nullcontext()
     )
 ]
 
 
 @pytest.fixture(params=race_list)
-def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+def prepare_quali_data(request, tmp_path) \
+        -> tuple[list[dict], Optional[list[dict]], list[dict], Optional[list[dict]]]:
     # Download and parse quali. classification and lap times PDF
     url_classification, url_lap_time, year, round_no, session, expected_classification, \
-        expected_lap_times = request.param
+        expected_lap_times, context = request.param
     if 'https://' not in url_classification:  # TODO: clean this up
         url_classification = 'https://www.fia.com/sites/default/files/' + url_classification
     download_pdf(url_classification, tmp_path / 'classification.pdf')
-    download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
-                 tmp_path / 'lap_times.pdf')
-    parser = QualifyingParser(tmp_path / 'classification.pdf', tmp_path / 'lap_times.pdf',
-                              year, round_no, session)
+    if url_lap_time:  # Whether lap times PDF is provided
+        download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
+                     tmp_path / 'lap_times.pdf')
+        parser = QualifyingParser(tmp_path / 'classification.pdf', tmp_path / 'lap_times.pdf',
+                                  year, round_no, session)
+    else:
+        parser = QualifyingParser(tmp_path / 'classification.pdf', None, year, round_no, session)
 
-    classification_data = parser.classification_df.to_json()
-    lap_times_data = parser.lap_times_df.to_json()
+    with context:
+        classification_data = parser.classification_df.to_json()
+        lap_times_data = parser.lap_times_df.to_json()
     with open('fiadoc/tests/fixtures/' + expected_classification, encoding='utf-8') as f:
         expected_classification = json.load(f)
     with open('fiadoc/tests/fixtures/' + expected_lap_times, encoding='utf-8') as f:
@@ -161,11 +202,11 @@ def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[
     lap_times_data.sort(
         key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
     )
+    for i in lap_times_data:
+        i['objects'].sort(key=lambda x: x['number'])
     expected_lap_times.sort(
         key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
     )
-    for i in lap_times_data:
-        i['objects'].sort(key=lambda x: x['number'])
     for i in expected_lap_times:
         i['objects'].sort(key=lambda x: x['number'])
 
@@ -177,8 +218,8 @@ def prepare_quali_data(request, tmp_path) -> tuple[list[dict], list[dict], list[
 
 
 def test_parse_quali(prepare_quali_data):
-    classification_data, lap_times_data, expected_classification, expected_lap_times \
-        = prepare_quali_data
+    classification_data, lap_times_data, expected_classification, expected_lap_times = \
+        prepare_quali_data
     assert classification_data == expected_classification
 
     # TODO: need to test against fastf1 in a better and more readable way
@@ -221,3 +262,4 @@ def test_parse_quali(prepare_quali_data):
                         f"Driver {driver}'s lap {expected_lap['number']} in {session} time " \
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
+    return
