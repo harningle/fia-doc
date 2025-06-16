@@ -150,8 +150,8 @@ race_list = [
         7,
         'quali',
         '2025_7_quali_classification.json',
-        None,
-        pytest.raises(FileNotFoundError, match='Lap times PDF is missing')
+        '2025_7_quali_lap_times_lap_times_pdf_unavailable.json',
+        pytest.warns(UserWarning, match='Lap times PDF is missing')
     ),
     (
         # Lap times are incorrectly matched with quali. sessions (#51)
@@ -186,15 +186,11 @@ def prepare_quali_data(request, tmp_path) \
 
     with context:
         classification_data = parser.classification_df.to_json()
-        lap_times_data = None
         lap_times_data = parser.lap_times_df.to_json()
     with open('fiadoc/tests/fixtures/' + expected_classification, encoding='utf-8') as f:
         expected_classification = json.load(f)
-    if expected_lap_times:
-        with open('fiadoc/tests/fixtures/' + expected_lap_times, encoding='utf-8') as f:
-            expected_lap_times = json.load(f)
-    else:
-        expected_lap_times = None
+    with open('fiadoc/tests/fixtures/' + expected_lap_times, encoding='utf-8') as f:
+        expected_lap_times = json.load(f)
 
     # Sort data
     classification_data.sort(
@@ -203,18 +199,16 @@ def prepare_quali_data(request, tmp_path) \
     expected_classification.sort(
         key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
     )
-    if lap_times_data:
-        lap_times_data.sort(
-            key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-        )
-        for i in lap_times_data:
-            i['objects'].sort(key=lambda x: x['number'])
-    if expected_lap_times:
-        expected_lap_times.sort(
-            key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-        )
-        for i in expected_lap_times:
-            i['objects'].sort(key=lambda x: x['number'])
+    lap_times_data.sort(
+        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
+    )
+    for i in lap_times_data:
+        i['objects'].sort(key=lambda x: x['number'])
+    expected_lap_times.sort(
+        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
+    )
+    for i in expected_lap_times:
+        i['objects'].sort(key=lambda x: x['number'])
 
     # TODO: currently manually tested against fastf1 lap times. The test data should be generated
     #       automatically later. Also need to manually add if the lap time is deleted and if the
@@ -227,10 +221,6 @@ def test_parse_quali(prepare_quali_data):
     classification_data, lap_times_data, expected_classification, expected_lap_times = \
         prepare_quali_data
     assert classification_data == expected_classification
-
-    # Skip lap times testing if lap times PDF is missing
-    if expected_lap_times is None:
-        return
 
     # TODO: need to test against fastf1 in a better and more readable way
     for i in lap_times_data:
