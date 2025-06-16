@@ -3,7 +3,7 @@ import os
 import pickle
 import re
 import warnings
-from functools import cached_property
+from functools import cached_property, partial
 from typing import Literal, Optional, get_args
 
 import numpy as np
@@ -17,7 +17,7 @@ from .models.driver import RoundEntryImport, RoundEntryObject
 from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
 from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
-from .utils import Page, duration_to_millisecond, time_to_timedelta
+from .utils import Page, duration_to_millisecond, time_to_timedelta, quali_lap_times_to_json
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -478,7 +478,6 @@ class RaceParser:
                 found = page.get_image_header()
                 if found:
                     found = [found]
-                    warnings.warn('Found an image header, instead of strings')
                     break
         if not found:
             doc.close()
@@ -685,13 +684,7 @@ class RaceParser:
                 axis=1
             ).tolist()
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(df.to_json(), f)
-            return
-
         df.to_json = to_json
-        df.to_pkl = to_pkl
         return df
 
     def _parse_history_chart(self) -> pd.DataFrame:
@@ -1286,12 +1279,8 @@ class RaceParser:
 
 
 class QualifyingParser:
-    """
-    TODO: need better docstring
-    TODO: probably need to refactor this. Not clean
-    Quali. sessions have to be parsed using multiple PDFs jointly. Otherwise, we don't know which
-    lap is in which quali. session
-    """
+    # TODO: need better docstring
+    # TODO: probably need to refactor this. Not clean
     def __init__(
             self,
             classification_file: str | os.PathLike,
@@ -1321,15 +1310,21 @@ class QualifyingParser:
     @cached_property
     def lap_times_df(self) -> pd.DataFrame:
         if self.is_pdf_complete is False:
-            raise FileNotFoundError("Lap times PDF is missing. Can't parse lap times")
-        return self._parse_lap_times()
+            warnings.warn('Lap times PDF is missing. Can get fastest laps only from the '
+                          'classification PDF')
+            df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[[-1]]),
+                                                   self.classification_df.NO.unique())
+            df.to_json = partial(quali_lap_times_to_json, df=df,
+                                 year=self.year, round_no=self.round_no, session=self.session)
+            return df
+        else:
+            return self._parse_lap_times()
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
         if self.session not in get_args(QualiSessionT):
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {get_args(QualiSessionT)}"')
-        # TODO: 2023 US sprint shootout. No "POLE POSITION LAP"???
         return
 
     def _parse_table_by_grid(
@@ -1395,7 +1390,6 @@ class QualifyingParser:
                 found = page.get_image_header()
                 if found:
                     found = [found]
-                    warnings.warn('Found an image header, instead of strings')
                     break
         if not found:
             doc.close()  # TODO: check docs. Do we need to manually close it? Memory safe?
@@ -2072,86 +2066,55 @@ class QualifyingParser:
                 # TODO: should get a warning here
             return is_valid
 
-        def apply_fallback_fastest_laps() -> pd.DataFrame:
-            """
-            Purge all lap times for drivers with invalid fastest laps and re-assign the fastest
-            laps only.
-
-            E.g., a driver has 5 laps in Q1, 6 laps in Q2, and does not make into Q3, and his Q1
-            fastest lap is invalid, i.e. is not equal to the Q1 fastest lap time in classification
-            PDF. We then drop all his 11 laps in both Q1 and Q2 from lap times df., and insert two
-            new laps with the Q1 and Q2 fastest lap times from the classification PDF. The lap No.
-            will be 99 as a placeholder. This fallback does discard all other laps, but this is
-            intended, as the entire lap-session match is not reliable for this driver.
-            """
-            valid_laps = df[~df.car_no.isin(invalid_fastest_lap_drivers)]
-
-            # Get fastest lap times from classification PDF for drivers with invalid fastest laps
-            invalid_laps = []
-            for car_no in invalid_fastest_lap_drivers:
-                for q in [1, 2, 3]:
-                    fastest_lap = self.classification_df.loc[
-                        self.classification_df.NO == car_no, f'Q{q}'
-                    ].to_numpy()[0]
-                    if pd.isna(fastest_lap):
-                        continue
-                    # Add a new lap with the fastest lap time
-                    invalid_laps.append({
-                        'car_no': car_no,
-                        'lap_no': 99,  # Placeholder lap No.
-                        'pit': False,
-                        'lap_time': fastest_lap,
-                        'lap_time_deleted': False,
-                        'Q': q,
-                        'is_fastest_lap': True
-                    })
-
-            invalid_laps = pd.DataFrame(invalid_laps)
-            return pd.concat([valid_laps, invalid_laps], ignore_index=True)
-
         if not is_fastest_lap_valid():
-            df = apply_fallback_fastest_laps()
+            df = self._apply_fallback_fastest_laps(df, invalid_fastest_lap_drivers)
 
         # TODO: bad practice
-        # Overwrite `.to_json()` method
-        def to_json() -> list[dict]:
-            lap_data = []
-            # TODO: first lap's lap time is calendar time, not lap time, so drop to
-            lap_times = df[df.lap_no >= 2].copy()  # noqa: PLR2004
-            lap_times.lap_time = lap_times.lap_time.apply(duration_to_millisecond)
-            for q in [1, 2, 3]:
-                temp = lap_times[lap_times.Q == q].copy()
-                temp['lap'] = temp.apply(
-                    lambda x: LapObject(
-                        number=x.lap_no,
-                        time=x.lap_time,
-                        is_deleted=x.lap_time_deleted,
-                        is_entry_fastest_lap=x.is_fastest_lap
-                    ),
-                    axis=1
-                )
-                temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
-                temp['session_entry'] = temp['car_no'].map(
-                    lambda x: SessionEntryForeignKeys(
-                        year=self.year,
-                        round=self.round_no,
-                        session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
-                        car_number=x
-                    )
-                )
-                temp['lap_data'] = temp.apply(
-                    lambda x: LapImport(
-                        object_type="Lap",
-                        foreign_keys=x['session_entry'],
-                        objects=x['lap']
-                    ).model_dump(exclude_unset=True),
-                    axis=1
-                )
-                lap_data.extend(temp['lap_data'].tolist())
-            return lap_data
-
-        df.to_json = to_json
+        df.to_json = partial(quali_lap_times_to_json,
+                             df=df, year=self.year, round_no=self.round_no, session=self.session)
         return df
+
+    def _apply_fallback_fastest_laps(
+            self,
+            lap_times_df: pd.DataFrame,
+            drivers_with_invalid_fastest_laps: set[int]
+    ) -> pd.DataFrame:
+        """
+        Purge all lap times for drivers with invalid fastest laps and re-assign the fastest
+        laps only.
+
+        E.g., a driver has 5 laps in Q1, 6 laps in Q2, and does not make into Q3, and his Q1
+        fastest lap is invalid, i.e. is not equal to the Q1 fastest lap time in classification
+        PDF. We then drop all his 11 laps in both Q1 and Q2 from lap times df., and insert two
+        new laps with the Q1 and Q2 fastest lap times from the classification PDF. The lap No.
+        will be 99 as a placeholder. This fallback does discard all other laps, but this is
+        intended, as the entire lap-session match is not reliable for this driver.
+        """
+        valid_laps = lap_times_df[~lap_times_df.car_no.isin(drivers_with_invalid_fastest_laps)]
+
+        # Get fastest lap times from classification PDF for drivers with invalid fastest laps
+        invalid_laps = []
+        for car_no in drivers_with_invalid_fastest_laps:
+            for q in [1, 2, 3]:
+                fastest_lap = self.classification_df.loc[
+                    self.classification_df.NO == car_no, f'Q{q}'
+                ].to_numpy()[0]
+                if pd.isna(fastest_lap) or (fastest_lap in ('DNF', 'DQ', 'DSQ', 'DNS')):
+                    continue
+                # Add a new lap with the fastest lap time
+                invalid_laps.append({
+                    'car_no': car_no,
+                    'lap_no': 99,  # Placeholder lap No.
+                    'pit': False,
+                    'lap_time': fastest_lap,
+                    'lap_time_deleted': False,
+                    'Q': q,
+                    'is_fastest_lap': True
+                })
+
+        invalid_laps = pd.DataFrame(invalid_laps)
+        return pd.concat([valid_laps, invalid_laps], ignore_index=True)
+
 
 class PitStopParser:
     def __init__(
