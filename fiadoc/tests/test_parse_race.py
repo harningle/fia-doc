@@ -69,6 +69,20 @@ race_list = [
         nullcontext()
     ),
     (
+        # DNF but classified, e.g., crashed in final lap, but finished 90%+ of the race
+        # (jolpica/jolpica-f1#223, jolpica/jolpica-f1#246)
+        'https://www.fia.com/system/files/decision-document/2025_canadian_grand_prix_-_final_race_classification.pdf',
+        '2025_10_can_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2025_10_can_f1_r0_timing_racehistorychart_v01.pdf',
+        '2025_10_can_f1_r0_timing_racelapchart_v01.pdf',
+        2025,
+        10,
+        'race',
+        '2025_10_race_classification.json',
+        '2025_10_race_lap_times.json',
+        nullcontext()
+    ),
+    (
         # Without some lap times PDF
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_race_classification.pdf',
         '2025_07_ita_f1_r0_timing_racelapanalysis_v01_0.pdf',
