@@ -13,7 +13,7 @@ dependencies = [
   "matplotlib>=3.4.0,<4.0.0",
   "pandas>=2.0.0,<3.0.0",
   "pydantic>=2.0.0,<3.0.0",
-  "pymupdf==1.25.1",  # Seems related to pymupdf/PyMuPDF#4206? Check `assert option in formats`
+  "pymupdf==1.26.0",
   "requests>=2.28.0,<3.0.0",
   "jolpica-schemas @ git+https://github.com/jolpica/jolpica-f1@71f12b1c9637aa838926abcb6f4840fbfac4d87c#egg=jolpica-schemas&subdirectory=jolpica/schemas",
 ]

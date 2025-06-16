@@ -701,7 +701,8 @@ class RaceParser:
 
             # Iterate over each table header and get the table content
             h = page.bound()[3]
-            for i, lap in enumerate(headers):
+            for i, header in enumerate(headers):
+                # Get lap No. from the table header
                 """
                 The left boundary of the table is the leftmost of the "Lap xxx" text, and the right
                 boundary is the leftmost of the next "Lap x" text. If it's the last lap, i.e. no
@@ -712,12 +713,23 @@ class RaceParser:
                 TODO: a better way to determine table width is by using the vector graphics: under
                 the table header, we have a black horizontal line, whose length is the table width
                 """
-                left_boundary = lap.x0
+                left_boundary = header.x0
+                top_boundary = header.y1
                 if i + 1 < len(headers):
                     right_boundary = headers[i + 1].x0
                 else:
                     right_boundary = (left_boundary + w / 5) * 1.05
-                temp = page.find_tables(clip=(left_boundary, t, right_boundary, h),
+                header_text = page.get_text(
+                    'text',
+                    clip=(left_boundary, header.y0, right_boundary, header.y1)
+                )
+                lap_no = re.search(r'LAP (\d+)', header_text)
+                assert lap_no, (f'Cannot find lap No. in header of table {i} on p.{page.number} '
+                                f'in {self.history_chart_file}')
+                lap_no = int(lap_no.group(1))
+
+                # Get the table content below header
+                temp = page.find_tables(clip=(left_boundary, top_boundary, right_boundary, h),
                                         strategy='lines',
                                         add_lines=[((left_boundary, 0), (left_boundary, h))])
                 assert len(temp.tables) == 1, \
@@ -725,9 +737,25 @@ class RaceParser:
                     f'{self.history_chart_file}'
                 temp = temp[0].to_pandas()
 
-                # Three columns: "LAP x", "GAP", "TIME". "LAP x" is the column for driver No. So
-                # add a new column for lap No. with value "x", and rename the columns
-                lap_no = int(temp.columns[0].split(' ')[1])
+                # Check if table content is mistakenly treated as table header
+                """
+                This is super inconsistent across PyMuPDF versions. In 1.25.1, it detects cols./
+                table headers correctly. However, in 1.26.0, table header is lost (even if we
+                manually add `horizontal_lines`), and the zero-th row is treated as the cols.
+                That's why we manually parse the header and lap No. above, and here everything in
+                the table (table content AND cols./headers) should be content, and there is should
+                be header. If any, then we move the header into the table content.
+                """
+                assert temp.shape[1] == 3, (  # noqa: PLR2004
+                    f'Expected 3 columns in the table of lap {lap_no} on p.{page.number} in '
+                    f'{self.history_chart_file}. Found {temp.shape[1]} columns instead: '
+                    f'{temp.columns}'
+                )
+                if any([i.isdigit() for i in temp.columns[2]]):
+                    temp.loc[-1] = temp.columns  # Add the header as the first row
+                    temp.iloc[-1, 1] = ''        # "GAP" col. is always empty for the race leader
+                    temp.index += 1
+                    temp = temp.sort_index()
                 temp.columns = ['car_no', 'gap', 'time']
                 temp['lap'] = lap_no
                 temp = temp[temp.car_no != '']  # Sometimes will get one additional empty row
@@ -942,7 +970,7 @@ class RaceParser:
                     l = i * w
                     r = (i + 1) * w
                     t = min([i.y0 for i in laps] + [i.y0 for i in times])
-                    driver = page.get_text('block', clip=(l, h, r, t)).strip()
+                    driver = page.get_text('text', clip=(l, h, r, t)).strip()
                     if not driver:
                         continue
                         # TODO: may want a test here. Every row above should have exactly 3 drivers
@@ -1084,7 +1112,7 @@ class RaceParser:
 
                         # Find the driver name, which is located immediately above the table
                         driver = page.get_text(
-                            'block',
+                            'text',
                             clip=(
                                 col * w / 3,        # Each driver occupies ~1/3 of the page width
                                 top_pos[row] - 30,  # Driver name is ~20-30 px above the table
@@ -1872,7 +1900,7 @@ class QualifyingParser:
 
                     # Find the driver name, which is located immediately above the table
                     driver = page.get_text(
-                        'block',
+                        'text',
                         clip=(
                             col * w / 3,        # Each driver occupies ~1/3 of the page width
                             top_pos[row] - 30,  # Driver name is usually 20-30 px above the table
