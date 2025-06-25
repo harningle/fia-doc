@@ -1341,7 +1341,7 @@ class QualifyingParser:
         if self.is_pdf_complete is False:
             warnings.warn('Lap times PDF is missing. Can get fastest laps only from the '
                           'classification PDF')
-            df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[[-1]]),
+            df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[]),
                                                    self.classification_df.NO.unique())
             df.to_json = partial(quali_lap_times_to_json, df=df,
                                  year=self.year, round_no=self.round_no, session=self.session)
@@ -2116,8 +2116,8 @@ class QualifyingParser:
         fastest lap is invalid, i.e. is not equal to the Q1 fastest lap time in classification
         PDF. We then drop all his 11 laps in both Q1 and Q2 from lap times df., and insert two
         new laps with the Q1 and Q2 fastest lap times from the classification PDF. The lap No.
-        will be 99 as a placeholder. This fallback does discard all other laps, but this is
-        intended, as the entire lap-session match is not reliable for this driver.
+        will be `None`. This fallback does discard all other laps, but this is intended, as the
+        entire lap-session match is not reliable for this driver.
         """
         valid_laps = lap_times_df[~lap_times_df.car_no.isin(drivers_with_invalid_fastest_laps)]
 
@@ -2133,7 +2133,7 @@ class QualifyingParser:
                 # Add a new lap with the fastest lap time
                 invalid_laps.append({
                     'car_no': car_no,
-                    'lap_no': 99,  # Placeholder lap No.
+                    'lap_no': None,  # `None` bc. we don't know which lap is the fastest lap
                     'pit': False,
                     'lap_time': fastest_lap,
                     'lap_time_deleted': False,
