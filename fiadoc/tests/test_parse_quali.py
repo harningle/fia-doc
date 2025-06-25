@@ -221,7 +221,9 @@ def test_parse_quali(prepare_quali_data):
     classification_data, lap_times_data, expected_classification, expected_lap_times = \
         prepare_quali_data
     assert classification_data == expected_classification
+    assert lap_times_data == expected_lap_times
 
+    """
     # TODO: need to test against fastf1 in a better and more readable way
     for i in lap_times_data:
         driver = i['foreign_keys']['car_number']
@@ -262,4 +264,5 @@ def test_parse_quali(prepare_quali_data):
                         f"Driver {driver}'s lap {expected_lap['number']} in {session} time " \
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
+    """
     return

@@ -17,7 +17,7 @@ from .models.driver import RoundEntryImport, RoundEntryObject
 from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
 from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
-from .utils import Page, duration_to_millisecond, time_to_timedelta, quali_lap_times_to_json
+from .utils import Page, duration_to_millisecond, quali_lap_times_to_json, time_to_timedelta
 
 pd.set_option('future.no_silent_downcasting', True)
 
