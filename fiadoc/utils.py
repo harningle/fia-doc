@@ -112,7 +112,8 @@ def download_pdf(url: str, out_path: str | os.PathLike) -> None:
 def quali_lap_times_to_json(df, year, round_no, session) -> list[dict]:
     lap_data = []
     # TODO: first lap's lap time is calendar time, not lap time, so drop it
-    df = df[df.lap_no >= 2].copy()  # noqa: PLR2004
+    # Lap No. can be missing (e.g.#47)
+    df = df[(df.lap_no >= 2) | df.lap_no.isna()].copy()  # noqa: PLR2004
     df.lap_time = df.lap_time.apply(duration_to_millisecond)
     for q in [1, 2, 3]:
         temp = df[df.Q == q].copy()
