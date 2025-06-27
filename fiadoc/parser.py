@@ -29,6 +29,80 @@ LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less th
                    # considered to be the same line
 
 
+class BaseParser:
+    """Base class for all parsers here
+
+    Provides some common functionality, such as locating the title, parsing tables by grid lines,
+    etc. Not meant to be instantiated directly, but rather to be inherited by others.
+    """
+    @staticmethod
+    def _parse_table_by_grid(
+            file: str | os.PathLike,
+            page: Page,
+            vlines: list[float],
+            hlines: list[float],
+            tol: float = 2,
+            header_included: bool = True
+    ) -> pd.DataFrame:
+        """Parse the table cell by cell, defined by lines separating the columns and rows
+
+        :param file: the PDF file to parse
+        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
+                       boundaries need to be included
+        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
+                       boundaries need to be included
+        :param tol: tolerance for text and cell positioning. In principle, all texts should fall
+                    inside the cell's bounding box. Default is 2 pixels, i.e. if text is within 2px
+                    of the cell's boundary, it is considered to be inside the cell. See #33
+        :param header_included: whether the first row is header/col. names. Default is True
+        """
+        cells = []
+        for i in range(len(hlines) - 1):
+            row = []
+            for j in range(len(vlines) - 1):
+                text = ''
+                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
+
+                # Get text inside the cell, defined by the vertical and horizontal lines
+                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
+                """
+                For each cell defined by the `vlines` and `hlines`, we get text inside it. However,
+                texts that are partially inside the cell will also be captured by pymupdf. So we
+                need to check whether the found text is totally or partially inside the cell's
+                bounding box, and do not want to false include other texts. However, we do want to
+                allow for a bit of tolerance, as `hlines` or `vlines` are not always perfectly
+                positioned. The tolerance is set to 2 pixels in general. But for PDFs that have
+                smaller page margin, i.e. text font size or line height are bigger in these PDFs,
+                we need to increase the tolerance. See #33.
+                """
+                cell = page.get_text('blocks', clip=(l, t, r, b))
+                if cell:
+                    # Usually, one cell is one line of text. The only exception is Andrea Kimi
+                    # Antonelli. His name is too long and thus (maybe) wrapped into two lines (#42)
+                    if len(cell) > 1:
+                        if len(cell) == 2 and cell[0][4].strip() == 'Andrea Kimi':  # noqa: PLR2004
+                            text = cell[0][4].strip() + ' ' + cell[1][4].strip()
+                    elif len(cell) == 1:
+                        cell = cell[0]
+                        if cell[4].strip():
+                            bbox = cell[0:4]
+                            if bbox[0] < l - tol or bbox[2] > r + tol \
+                                    or bbox[1] < t - tol or bbox[3] > b + tol:
+                                raise ValueError(f"Found text outside the cell's area in row {i}, "
+                                                 f"col. {j} on p.{page.number} in {file}: {cell}")
+                            text = cell[4].strip()
+                    else:
+                        raise ValueError(f'Expected one text block in row {i}, col. {j} on '
+                                         f'p.{page.number} in {file}. Found {len(cell)}: {cell}')
+                row.append(text)
+            cells.append(row)
+
+        if header_included:
+            return pd.DataFrame(cells[1:], columns=cells[0])
+        else:
+            return pd.DataFrame(cells)
+
+
 class EntryListParser:
     def __init__(
             self,
@@ -49,16 +123,20 @@ class EntryListParser:
             line_height: float,
             tol: float = 2
     ) -> pd.DataFrame:
-        """Manually parse the table cell by cell, defined by lines separating the columns and rows
+        """Parse the table cell by cell, defined by lines separating the columns and rows
 
-        The reason why we parse this table manually rather than using `page.find_tables` is that
-        when we have the reserve driver table, car No. may have superscript, which can not be
-        handled otherwise. The superscript indicates which reserve driver is driving whose car.
-        E.g., Antonelli is driving Hamilton's car, then driver No. 44 and driver No. 12 will have
-        the same superscript.
+        This overrides the method from `BaseParser` to handle the superscripts. The superscript
+        indicates which reserve driver is driving whose car. E.g., Antonelli (reserve) is driving
+        Hamilton's (normal) car, then driver No. 44 and driver No. 12 have the same superscript.
 
-        :param vlines: x-coords. of vertical lines separating the cols.
-        :param hlines: y-coords. of horizontal lines separating the rows
+        :param page: the page to parse
+        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
+                       boundaries need to be included
+        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
+                       boundaries need to be included
+        :param line_height: height of a usual row, i.e. the height of a car No. text. Will use this
+                            to detect the end of the main driver table and the start of the reserve
+                            driver table
         :param tol: tolerance for bbox. of text. Default is 2 pixels. See #33
         """
         cells = []
@@ -67,30 +145,15 @@ class EntryListParser:
             superscripts = []
             for j in range(len(vlines) - 1):
 
-                # Check if there is an unusual gap between two consecutive horizontal lines. If so,
-                # then we are now at the gap between the main table and the reserve driver table
-                if hlines[i + 1] - hlines[i] < line_height * 1.5:
-                    t = hlines[i]
-                    b = hlines[i + 1]
-                # If we are at the gap, then simply skip it
-                else:
+                # Check if there is an unusually big gap between two consecutive horizontal lines.
+                # If so, then we are now at the gap between the main table and the reserve driver
+                # table, so skip the current row (, which is the gap)
+                if hlines[i + 1] - hlines[i] > line_height * 1.5:
                     break
 
-                # Get text in the cell
-                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
-                """
-                For each cell defined by the `vlines` and `hlines`, we get text inside it. However,
-                texts that are partially inside the cell will also be captured by pymupdf. So we
-                need to check whether the found text is indeed inside the cell's bbox, and do not
-                false include other texts. However, we do want to allow a bit of tolerance, as
-                `hlines` are not always perfect. The tolerance is set to 2 pixels in general. But
-                for PDFs that have smaller page margin, i.e. texts and line height are bigger in
-                these PDFs, we need to increase the tolerance.
-                """
-                cell = page.get_text(
-                    'dict',
-                    clip=(vlines[j], t, vlines[j + 1], b)
-                )
+                # Get text(s) in the cell
+                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
+                cell = page.get_text('dict', clip=(l, t, r, b))
                 spans = []
                 for block in cell['blocks']:
                     for line in block['lines']:
@@ -99,62 +162,63 @@ class EntryListParser:
                                 bbox = span['bbox']
                                 # Need to check if the found text is indeed in the cell's bbox.
                                 # PyMuPDF is notoriously bad for not respecting `clip` parameter.
-                                # We give two pixels tolerance. See #33
-                                if bbox[0] >= vlines[j] - tol \
-                                        and bbox[2] <= vlines[j + 1] + tol \
-                                        and bbox[1] >= t - tol \
-                                        and bbox[3] <= b + tol:
+                                # We give `tol` pixels tolerance. See #33
+                                if bbox[0] >= l - tol and bbox[2] <= r + tol \
+                                        and bbox[1] >= t - tol and bbox[3] <= b + tol:
                                     spans.append(span)
 
                 # Check if any superscript
-                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-
-                # font-characteristics for font flags
+                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-font-characteristics  # noqa: E501
+                # for font flags
                 superscript = None
-                match len(spans):
-                    case 1:  # Only one text so no superscript
-                        row.append(spans[0]['text'].strip())
-                    case 2:  # One text and one superscript
-                        n_superscripts = 0
-                        n_regular_text = 0
-                        for span in spans:
-                            match span['flags']:
-                                case 0:
-                                    regular_text = span['text'].strip()
-                                    n_regular_text += 1
-                                case 1:
-                                    superscript = span['text'].strip()
-                                    n_superscripts += 1
-                                case _:
-                                    raise ValueError(f'Unknown error when parsing row {i}, col '
-                                                     f'{j} in {self.file}')
-                        # If we found two regular text above, then have to decide which is the
-                        # superscript using font size
-                        if n_superscripts == 2 or n_regular_text == 2 or n_regular_text == 0:  # noqa: PLR2004
-                            temp = (spans[0]['size'] + spans[1]['size']) / 2
-                            if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:  # noqa: PLR2004
-                                superscript = spans[1]['text'].strip()
-                                regular_text = spans[0]['text'].strip()
-                            elif (spans[1]['size'] - spans[0]['size']) / temp > 0.2:  # noqa: PLR2004
-                                superscript = spans[0]['text'].strip()
-                                regular_text = spans[1]['text'].strip()
-                            # In principle superscript font size should be sufficiently smaller
-                            # than the regular text. If the diff. is less than 20% raise an error
-                            else:
-                                raise ValueError(f'Cannot determine which text is superscript in '
-                                                 f'row {i}, col {j} in {self.file}: {cell}')
-                        row.append(regular_text)
-                        superscripts.append(superscript)
-                    case _:
-                        raise ValueError(f'Unknown error when parsing row {i}, col {j} in '
-                                         f'{self.file}: {cell}')
+                if len(spans) == 1:    # Only one text, which is the usual text, and no superscript
+                    row.append(spans[0]['text'].strip())
+                elif len(spans) == 2:  # Two texts. Should be one usual text and one superscript  # noqa: E501, PLR2004
+                    n_superscripts = 0
+                    n_regular_text = 0
+                    for span in spans:
+                        if span['flags'] == 0:
+                            regular_text = span['text'].strip()
+                            n_regular_text += 1
+                        elif span['flags'] == 1:
+                            superscript = span['text'].strip()
+                            n_superscripts += 1
+                        else:
+                            raise ValueError(
+                                f'Unable to infer whether the text is a regular text or a '
+                                f'superscript in cell in row {i}, col. {j} on p.{page.number} in '
+                                f'{self.file}: {cell}'
+                            )
+                    # If we found two regular texts above, then have to decide which is the
+                    # superscript using font size (#48). In principle superscript font size should
+                    # be sufficiently smaller than the regular text. We use 20% diff. as a cutoff
+                    if n_superscripts == 2 or n_regular_text == 2:  # noqa: PLR2004
+                        temp = (spans[0]['size'] + spans[1]['size']) / 2
+                        if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:  # noqa: PLR2004
+                            superscript = spans[1]['text'].strip()
+                            regular_text = spans[0]['text'].strip()
+                        elif (spans[1]['size'] - spans[0]['size']) / temp > 0.2:  # noqa: PLR2004
+                            superscript = spans[0]['text'].strip()
+                            regular_text = spans[1]['text'].strip()
+                        else:
+                            raise ValueError(f'Cannot determine which text is superscript in '
+                                             f'row {i}, col {j} on p.{page.number} in '
+                                             f'{self.file}: {cell}')
+                    row.append(regular_text)
+                    superscripts.append(superscript)
+                else:
+                    raise ValueError(f'Found more than two text blocks in the cell in row {i}, '
+                                     f'col. {j} on p.{page.number} in {self.file}. Expected only '
+                                     f'one or two texts. Found: {cell}')
 
-            # Only the first cell can have superscript, so after processing all cells in the
-            # row, should only get one single superscript
+            # Only the zero-th cell in each row (the car No. col.) can have a superscript, so after
+            # processing all cells in the row, should get at most one single superscript per row
             if len(superscripts) > 1:
-                raise ValueError(f'Found multiple superscripts in row {i}, col {j} in '
-                                 f'{self.file}: {cell}')
-            if row:  # Will be empty iff. we are the gap between the main and reserve driver table
-                row.append(superscripts[0] if superscripts else None)
+                raise ValueError(f'Found multiple superscripts in row {i} on p.{page.number} in '
+                                 f'{self.file}. Expected one or no superscript per row. Found: '
+                                 f'{superscripts}')
+            if row:  # Empty iff. we are at the gap between the main and reserve driver table
+                row.append(superscripts[0] if superscripts else None)  # Add superscript to the row
                 cells.append(row)
 
         # Convert to df.
@@ -164,31 +228,41 @@ class EntryListParser:
         elif df.shape[1] == 6:  # noqa: PLR2004
             df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor', 'reserve']
         else:
-            raise ValueError(f'Expected 5 or 6 columns, got {df.shape[1]} in {self.file}')
+            raise ValueError(f'Expected either 5 or 6 cols. in {self.file}. Found: '
+                             f'{df.columns.tolist()}')
         df.car_no = df.car_no.astype(int)
-        assert df.car_no.is_unique, f'Car No. is not unique in {self.file}'
+        assert df.car_no.is_unique, f'Car No. is not unique in {self.file}: {df.car_no.tolist()}'
 
         # Clean up the reserve driver relationship
         if 'reserve' not in df.columns:
             df['reserve'] = False
             return df
         df['reserve_for'] = None
-        for i in df.reserve.dropna().unique():
-            temp = df[df.reserve == i]
-            if len(temp) == 1:
-                # handle the case where a driver is incorrectly indicated as
-                # having a reserve driver, e.g. copy-paste error 2024, round 5
+        for i in df.reserve.dropna().unique():  # For each superscript
+            temp = df[df.reserve == i]          # Find the driver(s) with this superscript
+            # Should have two drivers: one main and one reserve for the main
+            if len(temp) == 2:  # noqa: PLR2004
+                assert temp.car_no.nunique() == 2, (  # noqa: PLR2004
+                    f'Expected two different drivers for superscript {i} in {self.file}. Found '
+                    f'{temp.car_no.nunique()}'
+                )
+                df.loc[df[df.reserve == i].index[1], 'reserve_for'] = temp.car_no.iloc[0]
+            # Handle the case where there is only one single driver with this superscript. This
+            # means a driver is incorrectly indicated as having a reserve driver, e.g. copy-paste
+            # error in the raw PDF in 2024 Chinese (#23)
+            # TODO: this may create problems. E.g., the parser misses a superscript and then misses
+            #       a reserve driver
+            elif len(temp) == 1:
                 df.loc[df.reserve == i, 'reserve'] = None
                 warnings.warn(
                     f'Driver {temp.driver.iloc[0]} is indicated as being or having a reserve '
-                    f'driver but no associated driver was found!'
+                    f'driver but no associated driver was found in {self.file}'
                 )
-                continue
-
-            assert len(temp) == 2, f'Expected 2 rows for superscript {i}, got {len(temp)}'  # noqa: PLR2004
-            assert temp.car_no.nunique() == 2, \
-                f'Expected 2 different drivers for superscript {i}, got {temp.car_no.nunique()}'  # noqa: PLR2004
-            df.loc[df[df.reserve == i].index[1], 'reserve_for'] = temp.car_no.iloc[0]
+            else:
+                raise ValueError(
+                    f'Expected exactly two drivers with superscript {i} in {self.file}. Found '
+                    f'{temp.driver.tolist()}'
+                )
         df.reserve = df['reserve_for'].notna()
         return df
 
@@ -350,7 +424,7 @@ class EntryListParser:
         return df
 
 
-class RaceParser:
+class RaceParser(BaseParser):
     def __init__(
             self,
             classification_file: str | os.PathLike,
@@ -413,48 +487,6 @@ class RaceParser:
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {get_args(RaceSessionT)}')
         return
-
-    # TODO: refactor. Have too many parse table by grid, in utils, in quali. parser, here, and in
-    #       entry list
-    def _parse_table_by_grid(
-            self,
-            page: Page,
-            vlines: list[float],
-            hlines: list[float],
-            tol: float = 2
-    ) -> pd.DataFrame:
-        """Manually parse the table cell by cell, defined by lines separating the columns and rows
-
-        See `EntryListParser._parse_table_by_grid()` for detailed explanation.
-
-        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
-                       boundaries need to be included
-        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
-                       boundaries need to be included
-        :param tol: tolerance for bbox. of text. Default is 2 pixels
-        """
-        cells = []
-        for i in range(len(hlines) - 1):
-            row = []
-            for j in range(len(vlines) - 1):
-                text = ''
-                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
-                cell = page.get_text('blocks', clip=(l, t, r, b))
-                if cell:
-                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
-                                           f'{self.classification_file}. Found {len(cell)}'
-                    cell = cell[0]
-                    if cell[4].strip():
-                        bbox = cell[0:4]
-                        if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
-                                or bbox[1] < t - tol or bbox[3] > b + tol:
-                            raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
-                                             f'{self.classification_file}')
-                        text = cell[4].strip()
-                row.append(text)
-            cells.append(row)
-        cells[0][0] = 'position'  # Finishing order col. has no col. name in PDF
-        return pd.DataFrame(cells[1:], columns=cells[0])
 
     def _parse_classification(self) -> pd.DataFrame:
         """Parse "Race/Sprint Race Final Classification" PDF
@@ -541,9 +573,16 @@ class RaceParser:
         hlines.append(b)
 
         # Parse the table using the grid above
-        df = self._parse_table_by_grid(page, vlines, hlines)
+        df = self._parse_table_by_grid(
+            file=self.classification_file,
+            page=page,
+            vlines=vlines,
+            hlines=hlines,
+            header_included=True
+        )
         assert df.shape[1] == 13, \
             f'Expected 13 cols, got {df.shape[1]} in {self.classification_file}'  # noqa: PLR2004
+        df.columns.to_numpy()[0] = 'position'  # zero-th col. has no name in PDF, so name it
 
         # Do the same for the "NOT CLASSIFIED" table. See `QualifyingParser._parse_classification`
         if has_not_classified:
@@ -561,9 +600,13 @@ class RaceParser:
             for i in range(len(car_nos) - 1):
                 hlines.append((car_nos[i][1] + car_nos[i + 1][0]) / 2)
             hlines.append(car_nos[-1][1] + 1)
-            not_classified = self._parse_table_by_grid(page, vlines, hlines)
-            not_classified.loc[-1] = not_classified.columns
-            not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
+            not_classified = self._parse_table_by_grid(
+                file=self.classification_file,
+                page=page,
+                vlines=vlines,
+                hlines=hlines,
+                header_included=False
+            )
             not_classified = not_classified.sort_index().reset_index(drop=True)
             assert not_classified.shape[1] == 13, \
                 (f'Expected 13 columns for "NOT CLASSIFIED" table , got '  # noqa: PLR2004
@@ -1307,7 +1350,7 @@ class RaceParser:
         raise NotImplementedError
 
 
-class QualifyingParser:
+class QualifyingParser(BaseParser):
     # TODO: need better docstring
     # TODO: probably need to refactor this. Not clean
     def __init__(
@@ -1355,52 +1398,6 @@ class QualifyingParser:
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {get_args(QualiSessionT)}"')
         return
-
-    def _parse_table_by_grid(
-            self,
-            page: Page,
-            vlines: list[float],
-            hlines: list[float],
-            tol: float = 2
-    ) -> pd.DataFrame:
-        """Manually parse the table cell by cell, defined by lines separating the columns and rows
-
-        See `EntryListParser._parse_table_by_grid()` for detailed explanation.
-
-        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
-                       boundaries need to be included
-        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
-                       boundaries need to be included
-        :param tol: tolerance for bbox. of text. Default is 2 pixels
-        """
-        cells = []
-        for i in range(len(hlines) - 1):
-            row = []
-            for j in range(len(vlines) - 1):
-                text = ''
-                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
-                cell = page.get_text('blocks', clip=(l, t, r, b))
-                if cell:
-                    # Usually, one cell is one line of text. The only exception is Andrea Kimi
-                    # Antonelli. His name is too long and thus wrapped into two lines
-                    if len(cell) > 1:
-                        if len(cell) == 2 and cell[0][4].strip() == 'Andrea Kimi':  # noqa: PLR2004
-                            text = cell[0][4].strip() + ' ' + cell[1][4].strip()
-                        else:
-                            raise Exception(f'Expected exactly one cell in row {i}, col {j} in '
-                                            f'{self.classification_file}. Found {cell}')
-                    cell = cell[0]
-                    if cell[4].strip():
-                        bbox = cell[0:4]
-                        if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
-                                or bbox[1] < t - tol or bbox[3] > b + tol:
-                            raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
-                                             f'{self.classification_file}: {cell}')
-                        text = cell[4].strip()
-                row.append(text)
-            cells.append(row)
-        cells[0][0] = 'position'  # Finishing order col. has no col. name in PDF
-        return pd.DataFrame(cells[1:], columns=cells[0])
 
     def _parse_classification(self):
         # Find the page with "Qualifying Session Final Classification"
@@ -1563,7 +1560,14 @@ class QualifyingParser:
             hlines.append(b)
 
         # Get the table
-        df = self._parse_table_by_grid(page, vlines, hlines)
+        df = self._parse_table_by_grid(
+            file=self.classification_file,
+            page=page,
+            vlines=vlines,
+            hlines=hlines,
+            header_included=True
+        )
+        df.columns.to_numpy()[0] = 'position'  # Zero-th col. has no col. name in PDF, so name it
 
         # Clean up column name, e.g. "TIME" -> "Q2_TIME"
         """
@@ -1648,14 +1652,15 @@ class QualifyingParser:
                     hlines.append(i)
             if b - hlines[-1] > LINE_MIN_VGAP:
                 hlines.append(b)
-            not_classified = self._parse_table_by_grid(page, vlines, hlines)
-            # No col. header in NOT CLASSIFIED table. The detected col. header is actually table
-            # content, so need to append the col. header to the table
-            not_classified.loc[-1] = not_classified.columns
-            not_classified = not_classified[(not_classified.position != '')
-                                            & not_classified.position.notna()]
-            not_classified.iloc[-1, 0] = ''  # Drop the "position" col. name
-            not_classified = not_classified.sort_index().reset_index(drop=True)
+            not_classified = self._parse_table_by_grid(
+                file=self.classification_file,
+                page=page,
+                vlines=vlines,
+                hlines=hlines,
+                header_included=False
+            )
+            print(not_classified)
+            print(df.columns.drop(['original_order', 'is_classified']))
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns.drop(['original_order', 'is_classified'])
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isna()]
@@ -2145,7 +2150,7 @@ class QualifyingParser:
         return pd.concat([valid_laps, invalid_laps], ignore_index=True)
 
 
-class PitStopParser:
+class PitStopParser(BaseParser):
     def __init__(
             self,
             file: str | os.PathLike,
@@ -2165,47 +2170,6 @@ class PitStopParser:
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are {get_args(RaceSessionT)}')
         return
-
-    # TODO: refactor. Have too many parse table by grid, in utils, in quali. parser, here, and in
-    #       entry list
-    def _parse_table_by_grid(
-            self,
-            page: Page,
-            vlines: list[float],
-            hlines: list[float],
-            tol: float = 2
-    ) -> pd.DataFrame:
-        """Manually parse the table cell by cell, defined by lines separating the columns and rows
-
-        See `EntryListParser._parse_table_by_grid()` for detailed explanation.
-
-        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
-                       boundaries need to be included
-        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
-                       boundaries need to be included
-        :param tol: tolerance for bbox. of text. Default is 2 pixels
-        """
-        cells = []
-        for i in range(len(hlines) - 1):
-            row = []
-            for j in range(len(vlines) - 1):
-                text = ''
-                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
-                cell = page.get_text('blocks', clip=(l, t, r, b))
-                if cell:
-                    assert len(cell) == 1, f'Expected exactly one cell in row {i}, col {j} in ' \
-                                           f'{self.file}. Found: {cell}'
-                    cell = cell[0]
-                    if cell[4].strip():
-                        bbox = cell[0:4]
-                        if bbox[0] < vlines[j] - tol or bbox[2] > vlines[j + 1] + tol \
-                                or bbox[1] < t - tol or bbox[3] > b + tol:
-                            raise ValueError(f'Found text outside the cell in row {i}, col {j} in '
-                                             f'{self.file}')
-                        text = cell[4].strip()
-                row.append(text)
-            cells.append(row)
-        return pd.DataFrame(cells[1:], columns=cells[0])
 
     def _parse(self) -> pd.DataFrame:
         doc = pymupdf.open(self.file)
@@ -2289,7 +2253,13 @@ class PitStopParser:
                 hlines.append(b)
 
             # Parse
-            tab = self._parse_table_by_grid(page, vlines, hlines)
+            tab = self._parse_table_by_grid(
+                file=self.file,
+                page=page,
+                vlines=vlines,
+                hlines=hlines,
+                header_included=True
+            )
             df.append(tab)
 
         # Clean up the table
