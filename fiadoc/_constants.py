@@ -75,7 +75,9 @@ DRIVERS = {
         'Nico Hulkenberg': 'hulkenberg',
         'Gabriel Bortoleto': 'bortoleto',
         'Garbiel Bortoleto': 'bortoleto',  # Typo in entry list in 2025 Australian
-        'Franco Colapinto': 'colapinto'
+        'Franco Colapinto': 'colapinto',
+        'Dino Beganovic': 'beganovic',
+        'Alexander Dunne': 'dunne'
     }
 }
 TEAMS = {
