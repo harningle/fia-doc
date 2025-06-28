@@ -21,6 +21,7 @@ from .utils import Page, duration_to_millisecond, quali_lap_times_to_json, time_
 
 pd.set_option('future.no_silent_downcasting', True)
 
+PracticeSessionT = Literal['fp', 'fp1', 'fp2', 'fp3']
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
 
@@ -421,6 +422,195 @@ class EntryListParser:
 
         df.to_json = to_json
         df.to_pkl = to_pkl
+        return df
+
+class PracticeParser(BaseParser):
+    def __init__(
+            self,
+            classification_file: str | os.PathLike,
+            lap_times_file: Optional[str | os.PathLike],
+            year: int,
+            round_no: int,
+            session: PracticeSessionT
+    ):
+        self.classification_file = classification_file
+        self.lap_times_file = lap_times_file
+        self.session = 'fp1' if session == 'fp' else session  # Sprint weekend FP renamed to FP1
+        self.year = year
+        self.round_no = round_no
+        self._check_session()
+
+    def _check_session(self) -> None:
+        # TODO: why I created this method?
+        if self.session not in get_args(PracticeSessionT):
+            raise ValueError(f'Invalid session: {self.session}. '
+                             f'Valid sessions are: {get_args(PracticeSessionT)}')
+        return
+
+    @cached_property
+    def is_pdf_complete(self) -> bool:
+        return self.lap_times_file is not None
+
+    @cached_property
+    def classification_df(self) -> pd.DataFrame:
+        return self._parse_classification()
+
+    def _parse_classification(self) -> pd.DataFrame:
+        """Parse "(First/Second/Third) Practice Final Classification" PDF
+
+        The output dataframe has columns [driver No., laps completed, total time,
+        finishing position, finishing status, fastest lap time, fastest lap speed, fastest lap No.]
+        """
+        # Find the page with "Practice Session Classification", on which the table is located
+        doc = pymupdf.open(self.classification_file)
+        found = []
+        for i in range(len(doc)):
+            page = Page(doc[i])
+            found = page.search_for('Practice Session Classification')
+            if found:
+                break
+            else:
+                found = page.get_image_header()
+                if found:
+                    found = [found]
+                    break
+        if not found:
+            doc.close()
+            raise ValueError(f'"Practice Session Classification" not found on any page in '
+                             f'{self.classification_file}')
+
+        # Page width. This is the rightmost x-coord. of the table
+        w = page.bound()[2]
+
+        # Position of "Practice Session Classification", which is the topmost y-coord. of the table
+        y = found[0].y1
+
+        # Bottommost y-coord. of the table, which is a big white strip below the table
+        # Go though the pixel map and find a wide horizontal white strip with 10+ px height
+        pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
+        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
+        is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
+        white_strips = []
+        strip_start = None
+        for i, is_white in enumerate(is_white_row):
+            if is_white and strip_start is None:
+                strip_start = i
+            elif not is_white and strip_start is not None:
+                if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows of white pixels
+                    white_strips.append(strip_start + t)
+                strip_start = None
+        if (strip_start is not None
+                and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
+            white_strips.append(strip_start + t)
+        if not white_strips:
+            raise ValueError(f'Could not find a white strip below the table on p.{page.number} in '
+                             f'{self.classification_file}')
+        strip_start = white_strips[0]  # The topmost one is the bottom of the table
+        b = strip_start
+
+        # Table bounding box
+        bbox = pymupdf.Rect(0, y, w, b)
+
+        # Left and right x-coords. of table cols.
+        pos = {}
+        for col in ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'TIME', 'LAPS', 'GAP', 'INT', 'KM/H',
+                    'TIME OF DAY']:
+            pos[col] = {
+                'left': page.search_for(col, clip=bbox)[0].x0,
+                'right': page.search_for(col, clip=bbox)[0].x1
+            }
+            # TODO: will find "NORRIS" when searching for "NO"?
+
+        # Vertical lines separating the columns
+        vlines = [
+            0,
+            pos['NO']['left'] - 1,
+            (pos['NO']['right'] + pos['DRIVER']['left']) / 2,
+            pos['NAT']['left'] - 1,
+            (pos['NAT']['right'] + pos['ENTRANT']['left']) / 2,
+            1.5 * pos['TIME']['left'] - 0.5 * pos['TIME']['right'],  # Left of "TIME" minus the
+            pos['LAPS']['left'],  # half-width of "TIME"
+            pos['LAPS']['right'],
+            (pos['GAP']['right'] + pos['INT']['left']) / 2,
+            (pos['INT']['right'] + pos['KM/H']['left']) / 2,
+            pos['TIME OF DAY']['left'],
+            pos['TIME OF DAY']['right']
+        ]
+
+        # Horizontal lines separating the rows
+        car_nos = page.get_text('blocks', clip=(pos['NO']['left'], y, pos['NO']['right'], b))
+        hlines = [y]
+        for i in range(len(car_nos) - 1):
+            hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
+        hlines.append(b)
+
+        # Parse the table using the grid above
+        df = self._parse_table_by_grid(
+            file=self.classification_file,
+            page=page,
+            vlines=vlines,
+            hlines=hlines,
+            header_included=True
+        )
+        assert df.shape[1] == 11, \
+            f'Expected 11 cols on p.{page.number} in {self.classification_file}. Got ' \
+            f'{df.columns.tolist()}'
+        df.columns.to_numpy()[0] = 'position'  # zero-th col. has no name in PDF, so name it
+
+        # Set col. names
+        del df['NAT']
+        df = df.rename(columns={
+            'position': 'finishing_position',
+            'NO': 'car_no',
+            'DRIVER': 'driver',
+            'ENTRANT': 'team',
+            'TIME': 'fastest_lap_time',
+            'LAPS': 'laps_completed',
+            'GAP': 'gap',
+            'INT': 'int',
+            'KM/H': 'avg_speed',
+            'TIME OF DAY': 'fastest_lap_calender_time'
+        })
+        df.finishing_position = df.finishing_position.astype(int)
+        df.car_no = df.car_no.astype(int)
+        df.laps_completed = df.laps_completed.astype(int)
+        df.fastest_lap_time = df.fastest_lap_time.apply(duration_to_millisecond)
+
+        """
+        We don't really know the finishing status of the driver from the table. E.g., in 2024
+        Australian FP1, Albon crashed, but before that, he already set several valid laps, so his
+        name is in the PDF, without any mark about the crash. So we set the finishing status to be
+        missing for everyone, because we can't infer that from the PDF.
+
+        And all drivers in the table will be classified, because as long as they make a lap that
+        counts, they are classified and in the PDF.
+        """
+
+        def to_json() -> list[dict]:
+            return df.apply(
+                lambda x: SessionEntryImport(
+                    object_type="SessionEntry",
+                    foreign_keys=SessionEntryForeignKeys(
+                        year=self.year,
+                        round=self.round_no,
+                        session=self.session.upper(),
+                        car_number=x.car_no
+                    ),
+                    objects=[
+                        SessionEntryObject(
+                            position=x.finishing_position,
+                            is_classified=True,
+                            status=None,
+                            laps_completed=x.laps_completed,
+                            fastest_lap_rank=x.finishing_position  # It's FP so finishing position
+                        )  # is the fastest lap ranking
+                    ]
+                ).model_dump(exclude_none=True, exclude_unset=True),
+                axis=1
+            ).tolist()
+
+        df.to_json = to_json
         return df
 
 
