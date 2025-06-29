@@ -23,12 +23,12 @@ race_list = [
         nullcontext()
     ),
     (
+        # Multiple reserve drivers that must be skipped on export to json because they are not in
+        # the driver mapping
         '2024%20Mexico%20City%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         20,
         '2024_20_entry_list.json',
-        # multiple reserve drivers that must be skipped on export to json
-        # because they are not in the driver mapping
         pytest.warns(UserWarning, match='Error when parsing driver')
     ),
     (
@@ -37,7 +37,7 @@ race_list = [
         '2024%20Japanese%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         4,
-        '2024_04_entry_list.json',
+        '2024_4_entry_list.json',
         pytest.warns(UserWarning, match='Error when parsing driver Ayumu')
     ),
     (
@@ -46,7 +46,7 @@ race_list = [
         '2024%20Chinese%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         5,
-        '2024_05_entry_list.json',
+        '2024_5_entry_list.json',
         pytest.warns(UserWarning, match='Ricciardo is indicated as')
     ),
     (
@@ -56,6 +56,30 @@ race_list = [
         1,
         '2025_1_entry_list.json',
         nullcontext()
+    ),
+    (
+        # Weird PDF page margin (#33)
+        '2025_japanese_grand_prix_-_entry_list.pdf',
+        2025,
+        3,
+        '2025_3_entry_list.json',
+        pytest.warns(UserWarning, match='Error when parsing driver Ryo Hirakawa')
+    ),
+    (
+        # Car No. superscripts shown as regular text
+        '2025_bahrain_grand_prix_-_entry_list.pdf',
+        2025,
+        4,
+        '2025_4_entry_list.json',
+        pytest.warns(UserWarning, match='Error when parsing driver Ryo Hirakawa')
+    ),
+    (
+        # Two and only two reserve drivers (#55)
+        '2025_spanish_grand_prix_-_entry_list.pdf',
+        2025,
+        9,
+        '2025_9_entry_list.json',
+        pytest.warns(UserWarning, match='Error when parsing driver')
     )
 ]
 # Not going to test year 2023 for entry list, as their PDF format is different, and we are not

@@ -8,15 +8,15 @@ authors = [
 description = "Parse FIA PDF documents to get race data"
 readme = "README.md"
 
-requires-python = ">=3.12,<3.14"  # jolpica-schemas requires 3.12+
+requires-python = ">=3.12,<3.13"  # jolpica-schemas requires 3.12+
 dependencies = [
-  "jolpica-schemas @ git+https://github.com/jolpica/jolpica-f1@71f12b1c9637aa838926abcb6f4840fbfac4d87c#egg=jolpica-schemas&subdirectory=jolpica/schemas",
   "matplotlib>=3.4.0,<4.0.0",
   "pandas>=2.0.0,<3.0.0",
   "pydantic>=2.0.0,<3.0.0",
-  "pymupdf==1.25.1",  # Seems related to pymupdf/PyMuPDF#4206? Check `assert option in formats`
+  "pymupdf==1.26.0",
   "pytesseract==0.3.*",
-  "requests>=2.28.0,<3.0.0"
+  "requests>=2.28.0,<3.0.0",
+  "jolpica-schemas @ git+https://github.com/jolpica/jolpica-f1@71f12b1c9637aa838926abcb6f4840fbfac4d87c#egg=jolpica-schemas&subdirectory=jolpica/schemas",
 ]
 
 [build-system]
@@ -51,4 +51,38 @@ testpaths = [
 filterwarnings = [
   "ignore::DeprecationWarning:importlib.*:",  # See pymupdf/PyMuPDF#3931 and swig/swig#2881
   "ignore::DeprecationWarning:sys.*:"
+]
+
+[tool.ruff]
+line-length = 99
+exclude = [
+  "fiadoc/tests",
+  "parse_event_note.py",
+  "notebook"
+]
+
+[tool.ruff.lint]
+select = [
+  "I",
+  "PD",
+  "N",
+  "E",
+  "W",
+  "F",
+  "PL",
+  "UP",
+  "FURB"
+]
+ignore = [
+  "PD013",    # I still like `df.stack` more than `df.melt`
+  "PD901",    # Fine if `df` as a var. name
+  "E741",     # Don't care about ambiguous var. name. We have comments
+  "PLR1711",  # I prefer explicit `return` even if returns nothing
+  "PLR0912",  # TODO: skip too many branches or statements or func. args. for now. Need to refactor
+  "PLR0915",
+  "PLR0913",
+  "PLR1714",  # Write out all comparisons for readability
+  "UP009",    # UTF-8 encoding
+  "UP007",    # I prefer `Optional[xxx]` over xxx | None
+  "UP045"     # I prefer `Optional[xxx]` over xxx | None
 ]

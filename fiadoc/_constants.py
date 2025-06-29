@@ -61,6 +61,7 @@ DRIVERS = {
         'Liam Lawson': 'lawson',
         'George Russell': 'russell',
         'Andrea Kimi Antonelli': 'antonelli',
+        'Kimi Antonelli': 'antonelli',
         'Lance Stroll': 'stroll',
         'Fernando Alonso': 'alonso',
         'Pierre Gasly': 'gasly',
@@ -73,7 +74,8 @@ DRIVERS = {
         'Carlos Sainz': 'sainz',
         'Nico Hulkenberg': 'hulkenberg',
         'Gabriel Bortoleto': 'bortoleto',
-        'Garbiel Bortoleto': 'bortoleto'  # Typo in entry list in 2025 Australian
+        'Garbiel Bortoleto': 'bortoleto',  # Typo in entry list in 2025 Australian
+        'Franco Colapinto': 'colapinto'
     }
 }
 TEAMS = {

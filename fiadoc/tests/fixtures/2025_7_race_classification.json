@@ -1,0 +1,462 @@
+[
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 1,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 1,
+                "is_classified": true,
+                "status": 0,
+                "points": 25,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5493199
+                },
+                "fastest_lap_rank": 1,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 4,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 2,
+                "is_classified": true,
+                "status": 0,
+                "points": 18,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5499308
+                },
+                "fastest_lap_rank": 4,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 81,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 3,
+                "is_classified": true,
+                "status": 0,
+                "points": 15,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5506155
+                },
+                "fastest_lap_rank": 5,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 44,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 4,
+                "is_classified": true,
+                "status": 0,
+                "points": 12,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5507555
+                },
+                "fastest_lap_rank": 2,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 23,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 5,
+                "is_classified": true,
+                "status": 0,
+                "points": 10,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5511144
+                },
+                "fastest_lap_rank": 3,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 16,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 6,
+                "is_classified": true,
+                "status": 0,
+                "points": 8,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5513973
+                },
+                "fastest_lap_rank": 6,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 63,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 7,
+                "is_classified": true,
+                "status": 0,
+                "points": 6,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5515233
+                },
+                "fastest_lap_rank": 9,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 55,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 8,
+                "is_classified": true,
+                "status": 0,
+                "points": 4,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5516097
+                },
+                "fastest_lap_rank": 10,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 6,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 9,
+                "is_classified": true,
+                "status": 0,
+                "points": 2,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5516785
+                },
+                "fastest_lap_rank": 7,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 22,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 10,
+                "is_classified": true,
+                "status": 0,
+                "points": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5519645
+                },
+                "fastest_lap_rank": 12,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 14,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 11,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5520449
+                },
+                "fastest_lap_rank": 11,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 27,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 12,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5523495
+                },
+                "fastest_lap_rank": 15,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 10,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 13,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5524623
+                },
+                "fastest_lap_rank": 14,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 30,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 14,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5525710
+                },
+                "fastest_lap_rank": 16,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 18,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 15,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5526192
+                },
+                "fastest_lap_rank": 17,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 43,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 16,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5526610
+                },
+                "fastest_lap_rank": 13,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 87,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 17,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5527007
+                },
+                "fastest_lap_rank": 8,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 5,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 18,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5531771
+                },
+                "fastest_lap_rank": 19,
+                "laps_completed": 63
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 12,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 19,
+                "is_classified": false,
+                "status": 11,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 3689744
+                },
+                "fastest_lap_rank": 18,
+                "laps_completed": 44
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 7,
+            "car_number": 31,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "position": 20,
+                "is_classified": false,
+                "status": 11,
+                "points": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 2262335
+                },
+                "fastest_lap_rank": 20,
+                "laps_completed": 27
+            }
+        ]
+    }
+]

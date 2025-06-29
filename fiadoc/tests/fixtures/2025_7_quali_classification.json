@@ -2,675 +2,720 @@
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 63
+            "year": 2025,
+            "round": 7,
+            "car_number": 1,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 1,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 44
+            "year": 2025,
+            "round": 7,
+            "car_number": 81,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 2,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 1
+            "year": 2025,
+            "round": 7,
+            "car_number": 14,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 3,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 16
+            "year": 2025,
+            "round": 7,
+            "car_number": 18,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 4,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 81
+            "year": 2025,
+            "round": 7,
+            "car_number": 63,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 5,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 55
+            "year": 2025,
+            "round": 7,
+            "car_number": 4,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 6,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 4
+            "year": 2025,
+            "round": 7,
+            "car_number": 10,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 7,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 10
+            "year": 2025,
+            "round": 7,
+            "car_number": 12,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 8,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 43
+            "year": 2025,
+            "round": 7,
+            "car_number": 55,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 9,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 22
+            "year": 2025,
+            "round": 7,
+            "car_number": 16,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 10,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 27
+            "year": 2025,
+            "round": 7,
+            "car_number": 23,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 11,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 31
+            "year": 2025,
+            "round": 7,
+            "car_number": 44,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 12,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 20
+            "year": 2025,
+            "round": 7,
+            "car_number": 6,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 13,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 24
+            "year": 2025,
+            "round": 7,
+            "car_number": 43,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 14,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 30
+            "year": 2025,
+            "round": 7,
+            "car_number": 5,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 15,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 11
+            "year": 2025,
+            "round": 7,
+            "car_number": 30,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 16,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 14
+            "year": 2025,
+            "round": 7,
+            "car_number": 27,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 17,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 23
+            "year": 2025,
+            "round": 7,
+            "car_number": 31,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 18,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 77
+            "year": 2025,
+            "round": 7,
+            "car_number": 87,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 19,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q1",
-            "car_number": 18
+            "year": 2025,
+            "round": 7,
+            "car_number": 22,
+            "session": "Q1"
         },
         "objects": [
             {
                 "position": 20,
-                "is_classified": true
+                "is_classified": false,
+                "status": 11
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 44
+            "year": 2025,
+            "round": 7,
+            "car_number": 55,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 1,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 55
+            "year": 2025,
+            "round": 7,
+            "car_number": 81,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 2,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 63
+            "year": 2025,
+            "round": 7,
+            "car_number": 4,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 3,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 10
+            "year": 2025,
+            "round": 7,
+            "car_number": 63,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 4,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 16
+            "year": 2025,
+            "round": 7,
+            "car_number": 1,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 5,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 81
+            "year": 2025,
+            "round": 7,
+            "car_number": 14,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 6,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 1
+            "year": 2025,
+            "round": 7,
+            "car_number": 18,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 7,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 22
+            "year": 2025,
+            "round": 7,
+            "car_number": 10,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 8,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 4
+            "year": 2025,
+            "round": 7,
+            "car_number": 6,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 9,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 27
+            "year": 2025,
+            "round": 7,
+            "car_number": 23,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 10,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 31
+            "year": 2025,
+            "round": 7,
+            "car_number": 16,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 11,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 20
+            "year": 2025,
+            "round": 7,
+            "car_number": 44,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 12,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 24
+            "year": 2025,
+            "round": 7,
+            "car_number": 12,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 13,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 43
+            "year": 2025,
+            "round": 7,
+            "car_number": 5,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 14,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q2",
-            "car_number": 30
+            "year": 2025,
+            "round": 7,
+            "car_number": 43,
+            "session": "Q2"
         },
         "objects": [
             {
                 "position": 15,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 63
+            "year": 2025,
+            "round": 7,
+            "car_number": 81,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 1,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 55
+            "year": 2025,
+            "round": 7,
+            "car_number": 1,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 2,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 10
+            "year": 2025,
+            "round": 7,
+            "car_number": 63,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 3,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 16
+            "year": 2025,
+            "round": 7,
+            "car_number": 4,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 4,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 1
+            "year": 2025,
+            "round": 7,
+            "car_number": 14,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 5,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 4
+            "year": 2025,
+            "round": 7,
+            "car_number": 55,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 6,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 22
+            "year": 2025,
+            "round": 7,
+            "car_number": 23,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 7,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 81
+            "year": 2025,
+            "round": 7,
+            "car_number": 18,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 8,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 27
+            "year": 2025,
+            "round": 7,
+            "car_number": 6,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 9,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     },
     {
         "object_type": "SessionEntry",
         "foreign_keys": {
-            "year": 2024,
-            "round": 22,
-            "session": "Q3",
-            "car_number": 44
+            "year": 2025,
+            "round": 7,
+            "car_number": 10,
+            "session": "Q3"
         },
         "objects": [
             {
                 "position": 10,
-                "is_classified": true
+                "is_classified": true,
+                "status": 0
             }
         ]
     }

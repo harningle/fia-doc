@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """Frequently used foreign key models for the data objects"""
+from typing import Self
 
 from jolpica.schemas import data_import
 from pydantic import ConfigDict, field_validator, model_validator
-from typing_extensions import Self
 
 from .._constants import DRIVERS, TEAMS
 
 
 class SessionValidatorMixin:
-    @field_validator("session")
+    @field_validator('session')
     @classmethod
     def clean_session(cls, session: str) -> str:
         match session.lower().strip():

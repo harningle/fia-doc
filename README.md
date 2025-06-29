@@ -70,7 +70,7 @@ parser = RaceParser('data/pdf/2023_18_sprint_classification.pdf',
                     'data/pdf/2023_18_sprint_lap_chart.pdf',
                     2023,
                     18,
-                    'sprint_race')
+                    'sprint')
 with open('data/dump/2023_18_sprint_classification.json', 'w') as f:
     json.dump(parser.classification_df.to_json(), f)
 with open('data/dump/2023_18_sprint_lap_times.json', 'w') as f:
