@@ -4,7 +4,6 @@ import pickle
 import re
 import warnings
 from functools import cached_property, partial
-from string import printable
 from typing import Literal, Optional, get_args
 
 import numpy as np
@@ -13,14 +12,18 @@ import pymupdf
 from pydantic import ValidationError
 
 from ._constants import QUALI_DRIVERS
-from .core import Page, ParsingError
-from .models.classification import SessionEntryImport, SessionEntryObject
 from .models.classification import SessionEntryImport, SessionEntryObject
 from .models.driver import RoundEntryImport, RoundEntryObject
 from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
 from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
-from .utils import Page, duration_to_millisecond, quali_lap_times_to_json, time_to_timedelta
+from .utils import (
+    Page,
+    ParsingError,
+    duration_to_millisecond,
+    quali_lap_times_to_json,
+    time_to_timedelta,
+)
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -427,6 +430,7 @@ class EntryListParser:
         df.to_pkl = to_pkl
         return df
 
+
 class PracticeParser(BaseParser):
     def __init__(
             self,
@@ -472,11 +476,6 @@ class PracticeParser(BaseParser):
             found = page.search_for('Practice Session Classification')
             if found:
                 break
-            else:
-                found = page.get_image_header()
-                if found:
-                    found = [found]
-                    break
         if not found:
             doc.close()
             raise ValueError(f'"Practice Session Classification" not found on any page in '
@@ -556,9 +555,10 @@ class PracticeParser(BaseParser):
             hlines=hlines,
             header_included=True
         )
-        assert df.shape[1] == 11, \
-            f'Expected 11 cols on p.{page.number} in {self.classification_file}. Got ' \
+        assert df.shape[1] == 11, (  # noqa: PLR2004
+            f'Expected 11 cols on p.{page.number} in {self.classification_file}. Got '
             f'{df.columns.tolist()}'
+        )
         df.columns.to_numpy()[0] = 'position'  # zero-th col. has no name in PDF, so name it
 
         # Set col. names
@@ -617,7 +617,7 @@ class PracticeParser(BaseParser):
         return df
 
 
-class RaceParser:
+class RaceParser(BaseParser):
     def __init__(
             self,
             classification_file: str | os.PathLike,
@@ -699,11 +699,6 @@ class RaceParser:
             if found:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
-            else:
-                found = page.get_image_header()
-                if found:
-                    found = [found]
-                    break
         if not found:
             doc.close()
             raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
@@ -1594,85 +1589,6 @@ class QualifyingParser(BaseParser):
                              f'Valid sessions are: {get_args(QualiSessionT)}"')
         return
 
-
-    def _clean_up_classification_table(self, df: pd.DataFrame, is_not_classified: bool = False) \
-            -> pd.DataFrame:
-        """Clean wrong chars. from OCR"""
-        for col in df:
-            if df[col].dtype == 'object':
-                df[col] = df[col].str.strip()
-                # Drop invisible chars.
-                df[col] = df[col].apply(lambda x: ''.join([c for c in x if c in printable]))
-                # "-" as placeholder for empty string in our tesseract model. So replace "-" as
-                # well as some other common errors
-                df[col] = df[col].replace(r'^[\.\-_,|]+$', '', regex=True)
-                # TODO: already in `Page.get_text`, so maybe remove here?
-
-        # Finishing position col. should either be a number or "DQ". It can also be empty if it's
-        # the NOT CLASSIFIED table
-        """
-        Sometimes we can have stuff like ". 15" where it should be "15". In such cases, if the "15"
-        is equal to the previous row's "14" + 1, and the next row's "16" - 1, then we can safely
-        replace ". 15" with "15". If not, raise an error
-        """
-        df.position = df.position.str.replace('q', '9')  # Some common OCR errors
-        mask = df.position.str.fullmatch(r'\d{1,2}|DQ|DSQ') | (df.position == '')
-        if not mask.all():
-            raise ParsingError(f'Position col. in {self.classification_file} is not all numeric '
-                               f'or "DQ": {df.position.values}')
-
-        # Car No. should be pure digits
-        if not df.NO.str.isnumeric().all():
-            raise ParsingError(f'NO col. in {self.classification_file} is not all 1 or 2 digits: '
-                               f'{df.NO.values}')
-        df.NO = df.NO.astype(int)
-
-        # Don't care about driver name, nationality, or team name
-
-        # Q1, Q2, Q3 should be either a time or empty
-        """
-        Even if we fine tune our own tesseract model, the accuracy is not 100%. Most OCR mistakes
-        happen when the cell is empty. So here only check the non-empty cells, and replace the rest
-        with empty string manually. We know Q1 has 20 drivers, Q2, 15, and Q3, 10. So only need to
-        check these 20 + 15 + 10 cells.
-        """
-        pat = re.compile(r'\d:\d{2}\.\d{3}|DNF|DNS|DSQ|DQ')
-        for col in ['Q1', 'Q2', 'Q3']:
-            if is_not_classified and col in ['Q2', 'Q3']:  # Is empty for "NOT CLASSIFIED" table
-                continue
-            n_drivers = QUALI_DRIVERS[self.year][int(col[1])]
-            temp = df.loc[:n_drivers - 1, col]  # Pandas `.loc` slice is both inclusive
-            mask = temp.str.fullmatch(pat) | (temp == '')
-            if not mask.all():
-                raise ParsingError(f'{col} col. in {self.classification_file} is not all time or '
-                                   f'empty: {df[col].values}')
-            df.loc[n_drivers:, col] = ''
-
-        # The same holds for the calendar time col.
-        if is_not_classified is False:
-            pat = re.compile(r'\d{1,2}:\d{2}:\d{2}')
-            for col in ['Q1_TIME', 'Q2_TIME', 'Q3_TIME']:
-                n_drivers = QUALI_DRIVERS[self.year][int(col[1])]
-                temp = df.loc[:n_drivers - 1, col]
-                mask = temp.str.fullmatch(pat) | (temp == '')
-                if not mask.all():
-                    raise ParsingError(f'TIME col. in {self.classification_file} is not all time '
-                                       f'or empty: {df[col].values}')
-                df.loc[n_drivers:, col] = ''
-
-        # Laps completed should be a number or empty
-        for col in ['Q1_LAPS', 'Q2_LAPS', 'Q3_LAPS']:
-            if is_not_classified and col in ['Q2_LAPS', 'Q3_LAPS']:
-                continue
-            n_drivers = QUALI_DRIVERS[self.year][int(col[1])]
-            temp = df.loc[:n_drivers - 1, col]
-            mask = temp.str.isnumeric() | (temp == '')
-            if not mask.all():
-                raise ParsingError(f'LAPS col. in {self.classification_file} is not all numeric '
-                                   f'or empty: {df[col].values}')
-            df.loc[n_drivers:, col] = ''
-        return df
-
     def _search_for_table_bottom(self, page: Page, y: float) -> tuple[float, bool]:
         """y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first
 
@@ -1712,18 +1628,18 @@ class QualifyingParser(BaseParser):
         pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
         l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
         pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
-        is_white_row = np.all(pixmap == 255, axis=(1, 2))
+        is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
         white_strips = []
         strip_start = None
         for i, is_white in enumerate(is_white_row):
             if is_white and strip_start is None:
                 strip_start = i
             elif not is_white and strip_start is not None:
-                if i - strip_start >= 10:  # At least 10 rows/px of white
+                if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows/px of white
                     white_strips.append(strip_start + t)
                 strip_start = None
         # Edge case for the strip being at the bottom. Shouldn't happen but just in case
-        if strip_start is not None and len(is_white_row) - strip_start >= 10:
+        if strip_start is not None and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT:
             white_strips.append(strip_start + t)
         if not white_strips:
             raise ParsingError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
@@ -1744,11 +1660,6 @@ class QualifyingParser(BaseParser):
             if found:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
-            else:
-                found = page.get_image_header()
-                if found:
-                    found = [found]
-                    break
         if not found:
             doc.close()  # TODO: check docs. Do we need to manually close it? Memory safe?
             raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
@@ -1998,8 +1909,6 @@ class QualifyingParser(BaseParser):
                 hlines=hlines,
                 header_included=False
             )
-            print(not_classified)
-            print(df.columns.drop(['original_order', 'is_classified']))
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns.drop(['original_order', 'is_classified'])
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isna()]
@@ -2483,7 +2392,7 @@ class QualifyingParser(BaseParser):
         return pd.concat([valid_laps, invalid_laps], ignore_index=True)
 
 
-class PitStopParser:
+class PitStopParser(BaseParser):
     def __init__(
             self,
             file: str | os.PathLike,

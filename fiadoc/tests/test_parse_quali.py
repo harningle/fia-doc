@@ -127,7 +127,8 @@ race_list = [
         1,
         'quali',
         '2025_1_quali_final_classification.json',
-        '2025_1_quali_lap_times.json'
+        '2025_1_quali_lap_times.json',
+        nullcontext()
     ),
     (
         # Antonelli's name wrapped in two lines

@@ -78,6 +78,7 @@ ignore = [
   "PD901",    # Fine if `df` as a var. name
   "E741",     # Don't care about ambiguous var. name. We have comments
   "PLR1711",  # I prefer explicit `return` even if returns nothing
+  "PLR0911",  # I know too many `return`'s are not good, but...
   "PLR0912",  # TODO: skip too many branches or statements or func. args. for now. Need to refactor
   "PLR0915",
   "PLR0913",
