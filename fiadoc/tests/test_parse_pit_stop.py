@@ -9,6 +9,7 @@ from fiadoc.utils import download_pdf
 
 race_list = [
     (
+        # Normal pit stop summary spanning over three pages
         '2023_14_ned_f1_r0_timing_racepitstopsummary_v01.pdf',
         2023,
         13,

@@ -34,8 +34,7 @@ jobs:
       - name: Install tesseract
         run: |
           sudo apt-get update
-          sudo apt-get install tesseract-ocr -y
-          sudo apt-get install libtesseract-dev -y
+          sudo apt-get install tesseract-ocr libtesseract-dev -y
 
       - name: Run tests
         run: |

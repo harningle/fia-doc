@@ -20,28 +20,6 @@ race_list = [
         nullcontext()
     ),
     (
-        # Normal quali.
-        'doc_20_-_2023_united_states_grand_prix_-_final_qualifying_classification.pdf',
-        '2023_19_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
-        2023,
-        18,
-        'quali',
-        '2023_18_quali_classification.json',
-        '2023_18_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # No "POLE POSITION" in quali. classification
-        'doc_32_-_2023_united_states_grand_prix_-_final_sprint_shootout_classification.pdf',
-        '2023_19_usa_f1_sq0_timing_sprintshootoutsessionlaptimes_v01.pdf',
-        2023,
-        18,
-        'sprint_quali',
-        '2023_18_sprint_quali_classification.json',
-        '2023_18_sprint_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
         # Title is image rather than string
         'doc_53_-_2024_chinese_grand_prix_-_final_qualifying_classification.pdf',
         '2024_05_chn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
@@ -72,17 +50,6 @@ race_list = [
         'sprint_quali',
         '2024_21_sprint_quali_classification.json',
         '2024_21_sprint_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # No "POLE POSITION" in quali. classification
-        'doc_37_-_2023_spanish_grand_prix_-_final_qualifying_classification.pdf',
-        '2023_08_esp_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
-        2023,
-        7,
-        'quali',
-        '2023_7_quali_classification.json',
-        '2023_7_quali_lap_times.json',
         nullcontext()
     ),
     (

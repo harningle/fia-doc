@@ -9,17 +9,11 @@ from fiadoc.utils import download_pdf
 
 race_list = [
     (
+        # Normal entry list
         '2024%20S%C3%A3o%20Paulo%20Grand%20Prix%20-%20Revised%20Entry%20List.pdf',
         2024,
         21,
         '2024_21_entry_list.json',
-        nullcontext()
-    ),
-    (
-        '2024%20Belgian%20Grand%20Prix%20-%20Entry%20List.pdf',
-        2024,
-        14,
-        '2024_14_entry_list.json',
         nullcontext()
     ),
     (

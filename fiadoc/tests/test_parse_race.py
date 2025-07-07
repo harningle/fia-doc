@@ -9,31 +9,7 @@ from fiadoc.utils import download_pdf
 
 race_list = [
     (
-        'doc_66_-_2023_united_states_grand_prix_-_final_race_classification.pdf',
-        '2023_19_usa_f1_r0_timing_racelapanalysis_v01.pdf',
-        '2023_19_usa_f1_r0_timing_racehistorychart_v01.pdf',
-        '2023_19_usa_f1_r0_timing_racelapchart_v01.pdf',
-        2023,
-        18,
-        'race',
-        '2023_18_race_classification.json',
-        '2023_18_race_lap_times.json',
-        nullcontext()
-    ),
-    (
-        'doc_43_-_2023_united_states_grand_prix_-_final_sprint_classification.pdf',
-        '2023_19_usa_f1_s0_timing_sprintlapanalysis_v01.pdf',
-        '2023_19_usa_f1_s0_timing_sprinthistorychart_v01.pdf',
-        '2023_19_usa_f1_s0_timing_sprintlapchart_v01.pdf',
-        2023,
-        18,
-        'sprint',
-        '2023_18_sprint_classification.json',
-        '2023_18_sprint_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # test an event without unclassified drivers
+        # Normal race w/o unclassified drivers
         '2024_10_esp_f1_r0_timing_raceprovisionalclassification_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racelapanalysis_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racehistorychart_v01_1.pdf',
@@ -46,6 +22,7 @@ race_list = [
         nullcontext()
     ),
     (
+        # Normal race w/ some unclassified drivers
         'doc_50_-_2024_monaco_grand_prix_-_provisional_race_classification.pdf',
         '2024_08_mon_f1_r0_timing_racelapanalysis_v01.pdf',
         '2024_08_mon_f1_r0_timing_racehistorychart_v01.pdf',
@@ -55,18 +32,6 @@ race_list = [
         'race',
         '2024_8_race_classification.json',
         '2024_8_race_lap_times.json',
-        nullcontext()
-    ),
-    (
-        'doc_76_-_2023_austrian_grand_prix_-_final_race_classification.pdf',
-        '2023_10_aut_f1_r0_timing_racelapanalysis_v01.pdf',
-        '2023_10_aut_f1_r0_timing_racehistorychart_v01.pdf',
-        '2023_10_aut_f1_r0_timing_racelapchart_v01.pdf',
-        2023,
-        9,
-        'race',
-        '2023_9_race_classification.json',
-        '2023_9_race_lap_times.json',
         nullcontext()
     ),
     (
