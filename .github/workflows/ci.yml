@@ -27,10 +27,9 @@ jobs:
         run: |
           python -m pip install .
 
-      - name: Install extra dependencies for testing
+      - name: Install extra dependencies for testing (w/o xdist)
         run: |
-          python -m pip install -r requirements-dev.txt
-          python -m pip uninstall -y pytest-xdist
+          grep -v 'pytest-xdist' requirements-dev.txt | python -m pip install -r /dev/stdin
 
       - name: Install tesseract
         run: |
