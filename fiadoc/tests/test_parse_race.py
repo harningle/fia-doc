@@ -61,6 +61,19 @@ race_list = [
         None,
         pytest.raises(FileNotFoundError,
                       match='Lap chart, history chart, or lap time PDFs is missing')
+    ),
+    (
+        # Entire PDF is an image (#36)
+        'https://www.fia.com/system/files/decision-document/2025_austrian_grand_prix_-_final_race_classification.pdf',
+        '2025_11_aut_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2025_11_aut_f1_r0_timing_racehistorychart_v01.pdf',
+        '2025_11_aut_f1_r0_timing_racelapchart_v01.pdf',
+        2025,
+        11,
+        'race',
+        '2025_11_race_classification.json',
+        '2025_11_race_lap_times.json',
+        nullcontext()
     )
 ]
 

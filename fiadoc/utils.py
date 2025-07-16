@@ -15,6 +15,7 @@ import pymupdf
 import pytesseract
 import requests
 from PIL import Image
+from bs4 import BeautifulSoup
 
 from .models.foreign_key import SessionEntryForeignKeys
 from .models.lap import LapImport, LapObject
@@ -22,7 +23,7 @@ from .models.lap import LapImport, LapObject
 os.environ['TESSDATA_PREFIX'] = importlib.resources.files('fiadoc').as_posix()
 DPI = 300  # Works the best for tesseract OCR
 
-rc = {'figure.figsize': (4, 3),
+rc = {'figure.figsize': (8, 6),
       'axes.facecolor': 'white',  # Remove background colour
       'axes.grid': False,         # Turn on grid
       'axes.linewidth': '0.2',
@@ -170,20 +171,148 @@ class Page:
         return getattr(self._pymupdf_page, name)
 
     @cached_property
-    def ocr_page(self) -> pymupdf.Page:
-        """OCR the entire page (as if it's an image) and save the result as a new PDF file
+    def hocr_xml(self) -> BeautifulSoup:
+        """OCR the entire page and return the hOCR XML as a string
 
-        :return: OCR-ed page as a native `pymupdf.Page` (, so `.get_text` is the native `.get_text`
-                 w/o OCR. Otherwise, may be stuck in an infinite loop?)
+        :return: hOCR XML as a `BeautifulSoup` object
         """
-        random_filename = uuid.uuid4().hex  # TODO: to avoid name collision when multithreading (?)
+        # OCR
+        random_filename = uuid.uuid4().hex
         self.get_pixmap(dpi=DPI).pil_save(self.tempdir / f'{random_filename}.png')
-        with open(self.tempdir / f'{random_filename}.pdf', 'wb') as f:
-            f.write(pytesseract.image_to_pdf_or_hocr(
-                str(self.tempdir / f'{random_filename}.png'),
-                config=f'--dpi {DPI} -c tessedit_create_pdf=1')
-            )  # See https://stackoverflow.com/a/73580016/12867291 for "-c tessedit_create_pdf=1"
-        return pymupdf.open(self.tempdir / f'{random_filename}.pdf')[0]  # TODO: memory safe?
+        hocr = pytesseract.image_to_pdf_or_hocr(
+            str(self.tempdir / f'{random_filename}.png'),
+            config=f'--dpi {DPI} -c tessedit_create_hocr=1',
+            extension='hocr'
+        ).decode('utf-8')
+        soup = BeautifulSoup(hocr, features='xml')
+
+        # Because of the DPI, the bounding boxes in the hOCR XML are not in the same coordinate
+        # system as the original PDF page. Need to get the scale factor
+        original_bbox = self._pymupdf_page.bound()
+        ocr_page_bbox = list(map(int, re.findall(r'bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)',
+                                                 soup.find(id='page_1')['title'])[0]))
+        def transform_bbox(bbox: tuple[float, float, float, float]) \
+                -> tuple[float, float, float, float]:
+            """Transform the bbox from hOCR XML to the original PDF page coordinate system"""
+            scale_x = (original_bbox[2] - original_bbox[0]) / (ocr_page_bbox[2] - ocr_page_bbox[0])
+            scale_y = (original_bbox[3] - original_bbox[1]) / (ocr_page_bbox[3] - ocr_page_bbox[1])
+            return (original_bbox[0] + (bbox[0] - ocr_page_bbox[0]) * scale_x,
+                    original_bbox[1] + (bbox[1] - ocr_page_bbox[1]) * scale_y,
+                    original_bbox[0] + (bbox[2] - ocr_page_bbox[0]) * scale_x,
+                    original_bbox[1] + (bbox[3] - ocr_page_bbox[1]) * scale_y)
+
+        # Define some methods like `search_for` and `get_text` for the hOCR XML
+        def search_for(text: str, clip: Optional[tuple[float, float, float, float]] = None) \
+                -> list[pymupdf.Rect]:
+            """Search for text in the hOCR XML and return the bounding boxes as `pymupdf.Rect`"""
+            if clip is None:
+                clip = (-10, -10, original_bbox[2] + 10, original_bbox[3] + 10)
+
+            results = []
+            spans = soup.find_all('span', {'class': 'ocrx_word'})
+            words = text.split()
+
+            # Two pointer to find the words
+            """
+            Here is the biggest challenge. After OCR, tesseract put words into individual words.
+            That is, string like "Final Classification" is split into two separate strings: "Final"
+            and "Classification". Therefore, when `keyword = 'Final Classification'`, a naive
+            search will not find it. Our imperfect solution is to search word by word: if we find
+            "Final", and the next OCRed word is "Classification", we assume the two words matches
+            the keyword. This does require some assumption on "next", i.e. the order of spans in
+            the hOCR XML. But so far so good.
+            
+            The implementation below further assumes there is no consecutive match. That is, if
+            `keyword = 'some some'` and the ground truth is "some some some some". In principle, we
+            should return three results: the first two "some", the second and third "some", and the
+            final two "some". However, code below omits the second and third "some", as the second
+            "some" is already matched by the first "some". Not perfect, but so far so good.
+            """
+            i = 0
+            while i < len(spans):
+                if words[0] == spans[i].text:
+                    found = True
+                    bboxes = []
+                    for j in range(len(words)):
+                        if i + j >= len(spans) or words[j] != spans[i + j].text:
+                            found = False
+                            break
+                        bboxes.append(
+                            transform_bbox(
+                                tuple(map(int, re.findall(r'bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)',
+                                                          spans[i + j]['title'])[0]))
+                            )
+                        )
+                    if found:
+                        results.append((
+                            min(bbox[0] for bbox in bboxes),
+                            min(bbox[1] for bbox in bboxes),
+                            max(bbox[2] for bbox in bboxes),
+                            max(bbox[3] for bbox in bboxes)
+                        ))
+                        i += len(words)
+                    else:
+                        i += 1
+                else:
+                    i += 1
+
+            # Filter out results that are not in the clip area
+            tol = 2  # Allow for 2px when checking if the bbox is inside the clip area
+            results = [pymupdf.Rect(r) for r in results
+                       if r[0] > clip[0] - tol and r[1] > clip[1] - tol
+                          and r[2] < clip[2] + tol and r[3] < clip[3] + tol]
+            return results
+
+        def get_text(option: str, clip: Optional[tuple[float, float, float, float]] = None) \
+                -> str | list | dict:
+            """`.get_text` equivalent for the hOCR XML
+
+            :param option: The `option` parameter in `pymupdf.Page.get_text`. Only support "text",
+                           "words", "blocks", or "dict"
+            :param clip: (x0, y0, x1, y1). If provided, only return text in this area
+            :return: The text in the specified format, depending on `option`
+            """
+            if clip is None:
+                clip = (-10, -10, original_bbox[2] + 10, original_bbox[3] + 10)
+
+            results = []
+            spans = soup.find_all('span', {'class': 'ocrx_word'})
+            tol = 2  # Allow for 2px when checking if the bbox is inside the clip area
+            for span in spans:
+                bbox = tuple(map(int, re.findall(r'bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)',
+                                                 span['title'])[0]))
+                bbox = transform_bbox(bbox)
+                if bbox[0] > clip[0] - tol and bbox[1] > clip[1] - tol \
+                        and bbox[2] < clip[2] + tol and bbox[3] < clip[3] + tol:
+                    if option == 'text':
+                        results.append(span.text)
+                    elif option == 'words':
+                        results.append((bbox[0], bbox[1], bbox[2], bbox[3], span.text))
+                    elif option == 'blocks':
+                        results.append((bbox[0], bbox[1], bbox[2], bbox[3], span.text, -1, -1))
+                    elif option == 'dict':
+                        results.append({
+                            'blocks': [{
+                                'bbox': clip,
+                                'lines': [{
+                                    'bbox': clip,
+                                    'spans': [{
+                                        'bbox': clip,
+                                        'text': span.text
+                                    }]
+                                }]
+                            }]
+                        })
+                    else:
+                        raise ValueError(f'`option` must be one of "text", "words", "blocks", or '
+                                         f'"dict" if using OCR. Got "{option}"')
+            if not results:
+                return '' if option == 'text' else []
+            return results
+
+        soup.search_for = search_for
+        soup.get_text = get_text
+        return soup
 
     def show_page(self) -> None:
         """May not working well. For debug process only
@@ -223,7 +352,7 @@ class Page:
             return pymupdf.Rect(found[0][:4])
 
         # If not found above, search the OCR-ed page
-        for text in self.ocr_page.get_text('blocks'):
+        for text in self.hocr_xml.get_text('blocks'):
             if keyword in text[4]:
                 found.append(text)
         if (n := len(found)) >= 2:  # noqa: PLR2004
@@ -261,9 +390,7 @@ class Page:
             return results
 
         # If nothing found, OCR the page and search again
-        if self.ocr_page is None:
-            self.save_ocr()
-        return self.ocr_page.search_for(text, **kwargs)
+        return self.hocr_xml.search_for(text, **kwargs)
 
     @staticmethod
     def _clean_get_text_results(
@@ -327,6 +454,7 @@ class Page:
             self,
             option: str = 'text',
             clip: Optional[tuple[float, float, float, float]] = None,
+            small_area: bool = True,
             lang: Optional[Literal['f1', 'eng']] = 'f1',
             expected: Optional[re.Pattern] = None,
             **kwargs
@@ -334,21 +462,23 @@ class Page:
         r"""This is `pymupdf.Page.get_text` w/ OCR functionality
 
         This method does the native `.get_text` first. If no text that regex matches `expected` is
-        found, we proceed with OCR.
+        found (, suppose `expected` is provided), we proceed with OCR.
 
-        When `clip` is specified, we only OCR the clipped area instead of the whole page. And we
-        assume the clipped area is small and contains only a single line of text. That is, we use
-        `--psm 7` in tessaract. See
-        https://github.com/tesseract-ocr/tesseract/blob/main/doc/tesseract.1.asc#options.
-
-        When `clip` is not provided, we OCR the whole page. Note that after OCR, the text can be
-        slightly off from the original text. E.g. a letter that is originally located in coord.
-        (10, 20) can be in (11, 19) after OCR. For this reason, we probably never want to call this
-        method without specifying `clip`
+        * `clip` is not None: we only OCR the clipped area instead of the whole page
+            + `small_area` is `True`: we further assume the clipped area is small and contains only
+              a single line of text. This is often used when we OCR a cell in a table. In such
+              case, we feed this small area's image to tesseract with `--psm 7`. See
+              https://github.com/tesseract-ocr/tesseract/blob/main/doc/tesseract.1.asc#options.
+            + `small_area` is `False`: the clipped area can have multiple lines of text, e.g.
+              search for car numbers in the NO col. In this case, we search through the hOCR XML.
+              Because otherwise we couldn't get the positions of these texts
+        * `clip` is None: we OCR the whole page, using hOCR XML
 
         :param option: When `clip` is specified, `option` can only be "text", "words", "blocks", or
                        "dict". Otherwise, it can be any valid `option` in `pymupdf.Page.get_text`.
         :param clip: (x0, y0, x1, y1)
+        :param small_area: If `True`, we assume the clipped area is small and contains only a
+                           single word. Default is `True`
         :param lang: Which tesseract language to use for OCR. Default is our own fine-tuned model
                      "f1" which is better for small clipped area. The other option is tesseract's
                      default English "eng".
@@ -394,28 +524,29 @@ class Page:
         if not _result_is_empty(results):
             return results
 
-        # If `clip` is not provided, we OCR the whole page
-        if clip is None:
-            results = self.ocr_page.get_text(option, **kwargs)
+        # If `clip` is not provided or the area is big, we OCR using hOCR XML
+        if (clip is None) or (not small_area):
+            results = self.hocr_xml.get_text(option, clip)
             results = self._clean_get_text_results(results, option, expected)
             if _result_is_empty(results):
                 _return_empty()
             else:
                 return results
 
-        # If we have `clip`, only OCR the clipped area. First check if any black pixels
+        # If we have `clip` and the area is small, only OCR the clipped small area
+        # First check if any black pixels
         """
         We first check if there is any black pixel (RGB < 50) in the clipped area. If not, return
         empty immediately. This is because all texts are black(ish). We check this for two reasons:
 
         1. it's much faster to skip OCR if we already know there is no text in the clipped area
-        2. tessaract quality is really bad. If you give it a all grey pure colour image, it can
-           spit out some random text like "-". This breaks most of our parsing
+        2. tessaract quality is really bad. It may say a short light grey line is "-", which breaks
+           most of our parsing. So we try our best to avoid OCR-ing such areas
         """
         pixmap = self.get_pixmap(clip=clip, dpi=DPI)
         pixmap_arr = np.ndarray(
             [pixmap.height, pixmap.width, 3], dtype=np.uint8, buffer=pixmap.samples
-        ).copy()  # `samples_mv` memory error on Mac/Windows?
+        ).copy()  # TODO: `samples_mv` memory error on Mac/Windows?
         if not np.any(np.all(pixmap_arr <= 50, axis=2)):  # noqa: PLR2004
             return _return_empty()
 
@@ -474,7 +605,7 @@ class Page:
                     }]
                 }
             case _:
-                raise ValueError(f'Native `.get_text` does not find anything. For OCR, `option`'
+                raise ValueError(f'Native `.get_text` does not find anything. For OCR, `option` '
                                  f'must be one of "text", "words", "blocks", or "dict". Got '
                                  f'"{option}"')
 
@@ -618,6 +749,48 @@ class Page:
 
         df = pd.DataFrame(cells, columns=None, index=None)
         return df, superscripts, crossed_out
+
+    def search_for_white_strip(
+            self,
+            height: float = 10,
+            clip: Optional[tuple[float, float, float, float]] = None
+    ) -> Optional[float]:
+        """Search for a wide horizontal white strip in the page, with at least `height` px tall
+
+        :param height: The minimum height of the white strip in pixels. Default is 10 px, which is
+                       roughly the normal line height of the FIA PDFs
+        :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
+                     whole page
+        :return: The top of the found white strip, or `None` if not found
+        """
+        # Get the pixmap of the clipped area
+        clip = clip if clip else self.bound()
+        pixmap = self.get_pixmap(clip=clip)
+        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
+
+        # Find all white rows
+        is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
+        white_strips = []
+        strip_start = None
+
+        # Find consecutive white rows that are at least `height` px tall
+        for i, is_white in enumerate(is_white_row):
+            if is_white and strip_start is None:
+                strip_start = i
+            elif not is_white and strip_start is not None:
+                if i - strip_start >= height:
+                    white_strips.append(strip_start + t)
+                strip_start = None
+
+        # Edge case for the strip being at the bottom. Shouldn't happen but just in case
+        if strip_start is not None and len(is_white_row) - strip_start >= height:
+            white_strips.append(strip_start + t)
+
+        if not white_strips:
+            return None
+        else:
+            return white_strips[0]
 
 
 class ParsingError(Exception):

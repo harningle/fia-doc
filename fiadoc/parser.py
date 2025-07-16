@@ -731,8 +731,8 @@ class RaceParser(BaseParser):
         for col in ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'LAPS', 'TIME', 'GAP', 'INT', 'KM/H',
                     'FASTEST', 'ON', 'PTS']:
             pos[col] = {
-                'left': page.search_for(col, clip=bbox)[0].x0,
-                'right': page.search_for(col, clip=bbox)[0].x1
+                'left': page.search_for(col, clip=(0, y, w, y + 50))[0].x0,  # 50px is tall enough
+                'right': page.search_for(col, clip=bbox)[0].x1               # for the col. header
             }
 
         # Vertical lines separating the columns
@@ -754,7 +754,9 @@ class RaceParser(BaseParser):
         ]
 
         # Horizontal lines separating the rows
-        car_nos = page.get_text('blocks', clip=(pos['NO']['left'], y, pos['NO']['right'], b))
+        car_nos = page.get_text('blocks',
+                                clip=(pos['NO']['left'], y, pos['DRIVER']['left'], b),
+                                small_area=False)
         hlines = [y]
         for i in range(len(car_nos) - 1):
             hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
@@ -775,21 +777,17 @@ class RaceParser(BaseParser):
         # Do the same for the "NOT CLASSIFIED" table. See `QualifyingParser._parse_classification`
         if has_not_classified:
             t = page.search_for('NOT CLASSIFIED')[0].y1
-            line_height = max([i[3] - i[1] for i in car_nos])
-            car_nos = []
-            while car_no := page.get_text('blocks',
-                                          clip=(vlines[1], t, vlines[2], t + line_height)):
-                assert len(car_no) == 1, f'Error in detecting rows in the "NOT CLASSIFIED" ' \
-                                         f'table in {self.classification_file}'
-                if not re.match(r'\d+', car_no[0][4].strip()):  # See `QualifyingParser`
-                    break  # OCR
-                car_no = car_no[0]
-                car_nos.append([car_no[1], car_no[3]])
-                t = car_no[3]
-            hlines = [car_nos[0][0] - 1]
+            b = page.search_for_white_strip(clip=(0, t, w, page.bound()[3]))
+            if b is None:
+                raise ParsingError(f'cannot find the bottom of the "NOT CLASSIFIED" table on p.'
+                                   f'{page.number} in {self.classification_file}')
+            car_nos = page.get_text('blocks',
+                                    clip=(pos['NO']['left'], t, pos['DRIVER']['left'], b),
+                                    small_area=False)
+            hlines = [t]
             for i in range(len(car_nos) - 1):
-                hlines.append((car_nos[i][1] + car_nos[i + 1][0]) / 2)
-            hlines.append(car_nos[-1][1] + 1)
+                hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
+            hlines.append(b + 1)
             not_classified = self._parse_table_by_grid(
                 file=self.classification_file,
                 page=page,
@@ -816,8 +814,9 @@ class RaceParser(BaseParser):
 
         # Set col. names
         del df['NAT']
-        df = df.rename(columns={
-            'position': 'finishing_position',
+        df.columns = [i.upper() for i in df.columns]  # All col. names to upper case in case OCR
+        df = df.rename(columns={                      # gives lower case
+            'POSITION': 'finishing_position',
             'NO':       'car_no',
             'DRIVER':   'driver',
             'ENTRANT':  'team',
@@ -831,6 +830,7 @@ class RaceParser(BaseParser):
             'PTS':      'points'
         })
         df = df.replace({'': None})  # Empty string --> `None`, so `pd.isnull` works
+        df.columns = [i.lower() for i in df.columns]
 
         # Clean up finishing status, e.g. is lapped? Is DSQ?
         df.loc[df.gap.fillna('').str.contains('LAP', regex=False), 'finishing_status'] = 1
@@ -1494,7 +1494,7 @@ class RaceParser(BaseParser):
         del df['_merge']
         temp = df[df.lap == df.fastest_lap_no]
         assert (temp.lap_time == temp.fastest_lap_time).all(), \
-            'Fastest lap time in lap times does not match the one in final classification'
+            'Fastest lap time in lap times does not match the one in classification PDF'
         df['is_fastest_lap'] = df.lap == df.fastest_lap_no
         del df['fastest_lap_time'], df['fastest_lap_no']
 
