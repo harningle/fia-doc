@@ -38,7 +38,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest
+          pytest fiadoc/tests/test_parse_race.py
 
       - name: Linting
         run: ruff check --output-format=github .

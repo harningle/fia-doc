@@ -1493,6 +1493,7 @@ class RaceParser(BaseParser):
         #     f'{self.classification_file}: {df[df._merge != "both"].car_no.unique()}'
         del df['_merge']
         temp = df[df.lap == df.fastest_lap_no]
+        print(temp.values)
         assert (temp.lap_time == temp.fastest_lap_time).all(), \
             'Fastest lap time in lap times does not match the one in classification PDF'
         df['is_fastest_lap'] = df.lap == df.fastest_lap_no
