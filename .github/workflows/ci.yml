@@ -34,11 +34,11 @@ jobs:
       - name: Install tesseract
         run: |
           sudo apt-get update
-          sudo apt-get install tesseract-ocr libtesseract-dev -y
+          sudo apt-get install tesseract-ocr -y
 
       - name: Run tests
         run: |
-          pytest fiadoc/tests/test_parse_race.py
+          pytest fiadoc
 
       - name: Linting
         run: ruff check --output-format=github .
