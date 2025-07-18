@@ -554,6 +554,11 @@ class Page:
         pixmap_arr[np.all(pixmap_arr >= 200, axis=2)] = 255  # noqa: PLR2004
         random_filename = uuid.uuid4().hex
         Image.fromarray(pixmap_arr).save(self.tempdir / f'{random_filename}.png')
+        # try:
+        #     i = max([int(i.split('.')[0]) for i in os.listdir('training/statis')]) + 1
+        # except:
+        #     i = 1
+        # Image.fromarray(pixmap_arr).save(f'training/labelling/statis/{i}.png')
 
         # OCR the clipped area
         if lang not in {'f1', 'eng'}:
@@ -577,7 +582,12 @@ class Page:
         text = re.sub(r'^[.\-_,|—]+', '', text).strip()
 
         if not text:
+        #     with open(f'training/labelling/statis/{i}.gt.txt', 'w') as f:
+        #         f.write('.\n')
             _return_empty()
+        # else:
+        #     with open(f'training/labelling/statis/{i}.gt.txt', 'w') as f:
+        #         f.write(text)
         if expected and (not re.match(expected, text)):
             _return_empty()
 

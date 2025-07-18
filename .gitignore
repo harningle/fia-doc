@@ -163,6 +163,7 @@ cython_debug/
 data/
 *.pkl
 temp/
+training/labelling/static/
 
 # Mac shit
 .DS_Store
