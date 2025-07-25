@@ -1596,6 +1596,8 @@ class QualifyingParser(BaseParser):
         found = []
         for i in range(len(doc)):
             page = Page(doc[i])
+            if '.pdf' in page.get_text():  # This is the front page. Skip
+                continue
             found = page.search_for('Final Classification')
             if found:
                 break
