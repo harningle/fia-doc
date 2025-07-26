@@ -95,6 +95,19 @@ race_list = [
         None,
         pytest.raises(FileNotFoundError,
                       match='Lap chart, history chart, or lap time PDFs is missing')
+    ),
+    (
+        # A car starts a few laps later (#60)
+        'https://www.fia.com/system/files/decision-document/2025_belgian_grand_prix_-_final_sprint_classification.pdf',
+        '2025_13_bel_f1_s0_timing_sprintlapanalysis_v01.pdf',
+        '2025_13_bel_f1_s0_timing_sprinthistorychart_v01.pdf',
+        '2025_13_bel_f1_s0_timing_sprintlapchart_v01.pdf',
+        2025,
+        13,
+        'sprint',
+        '2025_13_sprint_classification.json',
+        '2025_13_sprint_lap_times.json',
+        nullcontext()
     )
 ]
 

@@ -554,9 +554,10 @@ class PracticeParser(BaseParser):
             hlines=hlines,
             header_included=True
         )
-        assert df.shape[1] == 11, \
-            f'Expected 11 cols on p.{page.number} in {self.classification_file}. Got ' \
+        assert df.shape[1] == 11, (  # noqa: PLR2004
+            f'Expected 11 cols on p.{page.number} in {self.classification_file}. Got '
             f'{df.columns.tolist()}'
+        )
         df.columns.to_numpy()[0] = 'position'  # zero-th col. has no name in PDF, so name it
 
         # Set col. names
@@ -1462,9 +1463,13 @@ class RaceParser(BaseParser):
         df = self._parse_lap_analysis()
 
         # Lap 1's lap times are calendar time in Race Lap Analysis. To get the actual lap time for
-        # lap 2, we parse Race History Chart PDF
-        lap_1 = self._parse_history_chart()
-        lap_1 = lap_1[lap_1.lap == 1][['car_no', 'lap', 'time']]
+        # lap 1, we parse Race History Chart PDF
+        lap_1 = (self._parse_history_chart()[['car_no', 'lap', 'time']]
+                 .sort_values(by=['car_no', 'lap'])
+                 .groupby('car_no')
+                 .first()  # See #60
+                 .assign(lap=1)
+                 .reset_index())
         df = df.merge(lap_1, on=['car_no', 'lap'], how='outer', indicator=True, validate='1:1')
         assert (df[df.lap == 1]['_merge'] == 'both').all(), \
             f"Lap 1's data do not match in {self.lap_analysis_file} and {self.history_chart_file}"
