@@ -1,0 +1,482 @@
+[
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 1,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 1,
+                "is_classified": true,
+                "status": 0,
+                "points": 8,
+                "grid": 2,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1597997
+                },
+                "fastest_lap_rank": 2,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 81,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 2,
+                "is_classified": true,
+                "status": 0,
+                "points": 7,
+                "grid": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1598750
+                },
+                "fastest_lap_rank": 3,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 4,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 3,
+                "is_classified": true,
+                "status": 0,
+                "points": 6,
+                "grid": 3,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1599411
+                },
+                "fastest_lap_rank": 1,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 16,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 4,
+                "is_classified": true,
+                "status": 0,
+                "points": 5,
+                "grid": 4,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1608173
+                },
+                "fastest_lap_rank": 4,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 31,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 5,
+                "is_classified": true,
+                "status": 0,
+                "points": 4,
+                "grid": 5,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1611786
+                },
+                "fastest_lap_rank": 7,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 55,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 6,
+                "is_classified": true,
+                "status": 0,
+                "points": 3,
+                "grid": 6,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1612961
+                },
+                "fastest_lap_rank": 6,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 87,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 7,
+                "is_classified": true,
+                "status": 0,
+                "points": 2,
+                "grid": 7,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1616607
+                },
+                "fastest_lap_rank": 9,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 6,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 8,
+                "is_classified": true,
+                "status": 0,
+                "points": 1,
+                "grid": 9,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1617116
+                },
+                "fastest_lap_rank": 8,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 5,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 9,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 10,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1620180
+                },
+                "fastest_lap_rank": 10,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 30,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 10,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 11,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1620894
+                },
+                "fastest_lap_rank": 12,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 22,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 11,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 12,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1622548
+                },
+                "fastest_lap_rank": 15,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 63,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 12,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 13,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1623966
+                },
+                "fastest_lap_rank": 13,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 18,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 13,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 15,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1624592
+                },
+                "fastest_lap_rank": 14,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 14,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 14,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 14,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1627043
+                },
+                "fastest_lap_rank": 17,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 44,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 15,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 18,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1628172
+                },
+                "fastest_lap_rank": 11,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 23,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 16,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 16,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1628938
+                },
+                "fastest_lap_rank": 16,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 12,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 17,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 19,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1629978
+                },
+                "fastest_lap_rank": 5,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 27,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 18,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 17,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1630864
+                },
+                "fastest_lap_rank": 18,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 43,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 19,
+                "is_classified": true,
+                "status": 0,
+                "points": 0,
+                "grid": 20,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1636069
+                },
+                "fastest_lap_rank": 20,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 13,
+            "car_number": 10,
+            "session": "SR"
+        },
+        "objects": [
+            {
+                "position": 20,
+                "is_classified": false,
+                "status": 11,
+                "points": 0,
+                "grid": 8,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1581382
+                },
+                "fastest_lap_rank": 19,
+                "laps_completed": 12
+            }
+        ]
+    }
+]
