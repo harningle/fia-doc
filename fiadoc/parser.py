@@ -691,6 +691,8 @@ class RaceParser(BaseParser):
         found = []
         for i in range(len(doc)):
             page = Page(doc[i])
+            if '.pdf' in page.get_text():  # Fix #59
+                continue
             found = page.search_for('Final Classification')
             if found:
                 break
