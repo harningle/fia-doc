@@ -641,6 +641,8 @@ class RaceParser(BaseParser):
     @cached_property
     def is_pdf_complete(self) -> bool:
         """Check if we have all lap times PDFs. If not, won't be able to get lap times df"""
+        if self.classification_file is None:
+            raise FileNotFoundError("Classification PDF is missing. Can't parse anything")
         if (self.lap_analysis_file is None or self.history_chart_file is None
                 or self.lap_chart_file is None):
             return False
@@ -660,7 +662,7 @@ class RaceParser(BaseParser):
 
         TODO: refactor
         """
-        if self.is_pdf_complete is False:
+        if not self.is_pdf_complete:
             raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
                                     "parse starting grid or lap times")
         _ = self.lap_times_df
@@ -668,7 +670,7 @@ class RaceParser(BaseParser):
 
     @cached_property
     def lap_times_df(self) -> pd.DataFrame:
-        if self.is_pdf_complete is False:
+        if not self.is_pdf_complete:
             raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
                                     "parse starting grid or lap times")
         self.starting_grid = None
@@ -743,7 +745,7 @@ class RaceParser(BaseParser):
             pos['NAT']['left'] - 1,
             (pos['NAT']['right'] + pos['ENTRANT']['left']) / 2,
             pos['LAPS']['left'],
-            pos['LAPS']['right'],
+            pos['LAPS']['right'] + 1,
             (pos['TIME']['right'] + pos['GAP']['left']) / 2,
             (pos['GAP']['right'] + pos['INT']['left']) / 2,
             (pos['INT']['right'] + pos['KM/H']['left']) / 2,
@@ -773,6 +775,8 @@ class RaceParser(BaseParser):
         assert df.shape[1] == 13, \
             f'Expected 13 cols, got {df.shape[1]} in {self.classification_file}'  # noqa: PLR2004
         df.columns.to_numpy()[0] = 'position'  # zero-th col. has no name in PDF, so name it
+        df.loc[0, 'INT'] = None
+        df.loc[0, 'GAP'] = None  # The winner has no GAP or INT
 
         # Do the same for the "NOT CLASSIFIED" table. See `QualifyingParser._parse_classification`
         if has_not_classified:
@@ -800,9 +804,10 @@ class RaceParser(BaseParser):
                 (f'Expected 13 columns for "NOT CLASSIFIED" table , got '  # noqa: PLR2004
                  f'{not_classified.shape[1]} in {self.classification_file}')
             not_classified.columns = df.columns
+            not_classified.position = None  # No finishing position for unclassified drivers
 
         else:
-            # no unclassified drivers
+            # No unclassified drivers
             not_classified = pd.DataFrame(columns=df.columns)
 
         df['is_classified'] = True # Set all drivers from the main table as classified
@@ -1107,10 +1112,13 @@ class RaceParser(BaseParser):
             row_seps = [pos.y0 - 1, (pos.y1 + laps[0]['bbox'][1]) / 2]
             for i in range(len(laps) - 1):
                 row_seps.append((laps[i]['bbox'][3] + laps[i + 1]['bbox'][1]) / 2)
+
+            # The bottom of the table is a wide white strip
+            page = Page(page)  # noqa: PLW2901
+            b = page.search_for_white_strip(clip=(0, row_seps[-1], page.bound()[2], b))
             row_seps.append(b)
 
             # Parse the table
-            page = Page(page)  # noqa: PLW2901
             tab, superscript, cross_out = page.parse_table_by_grid(
                 vlines=[(col_seps[i], col_seps[i + 1]) for i in range(len(col_seps) - 1)],
                 hlines=[(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
@@ -1461,9 +1469,13 @@ class RaceParser(BaseParser):
         df = self._parse_lap_analysis()
 
         # Lap 1's lap times are calendar time in Race Lap Analysis. To get the actual lap time for
-        # lap 2, we parse Race History Chart PDF
-        lap_1 = self._parse_history_chart()
-        lap_1 = lap_1[lap_1.lap == 1][['car_no', 'lap', 'time']]
+        # lap 1, we parse Race History Chart PDF
+        lap_1 = (self._parse_history_chart()[['car_no', 'lap', 'time']]
+                 .sort_values(by=['car_no', 'lap'])
+                 .groupby('car_no')
+                 .first()  # See #60
+                 .assign(lap=1)
+                 .reset_index())
         df = df.merge(lap_1, on=['car_no', 'lap'], how='outer', indicator=True, validate='1:1')
         assert (df[df.lap == 1]['_merge'] == 'both').all(), \
             f"Lap 1's data do not match in {self.lap_analysis_file} and {self.history_chart_file}"

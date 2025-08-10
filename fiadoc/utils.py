@@ -536,18 +536,19 @@ class Page:
         # If we have `clip` and the area is small, only OCR the clipped small area
         # First check if any black pixels
         """
-        We first check if there is any black pixel (RGB < 50) in the clipped area. If not, return
-        empty immediately. This is because all texts are black(ish). We check this for two reasons:
+        We first check if there are some black pixels (at least 10 pixels with RGB < 50) in the 
+        clipped area. If not, return empty immediately. This is because all texts are black(ish).
+        We check this for two reasons:
 
         1. it's much faster to skip OCR if we already know there is no text in the clipped area
-        2. tessaract quality is really bad. It may say a short light grey line is "-", which breaks
+        2. tesseract quality is really bad. It may say a short light grey line is "-", which breaks
            most of our parsing. So we try our best to avoid OCR-ing such areas
         """
         pixmap = self.get_pixmap(clip=clip, dpi=DPI)
         pixmap_arr = np.ndarray(
             [pixmap.height, pixmap.width, 3], dtype=np.uint8, buffer=pixmap.samples
         ).copy()  # TODO: `samples_mv` memory error on Mac/Windows?
-        if not np.any(np.all(pixmap_arr <= 50, axis=2)):  # noqa: PLR2004
+        if np.sum(pixmap_arr < 50) < 10:  # noqa: PLR2004
             return _return_empty()
 
         # Replace light grey pixel (RGB > 200) with white. This improves OCR quality a lot
@@ -565,7 +566,7 @@ class Page:
             raise ValueError(f'`lang` can only be "f1" or "eng". Got "{lang}"')
         text = pytesseract.image_to_string(
             str(self.tempdir / f'{random_filename}.png'),
-            config=f'--psm 7 --dpi {DPI} -l {lang}'
+            config=f'--psm 13 --dpi {DPI} -l {lang}'
         )
 
         # Some simply cleaning
@@ -762,17 +763,20 @@ class Page:
 
     def search_for_white_strip(
             self,
-            height: float = 10,
+            height: float = 4,
             clip: Optional[tuple[float, float, float, float]] = None
     ) -> Optional[float]:
         """Search for a wide horizontal white strip in the page, with at least `height` px tall
 
-        :param height: The minimum height of the white strip in pixels. Default is 10 px, which is
-                       roughly the normal line height of the FIA PDFs
+        :param height: The minimum height of the white strip in pixels. Default is 6 px, which is
+                       roughly half of the normal line height of the FIA PDFs
         :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
                      whole page
         :return: The top of the found white strip, or `None` if not found
         """
+        # TODO: this 6px height is very fragile. Better if get the exact vertical gap in pixels
+        #       between two car No. and use (some proportion of) this gap as `height`
+
         # Get the pixmap of the clipped area
         clip = clip if clip else self.bound()
         pixmap = self.get_pixmap(clip=clip)
