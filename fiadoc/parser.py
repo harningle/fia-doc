@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pymupdf
 from pydantic import ValidationError
+from scipy.ndimage import label, find_objects
 
 from ._constants import QUALI_DRIVERS
 from .models.classification import SessionEntryImport, SessionEntryObject
@@ -18,11 +19,14 @@ from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryFore
 from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
 from .utils import (
+    DPI,
+    OCRError,
     Page,
     ParsingError,
+    TextBlock,
     duration_to_millisecond,
     quali_lap_times_to_json,
-    time_to_timedelta,
+    time_to_timedelta
 )
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -44,7 +48,6 @@ class BaseParser:
     """
     @staticmethod
     def _parse_table_by_grid(
-            file: str | os.PathLike,
             page: Page,
             vlines: list[float],
             hlines: list[float],
@@ -53,7 +56,6 @@ class BaseParser:
     ) -> pd.DataFrame:
         """Parse the table cell by cell, defined by lines separating the columns and rows
 
-        :param file: the PDF file to parse
         :param vlines: x-coords. of vertical lines separating the cols. Table left and right
                        boundaries need to be included
         :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
@@ -95,12 +97,16 @@ class BaseParser:
                             bbox = cell[0:4]
                             if bbox[0] < l - tol or bbox[2] > r + tol \
                                     or bbox[1] < t - tol or bbox[3] > b + tol:
-                                raise ValueError(f"Found text outside the cell's area in row {i}, "
-                                                 f"col. {j} on p.{page.number} in {file}: {cell}")
+                                raise ValueError(
+                                    f"Found text outside the cell's area in row {i}, col. {j} on "
+                                    f"p.{page.number} in {page.file}: {cell}"
+                                )
                             text = cell[4].strip()
                     else:
-                        raise ValueError(f'Expected one text block in row {i}, col. {j} on '
-                                         f'p.{page.number} in {file}. Found {len(cell)}: {cell}')
+                        raise ValueError(
+                            f'Expected one text block in row {i}, col. {j} on p.{page.number} in '
+                            f'{page.file}. Found {len(cell)}: {cell}'
+                        )
                 row.append(text)
             cells.append(row)
 
@@ -108,6 +114,92 @@ class BaseParser:
             return pd.DataFrame(cells[1:], columns=cells[0])
         else:
             return pd.DataFrame(cells)
+
+    @staticmethod
+    def _detect_cols(
+            page: Page,
+            clip: tuple[float, float, float, float]
+    ) -> list[TextBlock]:
+        """
+        Search for table header/cols. in the `clip` area. Returns a list of (l, t, r, b, col. name)
+
+        The high-level idea is:
+
+        1. convert the `clip` area into an image
+        2. for each character, mask it into black rectangle using `scipy.ndimage.label`. This is
+           possible because all black pixels are text, all texts are in black, and everything else
+           is white
+        3. merge multiple black rectangles into a single one if they are sufficiently close to
+           each other
+        4. run OCR on each black rectangle to get the text inside it. And the four corners of the
+           rectangle are the bounding box of the text
+        """
+        # Get the pixmap of `clip` area
+        pixmap = page.get_pixmap(clip=clip, dpi=DPI)
+        arr = np.ndarray([pixmap.h, pixmap.w, 3], dtype=np.uint8, buffer=pixmap.samples)
+        del pixmap
+
+        # Drop rows with almost all black pixels (those are lines not text). After this step, all
+        # black pixels should be texts only
+        """
+        As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
+        (184 or 232), use RGB = 128 as a cutoff for "black"
+        """
+        arr = arr[np.mean(arr < 128, axis=(1, 2)) < 0.9]  # noqa: PLR2004
+
+        # Mask text with rectangles, i.e. label connected components
+        labelled, n_features = label(arr < 128)  # noqa: PLR2004
+        if n_features == 0:
+            return []
+        slices = sorted(find_objects(labelled), key=lambda x: x[1].start)
+
+        # Merge the rectangles/slices that are close to each other
+        """
+        "Close" is defined as smaller than the width of the thinnest char., which is often "I". The
+        gap between two cols. are usually very wide, except "NAT" and "ENTRANT", between which the
+        gap is roughly a normal whitespace. If we pick a too wide "close", "NAT" and "ENTRANT" will
+        be recognised as a single text block "NAT ENTRANT". If "close" is too narrow, then "NAT"
+        may be broken into "N", "A", and "T". Generally speaking, using the thinnest char.'s width
+        satisfies both conditions.
+        """
+        min_slice_width = min([s[1].stop - s[1].start for s in slices])  # Thinnest char.'s width
+        merged_slices = []
+        for s in slices:
+            if not merged_slices:
+                merged_slices.append(s)
+            else:
+                # Check if the left of the current slice is close to the right of the last slice
+                if s[1].start - merged_slices[-1][1].stop < min_slice_width:
+                    merged_slices[-1] = (
+                        slice(min(merged_slices[-1][0].start, s[0].start),
+                              max(merged_slices[-1][0].stop, s[0].stop)),
+                        slice(min(merged_slices[-1][1].start, s[1].start),
+                              max(merged_slices[-1][1].stop, s[1].stop)),
+                        merged_slices[-1][2]
+                    )
+                else:
+                    merged_slices.append(s)
+        del slices
+
+        # OCR the merged slices
+        cols = []
+        for s in merged_slices:
+            l, t, r, b = page._transform_bbox(
+                original_bbox=clip,
+                new_bbox=(0, 0, arr.shape[1], arr.shape[0]),
+                bbox=(s[1].start, s[0].start, s[1].stop, s[0].stop)
+            )
+            text = page.get_text('text', clip=(l - 1, t - 1, r + 1, b + 1)).strip()
+            if text:
+                # The "/" in "KM/H" is often mis-OCRed. Manually correct it here
+                if re.match(r'KM\SH', text):
+                    text = 'KM/H'
+                cols.append(TextBlock(text=text, bbox=(l, t, r, b)))
+            else:
+                raise OCRError(f'Unable to OCR text in the table header inside '
+                               f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
+                               f'{page.file}')
+        return cols
 
 
 class EntryListParser:
@@ -472,7 +564,7 @@ class PracticeParser(BaseParser):
         doc = pymupdf.open(self.classification_file)
         found = []
         for i in range(len(doc)):
-            page = Page(doc[i])
+            page = Page(doc[i], file=self.classification_file)
             found = page.search_for('Practice Session Classification')
             if found:
                 break
@@ -549,7 +641,6 @@ class PracticeParser(BaseParser):
 
         # Parse the table using the grid above
         df = self._parse_table_by_grid(
-            file=self.classification_file,
             page=page,
             vlines=vlines,
             hlines=hlines,
@@ -691,82 +782,91 @@ class RaceParser(BaseParser):
         """
         # Find the page with "Final Classification", on which the table is located
         doc = pymupdf.open(self.classification_file)
-        found = []
+        classification = []
         for i in range(len(doc)):
-            page = Page(doc[i])
-            found = page.search_for('Final Classification')
-            if found:
+            page = Page(doc[i], file=self.classification_file)
+            classification = page.search_for('Final Classification')
+            if classification:
                 break
-            found = page.search_for('Provisional Classification')
-            if found:
+            classification = page.search_for('Provisional Classification')
+            if classification:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
-        if not found:
+        if not classification:
             doc.close()
-            raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
-                             f'on any page in {self.classification_file}')
+            raise ParsingError(f'"Final Classification" or "Provisional Classification" not found '
+                               f'on any page in {self.classification_file}')
 
-        # Page width. This is the rightmost x-coord. of the table
+        # Bottom position of "Final Classification", below which is the table header/col. names
+        b_classification = classification[0].y1
+
+        # Locate the first long black horizontal line below "Final Classification". This is the
+        # line separating the table header and table body
+        black_line = page.search_for_black_line(
+            clip=(0, b_classification, page.bound()[2], page.bound()[3])
+        )
+        if black_line:
+            t_table_body = sorted(black_line)[0]  # Topmost black line below "Final Classification"
+        else:
+            raise ParsingError(f'Cannot find the black line separating table header and table '
+                               f'body below "Final Classification" on p.{page.number} in '
+                               f'{self.classification_file}')
+
+        # Page width. This is the right boundary of the table
         w = page.bound()[2]
 
-        # Position of "Final Classification". Topmost y-coord. of the table
-        y = found[0].y1
+        # Get text height. Need this to understand line height, vertical gaps between rows, etc.
+        temp = page.get_text('blocks', clip=(0, b_classification, w, t_table_body))
+        if not temp:
+            raise ParsingError(f'Cound not find any text in the table header on p.{page.number} '
+                               f'in {self.classification_file}')
+        line_height = np.mean([i[3] - i[1] for i in temp])
 
-        # Bottommost y-coord. of the table, identified by "NOT CLASSIFIED" or "FASTEST LAP",
-        # whichever comes first
-        has_not_classified = False
-        bottom = page.search_for('NOT CLASSIFIED')
-        if bottom:
-            has_not_classified = True
+        # Find the first white strip below the table header. This is the bottom of the table
+        white_strip = page.search_for_white_strip(clip=(0, t_table_body, w, page.bound()[3]),
+                                                  height=line_height / 2)
+        if white_strip:
+            b_table = sorted(white_strip)[0]
         else:
-            bottom = page.search_for('FASTEST LAP')
-        if not bottom:
-            raise ValueError(f'Could not find "NOT CLASSIFIED" or "FASTEST LAP" in '
-                             f'{self.classification_file}')
-        b = bottom[0].y0
+            raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
+                               f'{self.classification_file}')
 
-        # Table bounding box
-        bbox = pymupdf.Rect(0, y, w, b)
+        # Get table col. names and their positions
+        cols = self._detect_cols(page, clip=(0, b_classification, w, t_table_body))
+        if not cols:
+            raise ParsingError(f'Could not detect cols. in the table header on p.{page.number} in '
+                               f'{self.classification_file}')
+        cols = {i.text: i for i in cols}
+        if set(cols.keys()) != {'NO', 'DRIVER', 'NAT', 'ENTRANT', 'LAPS', 'TIME', 'GAP', 'INT',
+                                'KM/H', 'FASTEST', 'ON', 'PTS'}:
+            raise ParsingError(f'Got unexpected or miss some table cols. on p.{page.number} in '
+                               f'{self.classification_file}: {cols}')
 
-        # Left and right x-coords. of table cols.
-        pos = {}
-        for col in ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'LAPS', 'TIME', 'GAP', 'INT', 'KM/H',
-                    'FASTEST', 'ON', 'PTS']:
-            pos[col] = {
-                'left': page.search_for(col, clip=(0, y, w, y + 50))[0].x0,  # 50px is tall enough
-                'right': page.search_for(col, clip=bbox)[0].x1               # for the col. header
-            }
-
-        # Vertical lines separating the columns
+        # Vertical lines separating the cols.
         vlines = [
             0,
-            pos['NO']['left'],
-            (pos['NO']['right'] + pos['DRIVER']['left']) / 2,
-            pos['NAT']['left'] - 1,
-            (pos['NAT']['right'] + pos['ENTRANT']['left']) / 2,
-            pos['LAPS']['left'],
-            pos['LAPS']['right'] + 1,
-            (pos['TIME']['right'] + pos['GAP']['left']) / 2,
-            (pos['GAP']['right'] + pos['INT']['left']) / 2,
-            (pos['INT']['right'] + pos['KM/H']['left']) / 2,
-            pos['FASTEST']['left'],
-            pos['FASTEST']['right'],
-            pos['PTS']['left'],
-            pos['PTS']['right']
+            cols['NO'].l,
+            (cols['NO'].r + cols['DRIVER'].l) / 2,
+            cols['NAT'].l - 1,
+            (cols['NAT'].r + cols['ENTRANT'].l) / 2,
+            cols['LAPS'].l,
+            cols['LAPS'].r ,
+            (cols['TIME'].r + cols['GAP'].l) / 2,
+            (cols['GAP'].r + cols['INT'].l) / 2,
+            (cols['INT'].r + cols['KM/H'].l) / 2,
+            cols['FASTEST'].l - 1,
+            cols['FASTEST'].r + 1,
+            cols['PTS'].l,
+            cols['PTS'].r
         ]
 
         # Horizontal lines separating the rows
-        car_nos = page.get_text('blocks',
-                                clip=(pos['NO']['left'], y, pos['DRIVER']['left'], b),
-                                small_area=False)
-        hlines = [y]
-        for i in range(len(car_nos) - 1):
-            hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
-        hlines.append(b)
+        hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, w, b_table),
+                                                 min_height=line_height)
+        hlines.insert(0, b_classification)
 
         # Parse the table using the grid above
         df = self._parse_table_by_grid(
-            file=self.classification_file,
             page=page,
             vlines=vlines,
             hlines=hlines,
@@ -775,25 +875,25 @@ class RaceParser(BaseParser):
         assert df.shape[1] == 13, \
             f'Expected 13 cols, got {df.shape[1]} in {self.classification_file}'  # noqa: PLR2004
         df.columns.to_numpy()[0] = 'position'  # zero-th col. has no name in PDF, so name it
-        df.loc[0, 'INT'] = None
-        df.loc[0, 'GAP'] = None  # The winner has no GAP or INT
 
-        # Do the same for the "NOT CLASSIFIED" table. See `QualifyingParser._parse_classification`
-        if has_not_classified:
-            t = page.search_for('NOT CLASSIFIED')[0].y1
-            b = page.search_for_white_strip(clip=(0, t, w, page.bound()[3]))
-            if b is None:
-                raise ParsingError(f'cannot find the bottom of the "NOT CLASSIFIED" table on p.'
-                                   f'{page.number} in {self.classification_file}')
-            car_nos = page.get_text('blocks',
-                                    clip=(pos['NO']['left'], t, pos['DRIVER']['left'], b),
-                                    small_area=False)
-            hlines = [t]
-            for i in range(len(car_nos) - 1):
-                hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
-            hlines.append(b + 1)
+        # Check if there is a "NOT CLASSIFIED" table below the main table
+        not_classified = page.search_for('NOT CLASSIFIED')
+
+        # If yes, repeat the above for the "NOT CLASSIFIED" table
+        if not_classified:
+            t_table_body = not_classified[0].y1
+            white_strip = page.search_for_white_strip(clip=(0, t_table_body, w, page.bound()[3]),
+                                                      height=line_height / 2)
+            if white_strip:
+                b_table = sorted(white_strip)[0]
+            else:
+                raise ParsingError(
+                    f'Could not find the bottom of "NOT CLASSIFIED" table by white strip on '
+                    f'p.{page.number} in {self.classification_file}'
+                )
+            hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, w, b_table),
+                                                     min_height=line_height)
             not_classified = self._parse_table_by_grid(
-                file=self.classification_file,
                 page=page,
                 vlines=vlines,
                 hlines=hlines,
@@ -899,7 +999,7 @@ class RaceParser(BaseParser):
         def to_json() -> list[dict]:
             return df.apply(
                 lambda x: SessionEntryImport(
-                    object_type="SessionEntry",
+                    object_type='SessionEntry',
                     foreign_keys=SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
@@ -1113,12 +1213,11 @@ class RaceParser(BaseParser):
             for i in range(len(laps) - 1):
                 row_seps.append((laps[i]['bbox'][3] + laps[i + 1]['bbox'][1]) / 2)
 
-            # The bottom of the table is a wide white strip
-            page = Page(page)  # noqa: PLW2901
-            b = page.search_for_white_strip(clip=(0, row_seps[-1], page.bound()[2], b))
-            row_seps.append(b)
+            # The bottom is the last row's bottom + 1px buffer
+            row_seps.append(laps[-1]['bbox'][3] + 1)
 
             # Parse the table
+            page = Page(page, self.lap_chart_file)
             tab, superscript, cross_out = page.parse_table_by_grid(
                 vlines=[(col_seps[i], col_seps[i + 1]) for i in range(len(col_seps) - 1)],
                 hlines=[(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
