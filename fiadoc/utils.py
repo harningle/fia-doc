@@ -172,7 +172,8 @@ class Page:
     def __init__(self, page: pymupdf.Page, file: str | os.PathLike):
         self._pymupdf_page = page
         self.file = file
-        self.drawings = page.get_drawings()
+        self.w = page.bound()[2]
+        self.h = page.bound()[3]
         self.tempdir = Path(tempfile.mkdtemp('fiadoc'))
 
     def __getattr__(self, name: str):
@@ -694,15 +695,19 @@ class Page:
 
     def search_for_black_line(
             self,
+            clip: Optional[tuple[float, float, float, float]] = None,
             max_thickness: float = 2,
-            clip: Optional[tuple[float, float, float, float]] = None
+            min_length: float = 0.8
     ) -> list[float]:
         """Search for a long black horizontal line in the page
 
-        :param max_thickness: The max. thickness of the line in pixels. This helps to distinguish
-                              black box vs black line. Default is 5px
         :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
                      whole page
+        :param max_thickness: The max. thickness of the line in pixels. This helps to distinguish
+                              black box vs black line. Default is 5px
+        :param min_length: The minimum length of the line as a proportion of the `clip` width. The
+                           default is 0.8, i.e., the line should span at least 80% of the width of
+                           the `clip` area
         :return: The y-midpoints of the found lines in a list
         """
         # Get the pixmap of the clipped area
@@ -714,7 +719,7 @@ class Page:
         pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
 
         # Find rows with sufficient contiguous black pixels
-        is_black_row = np.mean(pixmap < 50, axis=(1, 2)) > 0.8  # noqa: PLR2004
+        is_black_row = np.mean(pixmap < 50, axis=(1, 2)) > min_length
 
         # Sample down to original resolution. If any row is black, then the downsampled row is also
         # treated as black
@@ -752,7 +757,7 @@ class Page:
                        roughly half of the normal line height of the FIA PDFs
         :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
                      whole page
-        :return: The top y-coord. of the found white strips in a list
+        :return: The top y-coord. of the found white strips in a list, sorted from top to bottom
         """
         # TODO: this 4px height is very fragile. Better if get the exact vertical gap in pixels
         #       between two car No. and use (some proportion of) this gap as `height`

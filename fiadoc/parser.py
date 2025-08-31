@@ -118,7 +118,9 @@ class BaseParser:
     @staticmethod
     def _detect_cols(
             page: Page,
-            clip: tuple[float, float, float, float]
+            clip: tuple[float, float, float, float],
+            col_min_gap: float = 1.1,
+            min_black_line_length: float = 0.9
     ) -> list[TextBlock]:
         """
         Search for table header/cols. in the `clip` area. Returns a list of (l, t, r, b, col. name)
@@ -133,6 +135,15 @@ class BaseParser:
            each other
         4. run OCR on each black rectangle to get the text inside it. And the four corners of the
            rectangle are the bounding box of the text
+
+        :param col_min_gap: Minimum gap between two cols., relative to the width of the thinnest
+                            char. Default is 1.1, i.e. 10% tolerance. If two chars. are
+                            horizontally closer than this gap, they are considered to be in the
+                            same word
+        :param min_black_line_length: Minimum length of a black line, relative to the width of
+                                      the `clip` area. Default is 0.9, i.e. 90% of the width of
+                                      the `clip` area. Any black horizontal line longer than this
+                                      is ignored
         """
         # Get the pixmap of `clip` area
         pixmap = page.get_pixmap(clip=clip, dpi=DPI)
@@ -145,7 +156,7 @@ class BaseParser:
         As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
         (184 or 232), use RGB = 128 as a cutoff for "black"
         """
-        arr = arr[np.mean(arr < 128, axis=(1, 2)) < 0.9]  # noqa: PLR2004
+        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]
 
         # Mask text with rectangles, i.e. label connected components
         labelled, n_features = label(arr < 128)  # noqa: PLR2004
@@ -160,9 +171,10 @@ class BaseParser:
         gap is roughly a normal whitespace. If we pick a too wide "close", "NAT" and "ENTRANT" will
         be recognised as a single text block "NAT ENTRANT". If "close" is too narrow, then "NAT"
         may be broken into "N", "A", and "T". Generally speaking, using the thinnest char.'s width
-        satisfies both conditions.
+        (w/ e.g. 10% buffer) satisfies both conditions.
         """
         min_slice_width = min([s[1].stop - s[1].start for s in slices])  # Thinnest char.'s width
+        min_slice_width *= col_min_gap                                   # Add some buffer
         merged_slices = []
         for s in slices:
             if not merged_slices:
@@ -1028,85 +1040,125 @@ class RaceParser(BaseParser):
 
     def _parse_history_chart(self) -> pd.DataFrame:
         doc = pymupdf.open(self.history_chart_file)
-        df = []
+        dfs = []
         for page in doc:
-            # Each page can have multiple tables, all of which begins from the same top y-position.
-            # Their table headers are vertically bounded between "History Chart" and "TIME". Find
-            # all the headers
-            t = page.search_for('History Chart')[0].y1
-            b = page.search_for('TIME')[0].y1
-            w = page.bound()[2]
-            headers = page.search_for('Lap', clip=(0, t, w, b))
+            # Each page can have multiple (usually five) tables, all of which begins from the same
+            # top y-position. The table headers are vertically bounded between "History Chart" and
+            # "TIME"
+            page = Page(page, file=self.history_chart_file)
+            history_chart = page.search_for('History Chart')
+            if len(history_chart) != 1:
+                raise ParsingError(f'Find none or multiple "History Chart" on p.{page.number} in '
+                                   f'{self.history_chart_file}: {history_chart}')
+            b_history_chart = history_chart[0].y1
+            table_header = page.search_for('TIME', clip=(0, b_history_chart, page.w, page.h))
+            if len(table_header) == 0:
+                raise ParsingError(f'Could not find "TIME" on p.{page.number} in '
+                                   f'{self.history_chart_file}: {table_header}')
+            b_table_header = table_header[0].y1
+            laps = page.search_for('Lap', clip=(0, b_history_chart, page.w, b_table_header))
 
             # Iterate over each table header and get the table content
-            h = page.bound()[3]
-            for i, header in enumerate(headers):
-                # Get lap No. from the table header
-                """
-                The left boundary of the table is the leftmost of the "Lap xxx" text, and the right
-                boundary is the leftmost of the next "Lap x" text. If it's the last lap, i.e. no
-                next table, then the right boundary can be determined by left boundary plus table
-                width, which is roughly one-fifth of the page width. We add 5% extra buffer to the
-                right boundary
+            for i, lap in enumerate(laps):
+                # Find table bottom, which is a white strip below the table header
+                l_next_lap = laps[i + 1].x0 - 1 if i + 1 < len(laps) else page.w
+                white_strip = page.search_for_white_strip(clip=(0, lap.y1, l_next_lap, page.h))
+                if len(white_strip) == 0:
+                    raise ParsingError(f'Could not find white strip below table {i} on p.'
+                                       f'{page.number} in {self.history_chart_file}')
+                b_table = white_strip[0]
 
-                TODO: a better way to determine table width is by using the vector graphics: under
-                the table header, we have a black horizontal line, whose length is the table width
-                """
-                left_boundary = header.x0
-                top_boundary = header.y1
-                if i + 1 < len(headers):
-                    right_boundary = headers[i + 1].x0
-                else:
-                    right_boundary = (left_boundary + w / 5) * 1.05
-                header_text = page.get_text(
-                    'text',
-                    clip=(left_boundary, header.y0, right_boundary, header.y1)
+                # Find the black line which separates the table header and table content
+                l_table = lap.x0 - 1
+                black_line = page.search_for_black_line(
+                    clip=(l_table, lap.y1, l_next_lap, b_table),
+                    min_length=0.7  # The line does not span across the entire clip area so shorter
+                )                   # threshold
+                if len(black_line) != 1:
+                    raise ParsingError(
+                        f'Could not find or find multiple black lines below the table header of '
+                        f'table {i} on p.{page.number} in {self.history_chart_file}: {black_line}'
+                    )
+                t_table_body = black_line[0]
+
+                # Get table header/col. names
+                cols = self._detect_cols(
+                    page,
+                    clip=(l_table, b_history_chart, l_next_lap, t_table_body),
+                    col_min_gap=5,  # Col. names are quite far from each other, so use a larger gap
+                    min_black_line_length=0.6
                 )
-                lap_no = re.search(r'LAP (\d+)', header_text)
-                assert lap_no, (f'Cannot find lap No. in header of table {i} on p.{page.number} '
-                                f'in {self.history_chart_file}')
+                if len(cols) != 3:
+                    raise ParsingError(f'Expected 3 cols. in the table {i} on p.{page.number} in '
+                                       f'{self.history_chart_file}. Found: {cols}')
+                if 'LAP' not in cols[0].text:
+                    raise ParsingError(f'Expected "LAP" in the zero-th col. name of table {i} on '
+                                       f'p.{page.number} in {self.history_chart_file}. Found: '
+                                       f'{cols[0]}')
+                lap_no = re.search(r'LAP (\d+)', cols[0].text)
+                if not lap_no:
+                    raise ParsingError(f'Expected "LAP x" to be the zero-th col. of table {i} on '
+                                       f'p.{page.number} in {self.history_chart_file}. Found: '
+                                       f'{cols[0]}')
                 lap_no = int(lap_no.group(1))
+                if cols[1].text != 'GAP':
+                    raise ParsingError(f'Expected "GAP" to be the first col. of table {i} on '
+                                       f'p.{page.number} in {self.history_chart_file}. Found: '
+                                       f'{cols[1]}')
+                if cols[2].text != 'TIME':
+                    raise ParsingError(f'Expected "TIME" to be the second col. of table {i} on '
+                                       f'p.{page.number} in {self.history_chart_file}. Found: '
+                                       f'{cols[2]}')
+                line_height = np.mean([i.b - i.t for i in cols])
 
-                # Get the table content below header
-                temp = page.find_tables(clip=(left_boundary, top_boundary, right_boundary, h),
-                                        strategy='lines',
-                                        add_lines=[((left_boundary, 0), (left_boundary, h))])
-                assert len(temp.tables) == 1, \
-                    f'Expected one table per lap, got {len(temp.tables)} on p.{page.number} in ' \
-                    f'{self.history_chart_file}'
-                temp = temp[0].to_pandas()
+                # Set col. separating vertical lines
+                """
+                We can use the left of "LAP x", the right of "LAP x", the midpoint between "GAP"
+                and "TIME", and the left of "LAP x + 1" as col. separators. But I'm not very
+                confident about the midpoint between "GAP" and "TIME", especially when the gap
+                between two cars are big, or a lap time is very slow (e.g., due to accident then 
+                lingering into the pit). Therefore, I use `._detect_cols()` to detect the cols.
+                This method is not designed for this purpose, but it does the job, as it sorts all
+                words from left to right, and groups them into cols. based on their x-coord, so it
+                works regardless of the y-coords.
+                """
+                temp = self._detect_cols(page,
+                                         clip=(l_table, b_history_chart, l_next_lap, b_table),
+                                         col_min_gap=5,
+                                         min_black_line_length=0.6)
+                if len(temp) != 3:
+                    raise ParsingError(f'Expected 3 cols. in the table {i} on p.{page.number} in '
+                                       f'{self.history_chart_file}. Found: {temp}')
+                vlines = [
+                    l_table,
+                    (temp[0].r + temp[1].l) / 2,
+                    (temp[1].r + temp[2].l) / 2,
+                    l_next_lap
+                ]
 
-                # Check if table content is mistakenly treated as table header
-                """
-                This is super inconsistent across PyMuPDF versions. In 1.25.1, it detects cols./
-                table headers correctly. However, in 1.26.0, table header is lost (even if we
-                manually add `horizontal_lines`), and the zero-th row is treated as the cols.
-                That's why we manually parse the header and lap No. above, and here everything in
-                the table (table content AND cols./headers) should be content, and there is should
-                be header. If any, then we move the header into the table content.
-                """
-                assert temp.shape[1] == 3, (  # noqa: PLR2004
-                    f'Expected 3 columns in the table of lap {lap_no} on p.{page.number} in '
-                    f'{self.history_chart_file}. Found {temp.shape[1]} columns instead: '
-                    f'{temp.columns}'
+                # Get row positions by checking white/grey background colours
+                hlines = page.search_for_grey_white_rows(
+                    clip=(l_table, t_table_body, l_next_lap, b_table),
+                    min_height=line_height
                 )
-                if any([i.isdigit() for i in temp.columns[2]]):
-                    temp.loc[-1] = temp.columns  # Add the header as the first row
-                    temp.iloc[-1, 1] = ''        # "GAP" col. is always empty for the race leader
-                    temp.index += 1
-                    temp = temp.sort_index()
-                temp.columns = ['car_no', 'gap', 'time']
-                temp['lap'] = lap_no
-                temp = temp[temp.car_no != '']  # Sometimes will get one additional empty row
+
+                # Parse the table using the grid above
+                df = self._parse_table_by_grid(page=page, vlines=vlines, hlines=hlines,
+                                               header_included=False)
+                df.columns = [i.text.split()[0].lower() for i in cols]  # "LAP 5" --> "lap"
+                df = df.rename(columns={'lap': 'car_no'})
+                df['lap'] = lap_no
+                df = df[df.car_no != '']  # Sometimes will get one additional empty row
 
                 # The row order/index is meaningful: it's the order/positions of the cars
-                # Need extra care for lapped cars; see harningle/fia-doc#19
+                # Need extra care for lapped cars (harningle/fia-doc#19)
                 # TODO: is this true for all cases? E.g. retirements?
-                temp = temp.reset_index(drop=False, names=['position'])
-                temp['position'] += 1  # 1-indexed
-                df.append(temp)
+                df = df.reset_index(drop=False, names=['position'])
+                df['position'] += 1  # 1-indexed
+                dfs.append(df)
 
-        df = pd.concat(df, ignore_index=True)
+        df = pd.concat(dfs, ignore_index=True)
+        del dfs
         df.car_no = df.car_no.astype(int)
 
         # Extra cleaning for lapped cars
