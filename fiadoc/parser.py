@@ -208,10 +208,82 @@ class BaseParser:
                     text = 'KM/H'
                 cols.append(TextBlock(text=text, bbox=(l, t, r, b)))
             else:
-                raise OCRError(f'Unable to OCR text in the table header inside '
-                               f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
-                               f'{page.file}')
+                raise ParsingError(f'Unable to OCR text in the table header inside '
+                                   f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
+                                   f'{page.file}')
         return cols
+
+    @staticmethod
+    def _detect_rows(
+            page: Page,
+            clip: tuple[float, float, float, float],
+            min_black_line_length: float = 0.9
+    ) -> list[TextBlock]:
+        """
+        Search for table rows in the `clip` area. Returns a list of TextBlock of the row names
+
+        See `_detect_cols()` for detals
+
+        :param min_black_line_length: Minimum length of a black vertical line, relative to the
+                                      height of the `clip` area. Default is 0.9, i.e. 90% of the
+                                      height of the `clip` area. Any black vertical line longer
+                                      than this is ignored
+        """
+        # Get the pixmap of `clip` area
+        pixmap = page.get_pixmap(clip=clip, dpi=DPI)
+        arr = np.ndarray([pixmap.h, pixmap.w, 3], dtype=np.uint8, buffer=pixmap.samples)
+        del pixmap
+
+        # Drop cols. with almost all black pixels (those are lines not text). After this step, all
+        # black pixels should be texts only
+        """
+        As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
+        (184 or 232), use RGB = 128 as a cutoff for "black"
+        """
+        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]
+
+        # Mask text with rectangles, i.e. label connected components
+        labelled, n_features = label(arr < 128)  # noqa: PLR2004
+        if n_features == 0:
+            return []
+        slices = sorted(find_objects(labelled), key=lambda x: x[0].start)
+
+        # Merge the rectangles/slices that are close to each other
+        min_slice_height = min([s[0].stop - s[0].start for s in slices])
+        merged_slices = []
+        for s in slices:
+            if not merged_slices:
+                merged_slices.append(s)
+            else:
+                # Check if the top of the current slice is close to the bottom of the last slice
+                if s[0].start - merged_slices[-1][0].stop < min_slice_height:
+                    merged_slices[-1] = (
+                        slice(min(merged_slices[-1][0].start, s[0].start),
+                              max(merged_slices[-1][0].stop, s[0].stop)),
+                        slice(min(merged_slices[-1][1].start, s[1].start),
+                              max(merged_slices[-1][1].stop, s[1].stop)),
+                        merged_slices[-1][2]
+                    )
+                else:
+                    merged_slices.append(s)
+        del slices
+
+        # Get text/OCR the merged slices
+        rows = []
+        for s in merged_slices:
+            l, t, r, b = page._transform_bbox(
+                original_bbox=clip,
+                new_bbox=(0, 0, arr.shape[1], arr.shape[0]),
+                bbox=(s[1].start, s[0].start, s[1].stop, s[0].stop)
+            )
+            text = page.get_text('text', clip=(l - 1, t - 1, r + 1, b + 1)).strip()
+            if text:
+                rows.append(TextBlock(text=text, bbox=(l, t, r, b)))
+            else:
+                raise ParsingError(f'Unable to get the text inside the row '
+                                   f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
+                                   f'{page.file}')
+        return rows
 
 
 class EntryListParser:
@@ -1210,98 +1282,121 @@ class RaceParser(BaseParser):
 
     def _parse_lap_chart(self) -> pd.DataFrame:
         doc = pymupdf.open(self.lap_chart_file)
-        df = []
+        dfs = []
         for page in doc:
-            t = page.search_for('Lap Chart')[0].y1  # The table is below "Race Lap Chart"
-            b = page.search_for('page')
-            if b:  # The table is above "page x of y"
-                b = b[0].y0
-            else:  # Or the bottom of the page (the © logo)
-                b = page.search_for('©')
-                if b:
-                    b = b[0].y0
-                else:
-                    raise ValueError(f'Cannot find © on p. {page.number} in {self.lap_chart_file}')
+            page = Page(page, file=self.lap_chart_file)
 
-            # Left boundary is the leftmost "LAP x"
-            l = page.search_for('LAP', clip=(0, t, page.bound()[2], b))[0].x0
+            # Table header/col. names are below "Race Lap Chart"
+            b_lap_chart = page.search_for('Lap Chart')[0].y1
 
-            # Top row's leftmost cell is "POS"
-            pos = page.search_for('POS', clip=(l, t, page.bound()[2], b))[0]
-            assert pos.x0 >= l, \
-                f'Expected "POS" to be (slightly) to the right of "LAP x" on page {page.number} ' \
-                f"in {self.lap_chart_file}. But it's found to the left"
-            assert pos.y0 > t, \
-                f'Expected "POS" below "Race Lap Chart" on page {page.number} in ' \
-                f'{self.lap_chart_file}. But it\'s found above'
+            # Table header is above a black line
+            black_line = page.search_for_black_line(clip=(0, b_lap_chart, page.w, page.h))
+            if not black_line:  # Maybe two lines: one for table top and one for page bottom
+                raise ParsingError(f'Could not find the black line below the table header '
+                                   f'on p.{page.number} in {self.lap_chart_file}')
+            t_table_body = black_line[0]
 
-            # To the right of "POS", we have positions 1, 2, ...
-            positions = page.get_text('dict', clip=(pos.x1, pos.y0, page.bound()[2], pos.y1))
-            assert len(positions['blocks']) == 1, f'Error in parsing positions in top row on ' \
-                                        f'page {page.number} in {self.lap_chart_file}'
-            positions = positions['blocks'][0]['lines']
-            assert positions, \
-                f'Expected some positions to the right of "POS" on page {page.number} in ' \
-                f'{self.lap_chart_file}. Found none'
+            # Table bottom is a white strip
+            """
+            A white strip of any height is fine. Because the table always has a black vertical line
+            between col. 0 and col. 1, so there is no white strip at all in the table. Any white
+            strip must indicate the end of the table.
+            """
+            white_strip = page.search_for_white_strip(clip=(0, t_table_body, page.w, page.h),
+                                                      height=1)
+            if not white_strip:
+                raise ParsingError(f'Could not find any white strip below the table on '
+                                   f'p.{page.number} in {self.lap_chart_file}')
+            b_table = white_strip[0]
 
-            # Each position is a col., so we take the midpoints between two positions as the col.
-            # separators
-            col_seps = [l - 5, (pos.x1 + positions[0]['bbox'][0]) / 2]
-            for i in range(len(positions) - 1):
-                col_seps.append((positions[i]['bbox'][2] + positions[i + 1]['bbox'][0]) / 2)
-            col_seps.append(page.bound()[2])
+            # Get col. names between the two y-coords. above
+            cols = self._detect_cols(page, clip=(0, b_lap_chart, page.w, t_table_body))
+            if len(cols) <= 1:
+                raise ParsingError(f'Expected at least two cols. in table on {page.number} in '
+                                   f'{self.lap_chart_file}. Found: {cols}')
+            if cols[0].text != 'POS':
+                raise ParsingError(f'Expected "POS" to be the zero-th col. on p.{page.number} '
+                                   f'in {self.lap_chart_file}. Found: {cols[0]}')
+            for i in range(1, len(cols)):
+                if not re.match(r'^\d+$', cols[i].text):
+                    raise ParsingError(
+                        f'Expected the {i}-th col. to be a number on p.{page.number} in '
+                        f'{self.lap_chart_file}. Found: {cols[i]}'
+                    )
 
-            # Below "POS" we have rows GRID, LAP 1, LAP 2, ...
-            laps = page.get_text('dict', clip=(l - 5, pos.y1, col_seps[1], b))
-            assert len(laps['blocks']) == 1, f'Error in parsing laps in leftmost col. on ' \
-                                             f'p.{page.number} in {self.lap_chart_file}'
-            laps = laps['blocks'][0]['lines']
-            assert laps, \
-                f'Expected some laps below "POS" on page {page.number} in ' \
-                f'{self.lap_chart_file}. Found none'
+            # Find a black vertical line below the black horizontal line above. This separates the
+            # zero-th col. and the first col.
+            """
+            `Page.search_for_black_line` is for horizontal lines only. So to search for vertical
+            lines, we rotate the page, i.e. applying [[0, -1], [1, 0]].
+            """
+            page.set_rotation(270)
+            black_line = page.search_for_black_line(
+                clip=(t_table_body, 0, b_table, page.w),    # `clip` is rotated too
+                min_length=0.7
+            )
+            black_line = [page.w - i for i in black_line]  # Transpose back
+            page.set_rotation(0)
+            if len(black_line) != 1:
+                raise ParsingError(f'Could not find or find multiple vertical black lines below '
+                                   f'the table header on p.{page.number} in '
+                                   f'{self.lap_chart_file}: {black_line}')
+            l_first_col = black_line[0]
+            vlines = [
+                0,
+                l_first_col,
+                *[(cols[i].r + cols[i + 1].l) / 2 for i in range(1, len(cols) - 1)],
+                page.w
+            ]
 
-            # Each lap is a row, so we take the midpoints between two laps as the row separators
-            row_seps = [pos.y0 - 1, (pos.y1 + laps[0]['bbox'][1]) / 2]
-            for i in range(len(laps) - 1):
-                row_seps.append((laps[i]['bbox'][3] + laps[i + 1]['bbox'][1]) / 2)
-
-            # The bottom is the last row's bottom + 1px buffer
-            row_seps.append(laps[-1]['bbox'][3] + 1)
+            # Locate rows. Same intuition as getting col. positions in `._parse_history_chart()`
+            rows = self._detect_rows(page,
+                                     clip=(0, t_table_body, l_first_col - 2, b_table),
+                                     min_black_line_length=0.5)
+            if not rows:
+                raise ParsingError(f'Could not detect any rows in the zero-th col. in table on '
+                                   f'p.{page.number} in {self.lap_chart_file}')
+            for row in rows:
+                if not re.match(r'^GRID$|^LAP \d+$', row.text):
+                    raise ParsingError(f'Expected "GRID" or "LAP x" for all cells in the zero-th '
+                                       f'col. in table on p.{page.number} in '
+                                       f'{self.lap_chart_file}. Found: {row}')
+            hlines = [
+                t_table_body,
+                *[(rows[i].b + rows[i + 1].t) / 2 for i in range(len(rows) - 1)],
+                b_table
+            ]
 
             # Parse the table
-            page = Page(page, self.lap_chart_file)
-            tab, superscript, cross_out = page.parse_table_by_grid(
-                vlines=[(col_seps[i], col_seps[i + 1]) for i in range(len(col_seps) - 1)],
-                hlines=[(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
+            df = self._parse_table_by_grid(
+                page=page,
+                vlines=vlines,
+                hlines=hlines,
+                header_included=False
             )
-            assert (len(superscript) == 0) and len(cross_out) == 0, \
-                f'Some superscript(s) or crossed out text(s) found in table on page ' \
-                f'{page.number} in {self.lap_chart_file}. Expect none'
-            assert (len(superscript) == 0) and len(cross_out) == 0, \
-                f'Some superscript(s) or crossed out text(s) found in table on page ' \
-                f'{page.number} in {self.lap_chart_file}. Expect none'
 
             # Reshape to long format, where a row is (lap, driver, position)
-            tab.columns = tab.iloc[0]
-            tab = tab[1:]
-            tab.index.name = None
-            if (tab.POS == 'GRID').any():
-                self.starting_grid = tab[tab.POS == 'GRID'] \
-                    .drop(columns='POS') \
-                    .T \
-                    .reset_index() \
-                    .rename(columns={0: 'starting_grid', 1: 'car_no'})
+            df.columns = [i.text for i in cols]
+            df.index.name = None
+            if (df.POS == 'GRID').any():
+                self.starting_grid = (df[df.POS == 'GRID']
+                                      .drop(columns='POS')
+                                      .T
+                                      .reset_index()
+                                      .rename(columns={'index': 'starting_grid', 0: 'car_no'}))
                 self.starting_grid.car_no = self.starting_grid.car_no.astype(int)
                 self.starting_grid.starting_grid = self.starting_grid.starting_grid.astype(int)
-            tab = tab[tab.POS != 'GRID']
-            tab.POS = tab.POS.str.removeprefix('LAP ').astype(int)
-            tab = tab.set_index('POS').stack().reset_index(name='car_no')
-            tab = tab.rename(columns={'POS': 'lap', 0: 'position'})
-            tab = tab[tab.car_no != '']
-            tab.position = tab.position.astype(int)
-            tab.car_no = tab.car_no.astype(int)
-            df.append(tab)
-        return pd.concat(df, ignore_index=True)
+                df = df[df.POS != 'GRID']
+            df.POS = df.POS.str.removeprefix('LAP ').astype(int)
+            df = (df.set_index('POS')
+                  .stack()
+                  .reset_index(name='car_no')
+                  .rename(columns={'POS': 'lap', 'level_1': 'position'}))
+            df = df[df.car_no.notna() & (df.car_no != '')]  # E.g., a car retires on lap 10, so lap
+            df.position = df.position.astype(int)           # 11 will have a missing car No.
+            df.car_no = df.car_no.astype(int)
+            dfs.append(df)
+        return pd.concat(dfs, ignore_index=True)
 
     def _parse_lap_analysis(self) -> pd.DataFrame:
         doc = pymupdf.open(self.lap_analysis_file)

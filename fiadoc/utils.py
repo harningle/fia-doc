@@ -22,9 +22,9 @@ from .models.lap import LapImport, LapObject
 
 DPI = 600  # Works the best for OCR
 OCR = PaddleOCR(lang='en',
-                       use_doc_orientation_classify=False,
-                       use_doc_unwarping=False,
-                       use_textline_orientation=False)
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False)
 # Correct common OCR mistakes
 # TODO: very fragile...
 OCR_ERRORS = {
@@ -430,7 +430,7 @@ class Page:
                 return not any([i[4].strip() for i in r])
             elif isinstance(r, dict):
                 return not any([span['text'].strip()
-                                for block in res['blocks']
+                                for block in r['blocks']
                                 for line in block['lines']
                                 for span in line['spans']])
             else:
