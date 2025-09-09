@@ -782,7 +782,7 @@ class Page:
                     white_strips.append(strip_start + t)
                 strip_start = None
 
-        # Edge case for the strip being at the bottom. Shouldn't happen but just in case
+        # Edge case for the strip being at the bottom
         if strip_start is not None and len(is_white_row) - strip_start >= height:
             white_strips.append(strip_start + t)
         return white_strips
@@ -790,7 +790,8 @@ class Page:
     def search_for_grey_white_rows(
             self,
             clip: Optional[tuple[float, float, float, float]] = None,
-            min_height: float = 0
+            min_height: float = 0,
+            min_width: float = 0.8
     ) -> Optional[list[float]]:
         """Search for grey/white rows in the page
 
@@ -805,6 +806,9 @@ class Page:
         :param min_height: The minimum height of the grey row in pixels. If a grey row is shorter
                            in height than this, it will be ignored. Default is 0, which means no
                            filtering on height
+        :param min_width: The minimum width of the grey row as a proportion of the `clip` width.
+                          The default is 0.8, i.e., a row with at least 80% grey pixels is treated
+                          as a grey row
         :return: A list of numbers, where each number is the top y-coord. of a row. The bottom of
                  the last row is also included
         """
@@ -819,7 +823,7 @@ class Page:
         min_height = scaling_factor * min_height
 
         # Find all grey/white rows. Grey is usually RGB = 232
-        is_grey_row = np.mean(pixmap < 240, axis=(1, 2)) > 0.8  # noqa: PLR2004
+        is_grey_row = np.mean(pixmap < 240, axis=(1, 2)) > min_width
         grey_rows = []
         row_start = None
         for i, is_grey in enumerate(is_grey_row):
@@ -835,11 +839,19 @@ class Page:
         # All rows should have roughly the same height
         row_heights = [grey_rows[i][1] - grey_rows[i][0] for i in range(len(grey_rows))] \
             + [grey_rows[i][0] - grey_rows[i - 1][1] for i in range(1, len(grey_rows))]
-        row_height = np.mean(row_heights)
-        if not np.all(np.isclose(row_heights, row_height, rtol=0.05)):
+        row_height = np.mean(row_heights) if row_heights else 0
+        if not np.all(np.isclose(row_heights, row_height, rtol=0.1)):
             raise ParsingError(f'Found rows with different heights on p.{self.number} in '
-                               f'{self.file}. Expected all rows to have similar heights')
-
+                               f'{self.file}. Expected all rows to have similar heights: '
+                               f'{row_heights}')
+        """
+        We use 10% as "roughly the same". It's actually a very tight tolerance. First, when we get
+        pixmap of the page, it's a matrix. So we will have coords. like (1, 5), not (1.1, 4.9).
+        This creates some rounding error. After scaling (DPI = 600), this error is further
+        amplified. Second, the `clip` may not always be perfect. The true table area may be
+        (0, 10, 100, 500), and what we provide as `clip` may be (0, 12, 100, 500). This may affect
+        the row height of the first and/or the last row. Therefore, 10% is a reasonable tolerance.
+        """
         # Convert the grey rows to the original page coordinates
         grey_rows = [(clip[1] + i[0] / scaling_factor, clip[1] + i[1] / scaling_factor)
                      for i in grey_rows]
@@ -850,21 +862,25 @@ class Page:
 
         # Check if the first row is white. (If it's grey, already captured above)
         # First check if have enough spacing above the first grey row
-        if grey_rows[0][0] < row_height * 0.9:
+        t_first_grey_row = grey_rows[0][0] if grey_rows else clip[1]  # May have zero grey row
+        if t_first_grey_row > clip[1] + row_height * 0.7:
             # Then check if any text in the area above the first grey row
-            text = self.get_text('text', clip=(clip[0], clip[1], clip[2], grey_rows[0][0]))
+            text = self.get_text('text', clip=(clip[0], clip[1], clip[2], t_first_grey_row))
             if text.strip():
                 # If yes, then it's a white row
-                white_rows.insert(0, (grey_rows[0][0] - row_height, grey_rows[0][0]))
+                white_rows.insert(0, (t_first_grey_row - row_height, t_first_grey_row))
 
         # Check if the last row is white, in the same way
-        if grey_rows[-1][1] < clip[3] - row_height * 0.9:
-            text = self.get_text('text', clip=(clip[0], grey_rows[-1][1], clip[2], clip[3]))
+        b_last_grey_row = grey_rows[-1][1] if grey_rows else clip[3]
+        if b_last_grey_row < clip[3] - row_height * 0.7:
+            text = self.get_text('text', clip=(clip[0], b_last_grey_row, clip[2], clip[3]))
             if text.strip():
-                white_rows.append((grey_rows[-1][1], grey_rows[-1][1] + row_height))
+                white_rows.append((b_last_grey_row, b_last_grey_row + row_height))
 
         # Get the rows' y-coords.
         temp = sorted([coord for row in grey_rows + white_rows for coord in row])
+        if not temp:
+            return []
         hlines = [temp[0]]
         for i in range(1, len(temp)):
             if not np.isclose(temp[i], temp[i - 1], rtol=0.01):
