@@ -697,22 +697,25 @@ class Page:
             self,
             clip: Optional[tuple[float, float, float, float]] = None,
             max_thickness: float = 2,
-            min_length: float = 0.8
+            min_length: float = 0.8,
+            scaling_factor: float = 4
     ) -> list[float]:
         """Search for a long black horizontal line in the page
 
         :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
                      whole page
         :param max_thickness: The max. thickness of the line in pixels. This helps to distinguish
-                              black box vs black line. Default is 5px
+                              black box vs black line. Default is 2px
         :param min_length: The minimum length of the line as a proportion of the `clip` width. The
                            default is 0.8, i.e., the line should span at least 80% of the width of
                            the `clip` area
+        :param scaling_factor: Upsample the image by this factor before searching for lines. This
+                               helps to detect thin lines. Default is 4, which means 1px line in
+                               the original image becomes 4px in the upsampled image
         :return: The y-midpoints of the found lines in a list
         """
         # Get the pixmap of the clipped area
         clip = clip if clip else None
-        scaling_factor = 4
         pixmap = self.get_pixmap(clip=clip,
                                  matrix=pymupdf.Matrix(scaling_factor, 0, 0, scaling_factor, 0, 0))
         l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
@@ -727,6 +730,7 @@ class Page:
                                  for i in range(0, len(is_black_row), scaling_factor)])
 
         # Find consecutive black rows that are at most `max_thickness`px thickness
+        max_thickness *= scaling_factor
         black_lines = []
         line_start = None
         for i, is_black in enumerate(is_black_row):
@@ -737,7 +741,7 @@ class Page:
                     black_lines.append((i + line_start) / 2)  # Midpoint of the line
                 line_start = None
 
-        # Edge case for the strip being at the bottom. Should never happen but just in case
+        # Edge case for the line being at the bottom of `clip`. Shouldn't happen but just in case
         if line_start is not None and len(is_black_row) - line_start <= max_thickness:
             black_lines.append((line_start + len(is_black_row)) / 2)
 

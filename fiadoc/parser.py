@@ -150,19 +150,24 @@ class BaseParser:
         arr = np.ndarray([pixmap.h, pixmap.w, 3], dtype=np.uint8, buffer=pixmap.samples)
         del pixmap
 
-        # Drop rows with almost all black pixels (those are lines not text). After this step, all
-        # black pixels should be texts only
+        # Drop rows and cols. with almost all black pixels (those are lines not text). After this
+        # step, all black pixels should be texts only
         """
         As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
         (184 or 232), use RGB = 128 as a cutoff for "black"
         """
         arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]
+        arr = arr[:, np.mean(arr < 128, axis=(0, 2)) < min_black_line_length]
 
         # Mask text with rectangles, i.e. label connected components
         labelled, n_features = label(arr < 128)  # noqa: PLR2004
         if n_features == 0:
             return []
         slices = sorted(find_objects(labelled), key=lambda x: x[1].start)
+
+        # Visualise the detected slices
+        # for s in merged_slices:
+        #     arr[s[0], s[1]] = [0, 0, 0]
 
         # Merge the rectangles/slices that are close to each other
         """
@@ -869,6 +874,8 @@ class RaceParser(BaseParser):
         classification = []
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)
+            if '.pdf' in page.get_text():  # Fix #59
+                continue
             classification = page.search_for('Final Classification')
             if classification:
                 break
@@ -1727,7 +1734,7 @@ class QualifyingParser(BaseParser):
 
     @cached_property
     def lap_times_df(self) -> pd.DataFrame:
-        if self.is_pdf_complete is False:
+        if not self.is_pdf_complete:
             warnings.warn('Lap times PDF is missing. Can get fastest laps only from the '
                           'classification PDF')
             df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[]),
@@ -1745,342 +1752,203 @@ class QualifyingParser(BaseParser):
                              f'Valid sessions are: {get_args(QualiSessionT)}"')
         return
 
-    def _search_for_table_bottom(self, page: Page, y: float) -> tuple[float, bool]:
-        """y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first
-
-        The quali. classification table's bottom is above "NOT CLASSIDIED" or "POLE POSITION". Some
-        PDFs may not have these texts. In these cases, we use the long black thick horizontal line
-        to determine the bottom of the table
-
-        :param page: Page
-        :param y: y-coord. of the top of the table. The search will start 50px below this coord.
-        :return: (y-coord. of the bottom of the table, whether "NOT CLASSIFIED - " is found)
-        """
-        # Whether we have a table for not classified drivers
-        bottom = page.search_for('NOT CLASSIFIED - ')
-        if bottom:
-            return bottom[0].y0, True
-
-        # If code reaches here, then there is no "NOT CLASSIFIED - ". Check for "POLE POSITION LAP"
-        bottom = page.search_for('POLE POSITION LAP')
-        if bottom:
-            return bottom[0].y0, False
-
-        # If still nothing is found, then we have to use the thick horizontal line to determine the
-        # table bottom. We first try to find lines as vector graphics
-        w = page.bound()[2]
-        lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
-        lines = [i for i in lines
-                 if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
-                 and i['width'] is not None
-                 and np.isclose(i['width'], 1, rtol=0.1)
-                 and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
-        if lines:
-            lines.sort(key=lambda x: x['rect'].y0)
-            return lines[0]['rect'].y0, False
-
-        # If no vector graphics lines are found, then find lines as pure image in the pixel map: a
-        # wide horizontal white strip with 10+ px height
-        pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
-        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples_mv)
-        is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
-        white_strips = []
-        strip_start = None
-        for i, is_white in enumerate(is_white_row):
-            if is_white and strip_start is None:
-                strip_start = i
-            elif not is_white and strip_start is not None:
-                if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows/px of white
-                    white_strips.append(strip_start + t)
-                strip_start = None
-        # Edge case for the strip being at the bottom. Shouldn't happen but just in case
-        if strip_start is not None and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT:
-            white_strips.append(strip_start + t)
-        if not white_strips:
-            raise ParsingError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
-                               f'or a thick horizontal line in {self.classification_file}')
-        strip_start = white_strips[0]  # The topmost line is the bottom of the table
-        return strip_start + 1, False  # One pixel buffer
-
     def _parse_classification(self):
         # Find the page with "Qualifying Session Final Classification"
         doc = pymupdf.open(self.classification_file)
-        found = []
+        classification = []
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)
-            found = page.search_for('Final Classification')
-            if found:
+            if '.pdf' in page.get_text():  # Fix #59
+                continue
+            classification = page.search_for('Final Classification')
+            if classification:
                 break
-            found = page.search_for('Provisional Classification')
-            if found:
+            classification = page.search_for('Provisional Classification')
+            if classification:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
-        if not found:
+        if not classification:
             doc.close()  # TODO: check docs. Do we need to manually close it? Memory safe?
             raise ValueError(f'"Final Classification" or "Provisional Classification" not found '
                              f'on any page in {self.classification_file}')
 
-        # Page width. This is the rightmost x-coord. of the table
-        w = page.bound()[2]
+        # Bottom of "Final Classification"
+        b_classification = classification[0].y1 + 1
 
-        # y-position of "Final Classification", which is the topmost y-coord. of the table
-        y = found[0].y1
-
-        # y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first. This
-        # is the bottom of the classification table. Some PDFs may not have these texts. In these
-        # cases, we use the long black thick horizontal line to determine the bottom of the table
-        has_not_classified = False
-        bottom = page.search_for('NOT CLASSIFIED - ')
-        if bottom:
-            has_not_classified = True
+        # First black horizontal line below "Final Classification"
+        if black_line := page.search_for_black_line(clip=(0, b_classification, page.w, page.h)):
+            t_table_body = black_line[0]
         else:
-            bottom = page.search_for('POLE POSITION LAP')
-        if not bottom:
-            lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
-            lines = [i for i in lines
-                     if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
-                     and i['width'] is not None
-                     and np.isclose(i['width'], 1, rtol=0.1)
-                     and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
-            if not lines:
-                # Go though the pixel map and find a wide horizontal white strip with 10+ px height
-                pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
-                l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-                is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
-                white_strips = []
-                strip_start = None
-                for i, is_white in enumerate(is_white_row):
-                    if is_white and strip_start is None:
-                        strip_start = i
-                    elif not is_white and strip_start is not None:
-                        if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows of white
-                            white_strips.append(strip_start + t)
-                        strip_start = None
-                # If the strip is at the bottom. Shouldn't happen but just in case
-                if (strip_start is not None
-                        and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
-                    white_strips.append(strip_start + t)
-                if not white_strips:
-                    raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
-                                     f'or a thick horizontal line in {self.classification_file}')
-                strip_start = white_strips[0]  # The topmost one is the bottom of the table
-                bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
-            else:
-                lines.sort(key=lambda x: x['rect'].y0)
-                bottom = [lines[0]['rect']]
-        b = bottom[0].y0
-
-        # Get the location of cols.
-        """
-        The default `page.find_tables` was working fine until Antonelli. His full name is long, so
-        that the horizontal gap between the driver name col. and nationality col. in his row is
-        narrow. This breaks the automatic col. detection of pymupdf. Therefore, we need to manually
-        specify the vertical lines separating cols.
-        """
-        no = page.search_for('NO', clip=(0, y, w, b))
-        if not no:
-            raise ParsingError(f'Cannot find "NO" in table header on page {page.number} in '
+            raise ParsingError(f'Cannot find the black line separating table header and table '
+                               f'body below "Final Classification" on p.{page.number} in '
                                f'{self.classification_file}')
-        no.sort(key=lambda x: (x.y0, x.x0))  # The most top left "NO" under "Final Classification"
-        no = no[0]
-        b_header = no.y1 + 1  # The bottom of the table header row
-        headers = page.get_text('text', clip=(0, y, w, b_header))  # Col. headers/names
-        if not headers:
-            raise ParsingError(f'Cannot find any text in table header on page {page.number} '
+
+        # Get text height of the table header row
+        temp = page.get_text('blocks', clip=(0, b_classification, page.w, t_table_body))
+        if not temp:
+            raise ParsingError(f'Cound not find any text in the table header on p.{page.number} '
                                f'in {self.classification_file}')
-        headers = headers.split()
-        cols: dict[str, tuple[float, float]] = {}
-        l = no.x0 - 1
-        q = 1
-        for col_name in headers:
-            col = page.search_for(col_name, clip=(l, y, w, b_header))
-            # These col. names are unique
-            if col_name not in ['LAPS', 'TIME']:
-                assert len(col) == 1, (f'Expected exactly one "{col_name}" in the header row in '
-                                       f'{self.classification_file}. Found {len(col)}')
-                cols[col_name] = (col[0].x0, col[0].x1)
-            # We will have three "LAPS" and "TIME" for Q1, Q2, and Q3
-            else:
-                assert len(col) == 4 - q, (
-                    f'Expected {4 - q} "{col_name}" in the header row after Q{q} (incl.) in '
-                    f'{self.classification_file}. Found {len(col)}'
-                )
-                col.sort(key=lambda x: x.x0)
-                cols[f'Q{q}_{col_name}'] = (col[0].x0, col[0].x1)
-            # Update the new leftmost x-coord. for the next col. I.e., instead of starting from the
-            # very left of the page, start from the right of the current col.
-            l = col[0].x1
-            # Update the session if necessary
-            if 'Q2' in col_name:  # Captures both "Q2" and "SQ2"
-                q = 2
-            elif 'Q3' in col_name:
-                q = 3
-        for col in ['SQ1', 'SQ2', 'SQ3']:
-            if col in cols:
-                cols[col.replace('SQ', 'Q')] = cols.pop(col)
+        line_height = np.mean([i[3] - i[1] for i in temp])
 
-        # Specify the vertical lines separating the cols.
-        shifter = 1.1 if self.session == 'quali' else 0.8
+        # Find the first white strip below the table header
+        if white_strip:= page.search_for_white_strip(clip=(0, t_table_body, page.w, page.h),
+                                                     height=line_height / 2):
+            b_table = white_strip[0]
+        else:
+            raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
+                               f'{self.classification_file}')
+
+        # Get col. names
+        col_names = self._detect_cols(page,
+                                      clip=(0, b_classification, page.w, t_table_body - 1),
+                                      col_min_gap=2)
+        if not col_names:
+            raise ParsingError(f'Could not detect cols. in the table header on p.{page.number} in '
+                               f'{self.classification_file}')
+        col_names.sort(key=lambda x: x.l)  # Sort cols. from left to right
+        if self.session == 'sprint_quali':  # Always use "Q1", "Q2", and "Q3" for both quali. and
+            for col in col_names:           # sprint quali.
+                if col.text == 'SQ1':
+                    col.text = 'Q1'
+                elif col.text == 'SQ2':
+                    col.text = 'Q2'
+                elif col.text == 'SQ3':
+                    col.text = 'Q3'
+        for col_name in ['LAPS', 'TIME']:  # Add prefix to "LAPS" and "TIME" for each session
+            session = 1
+            for col in col_names:
+                if col.text == col_name:
+                    col.text = f'Q{session}_{col.text}'
+                    session += 1
+        col_names = {i.text: i for i in col_names}
+
+        # Get col. vertical positions
         """
-        We don't have very good ways to detect the left and right boundary for col. "Q2" or "SQ2".
-        Generally, the left of "Q2" shifted to the left by a bit will do the job. We define "a bit"
-        as a fraction of the width of "Q2", so that the page/text size won't affect the detection.
-        Howover, the width of "Q2" and "SQ2" may not be the same, so the shifter will be different.
+        All cols. can easily be located by the left or right boundary of the col. name, except for
+        the boundary between ENTRANT and Q1, Q1_TIME and Q2, and Q2_TIME and Q3. We cannot handle
+        them using `._detect_cols` with the entire table area, because the gaps between cols. are
+        tiny (NAT and ENTRANT are very close), so we need to use small `col_min_gap`. However, a
+        small `col_min_gap` will split some cols. into two (e.g., 1:23.456 into 1: and 23.456).
+        Therefore, we handle these three boundaries separately.
+        
+        ENTRANT and Q1:
+        We look at the table body area between the left of ENTRANT and the left of Q1_LAPS. This
+        area should contain the ENTRANT col. and the Q1 col. only. Between them is some sizable
+        gap. We can use the gap as the boundary between the two cols.
+        
+        Q1_TIME and Q2, and Q2_TIME and Q3:
+        There is a vertical thin line between them. The line is super thin so we need to use higher
+        DPI (bigger `scaling_factor`) to detect it.
         """
+        # Boundary between ENTRANT and Q1
+        cols = self._detect_cols(
+            page,
+            clip=(
+                col_names['ENTRANT'].bbox[0] - 1,
+                t_table_body + 1,
+                col_names['Q1_LAPS'].bbox[0],
+                b_table + 1
+            ),
+            col_min_gap=5
+        )
+        if not (len(cols) == 2 and re.match(r'[\d:\n.]+', cols[1].text)):
+            raise ParsingError(f'Could not locate the boundary between ENTRANT and Q1 on '
+                               f'p.{page.number} in {self.classification_file}: {cols}')
+        sep_entrant_q1 = (cols[0].r + cols[1].l) / 2
+        # Boundary between Q1_TIME and Q2
+        page.set_rotation(90)
+        black_line = page.search_for_black_line(
+            clip=(page.h - b_table,
+                col_names['Q1_TIME'].r,
+                page.h - t_table_body,
+                col_names['Q2'].l
+            ),
+            scaling_factor=16
+        )
+        if len(black_line) != 1:
+            raise ParsingError(f'Could not locate the boundary between Q1_TIME and Q2 on '
+                               f'p.{page.number} in {self.classification_file}: {black_line}')
+        sep_q1time_q2 = black_line[0]
+        # Boundary between Q2_TIME and Q3
+        black_line = page.search_for_black_line(
+            clip=(
+                page.h - b_table,
+                col_names['Q2_TIME'].r,
+                page.h - t_table_body,
+                col_names['Q3'].l
+            ),
+            scaling_factor=16
+        )
+        if len(black_line) != 1:
+            raise ParsingError(f'Could not locate the boundary between Q2_TIME and Q3 on '
+                               f'p.{page.number} in {self.classification_file}: {black_line}')
+        sep_q2time_q3 = black_line[0]
+        page.set_rotation(0)
+        # All col. positions
         vlines = [
-            0,                                                        # Left of the page
-            cols['NO'][0] - 1,                                        # Left of "NO"
-            (cols['NO'][1] + cols['DRIVER'][0]) / 2,                  # Between "NO" and "DRIVER"
-            cols['NAT'][0] - 1,                                       # Left of "NAT"
-            (cols['NAT'][1] + cols['ENTRANT'][0]) / 2,                # Between "NAT" and "ENTRANT"
-            (1 + shifter) * cols['Q1'][0] - shifter * cols['Q1'][1],  # See notes above
-            cols['Q1_LAPS'][0],                                       # Left of "Q1_LAPS"
-            cols['Q1_LAPS'][1],                                       # Right of "Q1_LAPS"
-            (1 + shifter) * cols['Q2'][0] - shifter * cols['Q2'][1],
-            cols['Q2_LAPS'][0],                                       # Left of "Q2_LAPS"
-            cols['Q2_LAPS'][1],                                       # Right of "Q2_LAPS"
-            (1 + shifter) * cols['Q3'][0] - shifter * cols['Q3'][1],
-            cols['Q3_LAPS'][0],                                       # Left of "Q3_LAPS"
-            cols['Q3_LAPS'][1],                                       # Right of "Q3_LAPS"
-            w                                                         # Right of the page
+            0,
+            col_names['NO'].l - 1,
+            (col_names['NO'].r + col_names['DRIVER'].l) / 2,
+            col_names['NAT'].l - 1,
+            (col_names['NAT'].r + col_names['ENTRANT'].l) / 2,
+            sep_entrant_q1,
+            col_names['Q1_LAPS'].l,
+            col_names['Q1_LAPS'].r,
+            sep_q1time_q2,
+            col_names['Q2_LAPS'].l,
+            col_names['Q2_LAPS'].r,
+            sep_q2time_q3,
+            col_names['Q3_LAPS'].l,
+            col_names['Q3_LAPS'].r,
+            page.w
         ]
-        if '%' in headers:  # Some PDFs may have one additional col. for Q1 cutoff percentage
-            vlines.insert(headers.index('%') + 2,
-                          1.4 * cols['Q1_TIME'][0] - 0.4 * cols['Q1_TIME'][1])
 
-        # Get the row positions. The rows are coloured in grey, white, grey, white, ... So we just
-        # need to get the top and bottom positions of the grey rectangles
-        rects = []
-        for i in page.get_drawings_in_bbox(bbox=(0, b_header - 2, w, b)):
-            if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
-                rects.append(i['rect'].y0 + 1)
-                rects.append(i['rect'].y1 - 1)
-        rects.sort()
-        hlines: list[float] = [y, b_header]
-        for i in rects:
-            if i - hlines[-1] > LINE_MIN_VGAP:
-                hlines.append(i)
-        if b - hlines[-1] > LINE_MIN_VGAP:
-            hlines.append(b)
+        # Row positions
+        hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, page.w, b_table),
+                                                 min_height=line_height - 1)
 
         # Get the table
-        df = self._parse_table_by_grid(
-            file=self.classification_file,
-            page=page,
-            vlines=vlines,
-            hlines=hlines,
-            header_included=True
-        )
-        df.columns.to_numpy()[0] = 'position'  # Zero-th col. has no col. name in PDF, so name it
-
-        # Clean up column name, e.g. "TIME" -> "Q2_TIME"
-        """
-        We name the sessions as "Q1", "Q2", and "Q3", regardless of whether it's a normal
-        qualifying or a sprint qualifying. This makes the code simpler, and we should always use
-        `self.session` to determine what session it is.
-        """
-        cols = df.columns.tolist()
-        headers = [i.replace('SQ', 'Q') if i.startswith('SQ') else i for i in cols]
-        i = headers.index('Q1') + 1  # TODO: rewrite this. I myself don't understand now...
-        for q in [1, 2, 3]:
-            while i < len(headers) and headers[i] != f'Q{q + 1}':
-                if headers[i] != f'Q{q}':
-                    headers[i] = f'Q{q}_{headers[i]}'  # E.g., "TIME" --> "Q2_TIME"
-                i += 1
-        df.columns = headers
+        df = self._parse_table_by_grid(page, vlines=vlines, hlines=hlines, header_included=False)
+        df.columns = ['position'] + [i for i in col_names.keys()]
         df['finishing_status'] = 0
         df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
-        df = df[(df.position != '') & df.position.notna()]
         df['is_classified'] = True
 
-        # Do the same for the "NOT CLASSIFIED" table
-        if has_not_classified:
-            # Locate the bottom of the table
-            # TODO: refactor this. This is a copy of the above code
-            """
-            The bottom of "NOT CLASSIFIED" table is usually "POLE POSITION LAP", but some PDFs do
-            not have it, e.g. 2023 Australian. For these PDFs, we use a thick horizontal line,
-            which is the top of "POLE POSITION LAP" table, as the bottom of the "NOT CLASSIFIED"
-            table.
-            """
-            bottom = page.search_for('POLE POSITION LAP')
-            if not bottom:
-                lines = page.get_drawings_in_bbox((0, hlines[-1], w, page.bound()[3]))
-                lines = [i for i in lines
-                         if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
-                         and i['width'] is not None
-                         and np.isclose(i['width'], 1, rtol=0.1)
-                         and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
-                if not lines:
-                    # Go through the pixmap and find a wide white strip with 10+ px height
-                    pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
-                    l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                    pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-                    is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
-                    white_strips = []
-                    strip_start = None
-                    for i, is_white in enumerate(is_white_row):
-                        if is_white and strip_start is None:
-                            strip_start = i
-                        elif not is_white and strip_start is not None:
-                            if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:
-                                white_strips.append(strip_start + t)
-                            strip_start = None
-                    # If the strip is at the bottom. Shouldn't happen but just in case
-                    if (strip_start is not None
-                            and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
-                        white_strips.append(strip_start + t)
-                    if not white_strips:
-                        raise ValueError(
-                            f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a '
-                            f'thick horizontal line in {self.classification_file}'
-                        )
-                    strip_start = white_strips[0]  # The topmost one is the bottom of the table
-                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # 1px buffer
-                else:
-                    lines.sort(key=lambda x: x['rect'].y0)
-                    bottom = [lines[0]['rect']]
-            b = bottom[0].y0
-
-            # Use grey and white rectangles to determine the rows again
-            t = page.search_for('NOT CLASSIFIED - ')[0].y1
-            rects = []
-            for i in page.get_drawings_in_bbox(bbox=(0, t, w, b)):
-                if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
-                    rects.append(i['rect'].y0 + 1)
-                    rects.append(i['rect'].y1 - 1)
-            rects.sort()
-            hlines = [t + 1]
-            for i in rects:
-                if i - hlines[-1] > LINE_MIN_VGAP:
-                    hlines.append(i)
-            if b - hlines[-1] > LINE_MIN_VGAP:
-                hlines.append(b)
-            not_classified = self._parse_table_by_grid(
-                file=self.classification_file,
-                page=page,
-                vlines=vlines,
-                hlines=hlines,
-                header_included=False
-            )
-            not_classified['finishing_status'] = 11  # TODO: should clean up the code later
-            not_classified.columns = df.columns.drop(['original_order', 'is_classified'])
-            not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isna()]
+        # Parse "NOT CLASSIFIED" table, if any
+        if not_classified := page.search_for('NOT CLASSIFIED', clip=(0, b_table, page.w, page.h)):
+            t_table_body = not_classified[0].y1
+            if white_strip:= page.search_for_white_strip(clip=(0, t_table_body, page.w, page.h),
+                                                         height=line_height / 2):
+                b_table = white_strip[0]
+            else:
+                raise ParsingError(
+                    f'Could not find the bottom of "NOT CLASSIFIED" table by white strip on '
+                    f'p.{page.number} in {self.classification_file}'
+                )
+            hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, page.w, b_table),
+                                                     min_height=line_height - 1)
+            not_classified = self._parse_table_by_grid(page, vlines=vlines, hlines=hlines,
+                                                       header_included=False)
+            not_classified.columns = df.columns.drop(['finishing_status', 'original_order',
+                                                      'is_classified'])
+            not_classified.position = None  # No finishing position for unclassified drivers
             n = len(df)
             not_classified['original_order'] = range(n + 1, n + len(not_classified) + 1)
+            not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified['is_classified'] = False
-            df = pd.concat([df, not_classified], ignore_index=True)
+        else:
+            not_classified = pd.DataFrame(columns=df.columns)
+        df = pd.concat([df, not_classified], ignore_index=True)
+
         """
         `is_classified` here is simply a flag to indicate whether the driver belongs to the "NOT
-        CLASSIFIED" table. It doesn't mean a driver is classified or not. Basically everyone in
-        "NOT CLASSIFIED" table is not classified, and in addition, those who receive DSQ or DNQ are
-        not classified either.
+        CLASSIFIED" table. It doesn't mean a driver is classified or not in F1 sense.. Basically
+        everyone in "NOT CLASSIFIED" table is not classified, and in addition, those in the main
+        table who receive DSQ or DNQ are not classified either.
         """
 
-        # Fill in the position for DNF and DSQ drivers. See `QualifyingParser` for details
-        df = df.replace({'': None})
+        # Fill in the position for DNF and DSQ drivers
+        # TODO: check this
         df.loc[df.position.isin(['DQ', 'DSQ']), 'finishing_status'] = 20
         df.loc[df.position != 'DQ', 'temp'] = df.position
         df.temp = df.temp.astype(float)
@@ -2094,7 +1962,6 @@ class QualifyingParser(BaseParser):
         # Clean up
         df.NO = df.NO.astype(int)
         del df['NAT']
-        df = df.replace('', None)
         df.position = df.position.astype(int)
 
         # Overwrite `.to_json()` and `.to_pkl()` methods
