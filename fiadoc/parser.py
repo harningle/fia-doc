@@ -1626,50 +1626,30 @@ class QualifyingParser(BaseParser):
         # y-position of "Final Classification", which is the topmost y-coord. of the table
         y = found[0].y1
 
-        # y-position of "NOT CLASSIFIED - " or "POLE POSITION LAP", whichever comes the first. This
-        # is the bottom of the classification table. Some PDFs may not have these texts. In these
-        # cases, we use the long black thick horizontal line to determine the bottom of the table
-        has_not_classified = False
-        bottom = page.search_for('NOT CLASSIFIED - ')
-        if bottom:
-            has_not_classified = True
-        else:
-            bottom = page.search_for('POLE POSITION LAP')
-        if not bottom:
-            lines = page.get_drawings_in_bbox((0, y + 50, w, page.bound()[3]))
-            lines = [i for i in lines
-                     if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
-                     and i['width'] is not None
-                     and np.isclose(i['width'], 1, rtol=0.1)
-                     and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
-            if not lines:
-                # Go though the pixel map and find a wide horizontal white strip with 10+ px height
-                pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
-                l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-                is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
-                white_strips = []
-                strip_start = None
-                for i, is_white in enumerate(is_white_row):
-                    if is_white and strip_start is None:
-                        strip_start = i
-                    elif not is_white and strip_start is not None:
-                        if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows of white
-                            white_strips.append(strip_start + t)
-                        strip_start = None
-                # If the strip is at the bottom. Shouldn't happen but just in case
-                if (strip_start is not None
-                        and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
+        # We use the white strip to determine the bottom of the table
+        # Go though the pixel map and find a wide horizontal white strip with 10+ px height
+        pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
+        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
+        is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
+        white_strips = []
+        strip_start = None
+        for i, is_white in enumerate(is_white_row):
+            if is_white and strip_start is None:
+                strip_start = i
+            elif not is_white and strip_start is not None:
+                if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows of white
                     white_strips.append(strip_start + t)
-                if not white_strips:
-                    raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
-                                     f'or a thick horizontal line in {self.classification_file}')
-                strip_start = white_strips[0]  # The topmost one is the bottom of the table
-                bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # One pixel buffer
-            else:
-                lines.sort(key=lambda x: x['rect'].y0)
-                bottom = [lines[0]['rect']]
-        b = bottom[0].y0
+                strip_start = None
+        # If the strip is at the bottom. Shouldn't happen but just in case
+        if (strip_start is not None
+                and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
+            white_strips.append(strip_start + t)
+        if not white_strips:
+            raise ValueError(f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" '
+                             f'or a thick horizontal line in {self.classification_file}')
+        strip_start = white_strips[0]  # The topmost one is the bottom of the table
+        b = strip_start + 1
 
         # Get the location of cols.
         """
@@ -1788,53 +1768,34 @@ class QualifyingParser(BaseParser):
         df['is_classified'] = True
 
         # Do the same for the "NOT CLASSIFIED" table
-        if has_not_classified:
+        not_classified = page.search_for('NOT CLASSIFIED - ')
+        if not_classified:
             # Locate the bottom of the table
             # TODO: refactor this. This is a copy of the above code
-            """
-            The bottom of "NOT CLASSIFIED" table is usually "POLE POSITION LAP", but some PDFs do
-            not have it, e.g. 2023 Australian. For these PDFs, we use a thick horizontal line,
-            which is the top of "POLE POSITION LAP" table, as the bottom of the "NOT CLASSIFIED"
-            table.
-            """
-            bottom = page.search_for('POLE POSITION LAP')
-            if not bottom:
-                lines = page.get_drawings_in_bbox((0, hlines[-1], w, page.bound()[3]))
-                lines = [i for i in lines
-                         if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
-                         and i['width'] is not None
-                         and np.isclose(i['width'], 1, rtol=0.1)
-                         and i['rect'].x1 - i['rect'].x0 > 0.8 * w]
-                if not lines:
-                    # Go through the pixmap and find a wide white strip with 10+ px height
-                    pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
-                    l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-                    pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-                    is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
-                    white_strips = []
-                    strip_start = None
-                    for i, is_white in enumerate(is_white_row):
-                        if is_white and strip_start is None:
-                            strip_start = i
-                        elif not is_white and strip_start is not None:
-                            if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:
-                                white_strips.append(strip_start + t)
-                            strip_start = None
-                    # If the strip is at the bottom. Shouldn't happen but just in case
-                    if (strip_start is not None
-                            and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
+            # Go through the pixmap and find a wide white strip with 10+ px height
+            pixmap = page.get_pixmap(clip=(0, not_classified[0].y1 + 1, w, page.bound()[3]))
+            l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+            pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
+            is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
+            white_strips = []
+            strip_start = None
+            for i, is_white in enumerate(is_white_row):
+                if is_white and strip_start is None:
+                    strip_start = i
+                elif not is_white and strip_start is not None:
+                    if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:
                         white_strips.append(strip_start + t)
-                    if not white_strips:
-                        raise ValueError(
-                            f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a '
-                            f'thick horizontal line in {self.classification_file}'
-                        )
-                    strip_start = white_strips[0]  # The topmost one is the bottom of the table
-                    bottom = [pymupdf.Rect(l, strip_start + 1, r, strip_start + 2)]  # 1px buffer
-                else:
-                    lines.sort(key=lambda x: x['rect'].y0)
-                    bottom = [lines[0]['rect']]
-            b = bottom[0].y0
+                    strip_start = None
+            # If the strip is at the bottom. Shouldn't happen but just in case
+            if (strip_start is not None
+                    and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
+                white_strips.append(strip_start + t)
+            if not white_strips:
+                raise ValueError(
+                    f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a '
+                    f'thick horizontal line in {self.classification_file}'
+                )
+            b = white_strips[0] + 1 # The topmost one is the bottom of the table
 
             # Use grey and white rectangles to determine the rows again
             t = page.search_for('NOT CLASSIFIED - ')[0].y1
@@ -1857,8 +1818,6 @@ class QualifyingParser(BaseParser):
                 hlines=hlines,
                 header_included=False
             )
-            print(not_classified)
-            print(df.columns.drop(['original_order', 'is_classified']))
             not_classified['finishing_status'] = 11  # TODO: should clean up the code later
             not_classified.columns = df.columns.drop(['original_order', 'is_classified'])
             not_classified = not_classified[(not_classified.NO != '') | not_classified.NO.isna()]
@@ -1872,6 +1831,71 @@ class QualifyingParser(BaseParser):
         "NOT CLASSIFIED" table is not classified, and in addition, those who receive DSQ or DNQ are
         not classified either.
         """
+
+        # Do the same for "DISQUALIFIED" table
+        disqualified = page.search_for('DISQUALIFIED')
+        if disqualified:
+            """
+            There can be multiple "DISQUALIFIED" text. E.g., in the penalty notes, we may have
+            "DISQUALIFIED", and we may have "DISQUALIFIED" as the table title. The table title
+            should be horizontally centred on the page, so we do the following check.
+            """
+            disqualified.sort(key=lambda x: x.y0)  # The topmost "DISQUALIFIED"
+            disqualified = disqualified[0]
+            if np.isclose((disqualified.x0 + disqualified.x1) / 2, w / 2, rtol=0.1):
+                # Go through the pixmap and find a wide white strip with 10+ px height
+                pixmap = page.get_pixmap(clip=(0, disqualified.y1 + 1, w, page.bound()[3]))
+                l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
+                is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
+                white_strips = []
+                strip_start = None
+                for i, is_white in enumerate(is_white_row):
+                    if is_white and strip_start is None:
+                        strip_start = i
+                    elif not is_white and strip_start is not None:
+                        if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:
+                            white_strips.append(strip_start + t)
+                        strip_start = None
+                # If the strip is at the bottom. Shouldn't happen but just in case
+                if (strip_start is not None
+                        and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
+                    white_strips.append(strip_start + t)
+                if not white_strips:
+                    raise ValueError(
+                        f'Could not find "NOT CLASSIFIED - " or "POLE POSITION LAP" or a '
+                        f'thick horizontal line in {self.classification_file}'
+                    )
+                b = white_strips[0] + 1 # The topmost one is the bottom of the table
+
+                # Use grey and white rectangles to determine the rows again
+                t = page.search_for('DISQUALIFIED')[0].y1
+                rects = []
+                for i in page.get_drawings_in_bbox(bbox=(0, t, w, b)):
+                    if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                        rects.append(i['rect'].y0 + 1)
+                        rects.append(i['rect'].y1 - 1)
+                rects.sort()
+                hlines = [t + 1]
+                for i in rects:
+                    if i - hlines[-1] > LINE_MIN_VGAP:
+                        hlines.append(i)
+                if b - hlines[-1] > LINE_MIN_VGAP:
+                    hlines.append(b)
+                disqualified = self._parse_table_by_grid(
+                    file=self.classification_file,
+                    page=page,
+                    vlines=vlines,
+                    hlines=hlines,
+                    header_included=False
+                )
+                disqualified['finishing_status'] = 20  # TODO: should clean up the code later
+                disqualified.columns = df.columns.drop(['original_order', 'is_classified'])
+                disqualified = disqualified[(disqualified.NO != '') | disqualified.NO.isna()]
+                n = len(df)
+                disqualified['original_order'] = range(n + 1, n + len(disqualified) + 1)
+                disqualified['is_classified'] = False
+                df = pd.concat([df, disqualified], ignore_index=True)
 
         # Fill in the position for DNF and DSQ drivers. See `QualifyingParser` for details
         df = df.replace({'': None})
