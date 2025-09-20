@@ -163,6 +163,17 @@ race_list = [
         '2025_7_quali_classification.json',
         '2025_7_quali_lap_times_fallback.json',
         nullcontext()
+    ),
+    (
+        # Has DISQUALIFIED table (#61)
+        'https://www.fia.com/system/files/decision-document/2025_azerbaijan_grand_prix_-_final_qualifying_classification.pdf',
+        '2025_17_aze_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2025,
+        17,
+        'quali',
+        '2025_17_quali_classification.json',
+        '2025_17_quali_lap_times.json',
+        nullcontext()
     )
 ]
 
