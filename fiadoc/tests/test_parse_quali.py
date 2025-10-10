@@ -43,7 +43,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # DNF drivers in quali.
+        # DNF drivers in sprint quali.
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionprovisionalclassification_v01.pdf',
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -88,7 +88,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Text is image in the PDF...
+        # Text is image in classification PDF
         'https://www.fia.com/system/files/decision-document/2025_australian_grand_prix_-_final_qualifying_classification.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2025,

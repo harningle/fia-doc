@@ -55,7 +55,7 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-line-length = 99
+line-length = 100
 exclude = [
   "fiadoc/tests",
   "parse_event_note.py",

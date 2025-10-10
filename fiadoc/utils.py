@@ -1,6 +1,8 @@
 import os
 import re
 import tempfile
+import warnings
+
 # import uuid
 from functools import cached_property
 from pathlib import Path
@@ -8,15 +10,14 @@ from string import printable
 from types import SimpleNamespace
 from typing import Literal, Optional
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from paddleocr import PaddleOCR
 import pandas as pd
 import pymupdf
 import requests
-# from PIL import Image
+from paddleocr import PaddleOCR
 
+# from PIL import Image
 from .models.foreign_key import SessionEntryForeignKeys
 from .models.lap import LapImport, LapObject
 
@@ -225,59 +226,61 @@ class Page:
                        and i[2] < clip[2] + tol and i[3] < clip[3] + tol]
             return results
 
-        # def get_text(
-        #         option: str,
-        #         clip: Optional[tuple[float, float, float, float]] = None,
-        #         tol: float = 2
-        # ) -> str | list | dict:
-        #     """`pymupdf.Page.get_text` equivalent for the OCR results
-        #
-        #     TODO: this won't work for "partial get". That is, if "Lewis Hamilton" occupies the bbox
-        #           (10, 10, 50, 50), and we only want the text in (20, 10, 50, 50), we should get
-        #           "Hamilton". But the current implementation will return nothing, as the current
-        #           bbox is for the entire text and we don't know the coords. of part of the text.
-        #
-        #     :param option: The `option` parameter in `pymupdf.Page.get_text`. Only support "text",
-        #                    "words", "blocks", or "dict"
-        #     :param clip: (x0, y0, x1, y1). If provided, only return text in this area
-        #     :param tol: Tolerance in pixels. Only if a text is inside the clip area with `tol` px
-        #                 margin, it will be included in the results. Default is 2 px
-        #     :return: The text in the specified format, depending on `option`
-        #     """
-        #     if clip is None:
-        #         clip = (-1, -1, self._pymupdf_page.bound()[2] + 1,
-        #                 self._pymupdf_page.bound()[3] + 1)
-        #
-        #     results = []
-        #     for result in ocred_page:
-        #         bbox = tuple(result[:4])
-        #         if bbox[0] > clip[0] - tol and bbox[1] > clip[1] - tol \
-        #                 and bbox[2] < clip[2] + tol and bbox[3] < clip[3] + tol:
-        #             if option == 'text':
-        #                 results.append(result[4])
-        #             elif option == 'words':
-        #                 results.append((bbox[0], bbox[1], bbox[2], bbox[3], result[4]))
-        #             elif option == 'blocks':
-        #                 results.append((bbox[0], bbox[1], bbox[2], bbox[3], result[4], -1, -1))
-        #             elif option == 'dict':
-        #                 results.append({
-        #                     'blocks': [{
-        #                         'bbox': clip,
-        #                         'lines': [{
-        #                             'bbox': clip,
-        #                             'spans': [{
-        #                                 'bbox': clip,
-        #                                 'text': result[4]
-        #                             }]
-        #                         }]
-        #                     }]
-        #                 })
-        #             else:
-        #                 raise ValueError(f'`option` must be one of "text", "words", "blocks", or '
-        #                                  f'"dict" if using OCR. Got "{option}"')
-        #     if not results:
-        #         return '' if option == 'text' else []
-        #     return results
+        '''
+        def get_text(
+                option: str,
+                clip: Optional[tuple[float, float, float, float]] = None,
+                tol: float = 2
+        ) -> str | list | dict:
+            """`pymupdf.Page.get_text` equivalent for the OCR results
+
+            TODO: this won't work for "partial get". That is, if "Lewis Hamilton" occupies the bbox
+                  (10, 10, 50, 50), and we only want the text in (20, 10, 50, 50), we should get
+                  "Hamilton". But the current implementation will return nothing, as the current
+                  bbox is for the entire text and we don't know the coords. of part of the text.
+
+            :param option: The `option` parameter in `pymupdf.Page.get_text`. Only support "text",
+                           "words", "blocks", or "dict"
+            :param clip: (x0, y0, x1, y1). If provided, only return text in this area
+            :param tol: Tolerance in pixels. Only if a text is inside the clip area with `tol` px
+                        margin, it will be included in the results. Default is 2 px
+            :return: The text in the specified format, depending on `option`
+            """
+            if clip is None:
+                clip = (-1, -1, self._pymupdf_page.bound()[2] + 1,
+                        self._pymupdf_page.bound()[3] + 1)
+
+            results = []
+            for result in ocred_page:
+                bbox = tuple(result[:4])
+                if bbox[0] > clip[0] - tol and bbox[1] > clip[1] - tol \
+                        and bbox[2] < clip[2] + tol and bbox[3] < clip[3] + tol:
+                    if option == 'text':
+                        results.append(result[4])
+                    elif option == 'words':
+                        results.append((bbox[0], bbox[1], bbox[2], bbox[3], result[4]))
+                    elif option == 'blocks':
+                        results.append((bbox[0], bbox[1], bbox[2], bbox[3], result[4], -1, -1))
+                    elif option == 'dict':
+                        results.append({
+                            'blocks': [{
+                                'bbox': clip,
+                                'lines': [{
+                                    'bbox': clip,
+                                    'spans': [{
+                                        'bbox': clip,
+                                        'text': result[4]
+                                    }]
+                                }]
+                            }]
+                        })
+                    else:
+                        raise ValueError(f'`option` must be one of "text", "words", "blocks", or '
+                                         f'"dict" if using OCR. Got "{option}"')
+            if not results:
+                return '' if option == 'text' else []
+            return results
+        '''
 
         return SimpleNamespace(
             search_for=search_for,
@@ -387,6 +390,7 @@ class Page:
             self,
             option: str = 'text',
             clip: Optional[tuple[float, float, float, float]] = None,
+            small_area: bool = False,
             expected: Optional[re.Pattern] = None,
             **kwargs
     ) -> str | list | dict:
@@ -401,6 +405,11 @@ class Page:
         :param option: When `clip` is specified, `option` can only be "text", "words", "blocks", or
                        "dict". Otherwise, it can be any valid `option` in `pymupdf.Page.get_text`.
         :param clip: (x0, y0, x1, y1)
+        :param small_area: If True, we assume `clip` is a small area (e.g. a table cell). When OCR
+                           is on, and it's a small area, whatever results we get are joined into
+                           one single text block. This makes sure "George Russell" won't be split
+                           into "George" and "Russell". When OCR is off, this parameter has no
+                           effect. Default is False
         :param expected: If provided, only texts that match this regex will be returned. Default is
                          return everything w/o filtering. E.g., when we extract texts in the lap
                          time col., we want `expected` to be `re.compile(r'\d+:\d+\.\d+')`.
@@ -408,7 +417,7 @@ class Page:
         :return: Same type as the return of `pymupdf.Page.get_text`
         """
         def _return_empty() -> str | list | dict:
-            """Helper function to return empty results"""
+            """Helper function to return empty results with the appropriate type"""
             match option:
                 case 'text':
                     return ''
@@ -443,7 +452,9 @@ class Page:
         if not _result_is_empty(results):
             return results
 
-        # If `clip` is not provided, OCR the whole page and use `search_for`
+        # If `clip` is not provided, OCR the whole page and use `search_for`. We should always
+        # provide `clip` whenever possible, as OCR the whole page would very often mess up the
+        # positioning, e.g. "George Russell" may be OCR-ed as "George" and "Russell", respectively.
         if clip is None:
             results = self.ocred_page.get_text(option, clip)
             results = self._clean_get_text_results(results, option, expected)
@@ -452,10 +463,10 @@ class Page:
             else:
                 return results
 
-        # If we have `clip` and the area is small, only OCR the clipped small area
+        # If we have `clip`, only OCR the clipped small area
         # First check if any black pixels
         """
-        We first check if there are some black pixels (at least 10 pixels with RGB < 50) in the 
+        We first check if there are some black pixels (at least 10 pixels with RGB < 50) in the
         clipped area. If not, return empty immediately. This is because all texts are black(ish).
         We check this for two reasons:
 
@@ -483,7 +494,27 @@ class Page:
 
         # OCR the clipped area
         results = OCR.predict(pixmap_arr)
-        if len(results) == 1:
+        if len(results) != 1:
+            raise OCRError(f'Unexpected OCR results: {results}')
+        elif len(results) == 0:
+            return _return_empty()
+        results = results[0]
+        if small_area:
+            text = ' '.join([i.strip() for i in results['rec_texts']]).strip()
+            if not text:
+                return _return_empty()
+            bbox = (min([i[0] for i in results['rec_boxes']]),
+                    min([i[1] for i in results['rec_boxes']]),
+                    max([i[2] for i in results['rec_boxes']]),
+                    max([i[3] for i in results['rec_boxes']]))
+            results = [TextBlock(
+                text=OCR_ERRORS.get(text, text),
+                bbox=self._transform_bbox(
+                    original_bbox=clip,
+                    new_bbox=(0, 0, pixmap.width, pixmap.height),
+                    bbox=bbox
+                ))]
+        else:
             results = [TextBlock(
                 text=OCR_ERRORS.get(i[1], i[1]),
                 bbox=self._transform_bbox(
@@ -491,16 +522,8 @@ class Page:
                     new_bbox=(0, 0, pixmap.width, pixmap.height),
                     bbox=tuple(i[0])
                 )
-            ) for i in zip(results[0]['rec_boxes'], results[0]['rec_texts'])]
-        else:
-            raise OCRError(f'Unexpected OCR results: {results}')
-        if not results:
-        #     with open(f'training/labelling/statis/{i}.gt.txt', 'w') as f:
-        #         f.write('.\n')
-            _return_empty()
-        # else:
-        #     with open(f'training/labelling/statis/{i}.gt.txt', 'w') as f:
-        #         f.write(text)
+            ) for i in zip(results['rec_boxes'], results['rec_texts'])]
+
         # TODO: finish this regex check
         # if expected and (not re.match(expected, text)):
         #     _return_empty()
@@ -551,6 +574,62 @@ class Page:
                 raise ValueError(f'Native `.get_text` does not find anything. For OCR, `option` '
                                  f'must be one of "text", "words", "blocks", or "dict". Got '
                                  f'"{option}"')
+
+    def has_horizontal_line(
+            self,
+            clip: tuple[float, float, float, float],
+            length: float = 0.5,
+            colour: tuple[int, int, int] = (128, 128, 128),
+            colour_tol: float = 10
+    )-> bool:
+        """Check if there is a long enough horizontal line in the given `clip` area
+
+        This method implicitly requires `clip` to be accurate enough. That is, if `clip` has a
+        width of 100px, then only a horizontal line with a length of at least `length` * 100px will
+        be considered as a horizontal line here. This method is often used to detect the strikeout
+        text.
+
+        TODO: combine with `.search_for_black_line`?
+
+        :param clip: (x0, y0, x1, y1)
+        :param length: The minimum length of the horizontal line as a share of the width of `clip`.
+                       Lines shorter than this are ignored. Default is 0.5, i.e. 50% of the width
+        :param colour: RGB colour of the horizontal line. Default is (128, 128, 128). Quali. lap
+                       times PDFs use this colour. We allow for +/-10 tolerance for each channel
+        :param colour_tol: Tolerance for each channel of the `colour`. Default is 10
+        :return: True if found
+        """
+        # Pixels with the specified colour --> 1; 0 otherwise
+        pixmap = self.get_pixmap(clip=clip, dpi=DPI)
+        pixmap = np.ndarray(
+            [pixmap.height, pixmap.width, 3], dtype=np.uint8, buffer=pixmap.samples
+        ).copy()
+        pixmap = np.all(np.abs(pixmap - colour) <= colour_tol, axis=2)
+
+        # Drop the first 20% and last 20% rows, to avoid table header or bottom lines. These won't
+        # be the horizontal lines we want
+        """
+        E.g., the zero-th row's top may be the line of the table header. When we get the pixmap of
+        this area, this table top line will be included. The line itself is usually black, so won't
+        be detected as a grey horizontal line. However, because above this line is white, and
+        possibly due to anti-aliasing, the pixels just above this line may be light grey. This can
+        lead to false positive detection of horizontal lines. So we drop the first and last 20%
+        rows to avoid this problem.
+        """
+        pixmap = pixmap[int(pixmap.shape[0] * 0.2):int(pixmap.shape[0] * 0.8), :]
+
+        # Check if a row has at least `length` continuous grey pixels
+        min_length = int(pixmap.shape[1] * length)
+        for row in pixmap:
+            count = 0
+            for pixel in row:
+                if pixel:
+                    count += 1
+                    if count >= min_length:
+                        return True
+                else:
+                    count = 0
+        return False
 
     def get_drawings_in_bbox(self, bbox: tuple[float, float, float, float], tol: float = 1) \
             -> list:
@@ -722,7 +801,7 @@ class Page:
         pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
 
         # Find rows with sufficient contiguous black pixels
-        is_black_row = np.mean(pixmap < 50, axis=(1, 2)) > min_length
+        is_black_row = np.mean(pixmap < 50, axis=(1, 2)) > min_length  # noqa: PLR2004
 
         # Sample down to original resolution. If any row is black, then the downsampled row is also
         # treated as black
@@ -827,7 +906,7 @@ class Page:
         min_height = scaling_factor * min_height
 
         # Find all grey/white rows. Grey is usually RGB = 232
-        is_grey_row = np.mean(pixmap < 240, axis=(1, 2)) > min_width
+        is_grey_row = np.mean(pixmap < 240, axis=(1, 2)) > min_width  # noqa: PLR2004
         grey_rows = []
         row_start = None
         for i, is_grey in enumerate(is_grey_row):
@@ -841,20 +920,27 @@ class Page:
             grey_rows.append((row_start, len(is_grey_row)))
 
         # All rows should have roughly the same height
-        row_heights = [grey_rows[i][1] - grey_rows[i][0] for i in range(len(grey_rows))] \
-            + [grey_rows[i][0] - grey_rows[i - 1][1] for i in range(1, len(grey_rows))]
+        row_heights = ([grey_rows[i][1] - grey_rows[i][0] for i in range(len(grey_rows))]
+                       + [grey_rows[i][0] - grey_rows[i - 1][1] for i in range(1, len(grey_rows))])
         row_height = np.mean(row_heights) if row_heights else 0
         if not np.all(np.isclose(row_heights, row_height, rtol=0.1)):
-            raise ParsingError(f'Found rows with different heights on p.{self.number} in '
-                               f'{self.file}. Expected all rows to have similar heights: '
-                               f'{row_heights}')
+            outliers = [i for i in grey_rows if not np.isclose(i[1] - i[0], row_height, rtol=0.2)]
+            for row in outliers:
+                text = self.get_text('text', clip=(l, clip[1] + row[0] / scaling_factor,
+                                                   r, clip[1] + row[1] / scaling_factor))
+                if 'antonelli' in text.lower():  # See e4df38f. Basically sometimes FIA wraps
+                    continue                     # Antonelli's name into two lines, making the row
+                else:                            # taller
+                    raise ParsingError(f'Found rows with different heights on p.{self.number} in '
+                                       f'{self.file}. Expected all rows to have similar heights: '
+                                       f'{row_heights}')
         """
-        We use 10% as "roughly the same". It's actually a very tight tolerance. First, when we get
-        pixmap of the page, it's a matrix. So we will have coords. like (1, 5), not (1.1, 4.9).
-        This creates some rounding error. After scaling (DPI = 600), this error is further
-        amplified. Second, the `clip` may not always be perfect. The true table area may be
-        (0, 10, 100, 500), and what we provide as `clip` may be (0, 12, 100, 500). This may affect
-        the row height of the first and/or the last row. Therefore, 10% is a reasonable tolerance.
+        We use 20% as "roughly the same". It's actually a very tight tolerance. First, when we get
+        pixmap of the page, it's a matrix. So we will have coords./indices like (1, 5), not
+        (1.1, 4.9). This creates some rounding error. After scaling (DPI = 600), this error is
+        further amplified. Second, the `clip` may not always be perfect. The true table area may be
+        (0, 10, 100, 500), and `clip` may be (0, 12, 100.6, 499). This may affect the row height of
+        the first and/or the last row. Therefore, 20% is a reasonable tolerance.
         """
         # Convert the grey rows to the original page coordinates
         grey_rows = [(clip[1] + i[0] / scaling_factor, clip[1] + i[1] / scaling_factor)
@@ -866,20 +952,31 @@ class Page:
 
         # Check if the first row is white. (If it's grey, already captured above)
         # First check if have enough spacing above the first grey row
-        t_first_grey_row = grey_rows[0][0] if grey_rows else clip[1]  # May have zero grey row
+        t_first_grey_row = grey_rows[0][0] if grey_rows else clip[3]  # May have zero grey row
         if t_first_grey_row > clip[1] + row_height * 0.7:
             # Then check if any text in the area above the first grey row
             text = self.get_text('text', clip=(clip[0], clip[1], clip[2], t_first_grey_row))
             if text.strip():
                 # If yes, then it's a white row
-                white_rows.insert(0, (t_first_grey_row - row_height, t_first_grey_row))
+                if row_height:
+                    """
+                    E.g., we only have one row in the table, and it's white. Because there is no
+                    grey row, `row_height` will be default to zero above. In this case, we just use
+                    the top the `clip` as the top of the (and the only) white row.
+                    """
+                    white_rows.insert(0, (t_first_grey_row - row_height, t_first_grey_row))
+                else:
+                    white_rows.insert(0, (clip[1], t_first_grey_row))
 
         # Check if the last row is white, in the same way
-        b_last_grey_row = grey_rows[-1][1] if grey_rows else clip[3]
+        b_last_grey_row = grey_rows[-1][1] if grey_rows else clip[1]
         if b_last_grey_row < clip[3] - row_height * 0.7:
             text = self.get_text('text', clip=(clip[0], b_last_grey_row, clip[2], clip[3]))
             if text.strip():
-                white_rows.append((b_last_grey_row, b_last_grey_row + row_height))
+                if row_height:
+                    white_rows.append((b_last_grey_row, b_last_grey_row + row_height))
+                else:
+                    white_rows.append((b_last_grey_row, clip[3]))
 
         # Get the rows' y-coords.
         temp = sorted([coord for row in grey_rows + white_rows for coord in row])

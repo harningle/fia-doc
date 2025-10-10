@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pymupdf
 from pydantic import ValidationError
-from scipy.ndimage import label, find_objects
+from scipy.ndimage import find_objects, label
 
 from ._constants import QUALI_DRIVERS
 from .models.classification import SessionEntryImport, SessionEntryObject
@@ -20,13 +20,12 @@ from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
 from .utils import (
     DPI,
-    OCRError,
     Page,
     ParsingError,
     TextBlock,
     duration_to_millisecond,
     quali_lap_times_to_json,
-    time_to_timedelta
+    time_to_timedelta,
 )
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -41,7 +40,7 @@ LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less th
 
 
 class BaseParser:
-    """Base class for all parsers here
+    """Base class for all parsers
 
     Provides some common functionality, such as locating the title, parsing tables by grid lines,
     etc. Not meant to be instantiated directly, but rather to be inherited by others.
@@ -84,13 +83,20 @@ class BaseParser:
                 smaller page margin, i.e. text font size or line height are bigger in these PDFs,
                 we need to increase the tolerance. See #33.
                 """
-                cell = page.get_text('blocks', clip=(l, t, r, b))
+                cell = page.get_text('blocks', clip=(l, t, r, b), small_area=True)
                 if cell:
                     # Usually, one cell is one line of text. The only exception is Andrea Kimi
                     # Antonelli. His name is too long and thus (maybe) wrapped into two lines (#42)
                     if len(cell) > 1:
-                        if len(cell) == 2 and cell[0][4].strip() == 'Andrea Kimi':  # noqa: PLR2004
+                        if (len(cell) == 2  # noqa: PLR2004
+                                and ('antonelli' in cell[0][4].lower()
+                                     or 'antonelli' in cell[1][4].lower())):
                             text = cell[0][4].strip() + ' ' + cell[1][4].strip()
+                        else:
+                            raise ValueError(
+                                f'Expected one text block in row {i}, col. {j} on p.{page.number} '
+                                f'in {page.file}. Found {len(cell)}: {cell}'
+                            )
                     elif len(cell) == 1:
                         cell = cell[0]
                         if cell[4].strip():
@@ -136,10 +142,13 @@ class BaseParser:
         4. run OCR on each black rectangle to get the text inside it. And the four corners of the
            rectangle are the bounding box of the text
 
-        :param col_min_gap: Minimum gap between two cols., relative to the width of the thinnest
-                            char. Default is 1.1, i.e. 10% tolerance. If two chars. are
+        :param col_min_gap: Minimum gap between two cols., relative to the width of the median
+                            thinnest char. Default is 1.1, i.e. 10% tolerance. If two chars. are
                             horizontally closer than this gap, they are considered to be in the
-                            same word
+                            same word. We many have extremely thin char., like a dot. So we can't
+                            really base this on such extreme value. From thin to fat, we may have
+                            ".", "I", "a", "W". Usually the width of "a" is a good reference. So we
+                            use the width of the median thinnest char. here
         :param min_black_line_length: Minimum length of a black line, relative to the width of
                                       the `clip` area. Default is 0.9, i.e. 90% of the width of
                                       the `clip` area. Any black horizontal line longer than this
@@ -156,8 +165,8 @@ class BaseParser:
         As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
         (184 or 232), use RGB = 128 as a cutoff for "black"
         """
-        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]
-        arr = arr[:, np.mean(arr < 128, axis=(0, 2)) < min_black_line_length]
+        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]  # noqa: PLR2004
+        arr = arr[:, np.mean(arr < 128, axis=(0, 2)) < min_black_line_length]  # noqa: PLR2004
 
         # Mask text with rectangles, i.e. label connected components
         labelled, n_features = label(arr < 128)  # noqa: PLR2004
@@ -166,36 +175,33 @@ class BaseParser:
         slices = sorted(find_objects(labelled), key=lambda x: x[1].start)
 
         # Visualise the detected slices
-        # for s in merged_slices:
+        # for s in slices:
         #     arr[s[0], s[1]] = [0, 0, 0]
 
         # Merge the rectangles/slices that are close to each other
         """
-        "Close" is defined as smaller than the width of the thinnest char., which is often "I". The
-        gap between two cols. are usually very wide, except "NAT" and "ENTRANT", between which the
-        gap is roughly a normal whitespace. If we pick a too wide "close", "NAT" and "ENTRANT" will
-        be recognised as a single text block "NAT ENTRANT". If "close" is too narrow, then "NAT"
-        may be broken into "N", "A", and "T". Generally speaking, using the thinnest char.'s width
-        (w/ e.g. 10% buffer) satisfies both conditions.
+        "Close" is defined as smaller than the width of the median thinnest char., which is often
+        "a". The gap between two cols. are usually very wide, except "NAT" and "ENTRANT", between
+        which the gap is roughly a normal whitespace. If we pick a too wide "close", "NAT" and
+        "ENTRANT" will be recognised as a single text block "NAT ENTRANT". If "close" is too
+        narrow, then "NAT" may be broken into "N", "A", and "T". Generally speaking, using the
+        median thinnest char.'s width (w/ ~10% buffer) satisfies both conditions.
         """
-        min_slice_width = min([s[1].stop - s[1].start for s in slices])  # Thinnest char.'s width
-        min_slice_width *= col_min_gap                                   # Add some buffer
+        med_slice_width = np.median([s[1].stop - s[1].start for s in slices]) * col_min_gap
         merged_slices = []
         for s in slices:
             if not merged_slices:
                 merged_slices.append(s)
+            elif s[1].start - merged_slices[-1][1].stop < med_slice_width:
+                merged_slices[-1] = (
+                    slice(min(merged_slices[-1][0].start, s[0].start),
+                          max(merged_slices[-1][0].stop, s[0].stop)),
+                    slice(min(merged_slices[-1][1].start, s[1].start),
+                          max(merged_slices[-1][1].stop, s[1].stop)),
+                    merged_slices[-1][2]
+                )
             else:
-                # Check if the left of the current slice is close to the right of the last slice
-                if s[1].start - merged_slices[-1][1].stop < min_slice_width:
-                    merged_slices[-1] = (
-                        slice(min(merged_slices[-1][0].start, s[0].start),
-                              max(merged_slices[-1][0].stop, s[0].stop)),
-                        slice(min(merged_slices[-1][1].start, s[1].start),
-                              max(merged_slices[-1][1].stop, s[1].stop)),
-                        merged_slices[-1][2]
-                    )
-                else:
-                    merged_slices.append(s)
+                merged_slices.append(s)
         del slices
 
         # OCR the merged slices
@@ -245,7 +251,7 @@ class BaseParser:
         As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
         (184 or 232), use RGB = 128 as a cutoff for "black"
         """
-        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]
+        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]  # noqa: PLR2004
 
         # Mask text with rectangles, i.e. label connected components
         labelled, n_features = label(arr < 128)  # noqa: PLR2004
@@ -259,18 +265,16 @@ class BaseParser:
         for s in slices:
             if not merged_slices:
                 merged_slices.append(s)
+            elif s[0].start - merged_slices[-1][0].stop < min_slice_height:
+                merged_slices[-1] = (
+                    slice(min(merged_slices[-1][0].start, s[0].start),
+                          max(merged_slices[-1][0].stop, s[0].stop)),
+                    slice(min(merged_slices[-1][1].start, s[1].start),
+                          max(merged_slices[-1][1].stop, s[1].stop)),
+                    merged_slices[-1][2]
+                )
             else:
-                # Check if the top of the current slice is close to the bottom of the last slice
-                if s[0].start - merged_slices[-1][0].stop < min_slice_height:
-                    merged_slices[-1] = (
-                        slice(min(merged_slices[-1][0].start, s[0].start),
-                              max(merged_slices[-1][0].stop, s[0].stop)),
-                        slice(min(merged_slices[-1][1].start, s[1].start),
-                              max(merged_slices[-1][1].stop, s[1].stop)),
-                        merged_slices[-1][2]
-                    )
-                else:
-                    merged_slices.append(s)
+                merged_slices.append(s)
         del slices
 
         # Get text/OCR the merged slices
@@ -925,7 +929,7 @@ class RaceParser(BaseParser):
         # Get table col. names and their positions
         cols = self._detect_cols(page,
                                  clip=(0, b_classification + 1, w, t_table_body - 1),
-                                 col_min_gap=2)
+                                 col_min_gap=1)
         if not cols:
             raise ParsingError(f'Could not detect cols. in the table header on p.{page.number} in '
                                f'{self.classification_file}')
@@ -1126,7 +1130,7 @@ class RaceParser(BaseParser):
             # Each page can have multiple (usually five) tables, all of which begins from the same
             # top y-position. The table headers are vertically bounded between "History Chart" and
             # "TIME"
-            page = Page(page, file=self.history_chart_file)
+            page = Page(page, file=self.history_chart_file)  # noqa: PLW2901
             history_chart = page.search_for('History Chart')
             if len(history_chart) != 1:
                 raise ParsingError(f'Find none or multiple "History Chart" on p.{page.number} in '
@@ -1173,10 +1177,10 @@ class RaceParser(BaseParser):
                 cols = self._detect_cols(
                     page,
                     clip=(l_table, b_history_chart, l_next_lap, t_table_body),
-                    col_min_gap=5,  # Col. names are quite far from each other, so use a larger gap
+                    col_min_gap=2,  # Col. names are quite far from each other, so use a larger gap
                     min_black_line_length=0.6
                 )
-                if len(cols) != 3:
+                if len(cols) != 3:  # noqa: PLR2004
                     raise ParsingError(f'Expected 3 cols. in the table {i} on p.{page.number} in '
                                        f'{self.history_chart_file}. Found: {cols}')
                 if 'LAP' not in cols[0].text:
@@ -1204,7 +1208,7 @@ class RaceParser(BaseParser):
                 We can use the left of "LAP x", the right of "LAP x", the midpoint between "GAP"
                 and "TIME", and the left of "LAP x + 1" as col. separators. But I'm not very
                 confident about the midpoint between "GAP" and "TIME", especially when the gap
-                between two cars are big, or a lap time is very slow (e.g., due to accident then 
+                between two cars are big, or a lap time is very slow (e.g., due to accident then
                 lingering into the pit). Therefore, I use `._detect_cols()` to detect the cols.
                 This method is not designed for this purpose, but it does the job, as it sorts all
                 words from left to right, and groups them into cols. based on their x-coord, so it
@@ -1212,9 +1216,9 @@ class RaceParser(BaseParser):
                 """
                 temp = self._detect_cols(page,
                                          clip=(l_table, b_history_chart, l_next_lap, b_table),
-                                         col_min_gap=5,
+                                         col_min_gap=2,
                                          min_black_line_length=0.6)
-                if len(temp) != 3:
+                if len(temp) != 3:  # noqa: PLR2004
                     raise ParsingError(f'Expected 3 cols. in the table {i} on p.{page.number} in '
                                        f'{self.history_chart_file}. Found: {temp}')
                 vlines = [
@@ -1300,7 +1304,7 @@ class RaceParser(BaseParser):
         doc = pymupdf.open(self.lap_chart_file)
         dfs = []
         for page in doc:
-            page = Page(page, file=self.lap_chart_file)
+            page = Page(page, file=self.lap_chart_file)  # noqa: PLW2901
 
             # Table header/col. names are below "Race Lap Chart"
             b_lap_chart = page.search_for('Lap Chart')[0].y1
@@ -1419,7 +1423,7 @@ class RaceParser(BaseParser):
         dfs = []
         for page in doc:
             # Find "Race Lap Analysis"
-            page = Page(page, file=self.lap_analysis_file)
+            page = Page(page, file=self.lap_analysis_file)  # noqa: PLW2901
             race_lap_analysis = page.search_for('Lap Analysis')  # Can be "Sprint Lap Analysis" so
             if len(race_lap_analysis) != 1:                      # only search for "Lap Analysis"
                 raise ParsingError(f'Find none or multiple "Lap Analysis" on p.{page.number} in '
@@ -1442,7 +1446,7 @@ class RaceParser(BaseParser):
             detected as one black line, because we find lines by looking at rows with enough amount
             of black pixels. That's fine. We don't need the x-positions of the lines. Knowing the
             y-coord. of these lines is good enough for us to locate the table body.
-            
+
             Depending on the number of drivers on the page, we can have two line segments to six.
             So the total length of all the lines can be very short or long. But the minimum is two
             black line segments, which should easily be more than 25% of the page width. So we set
@@ -1478,7 +1482,7 @@ class RaceParser(BaseParser):
                 t_table_headers.insert(0, t_table_header)
 
                 # The driver name is above the table header and the next white strip above
-                if len(white_strip) < 2:
+                if len(white_strip) < 2:  # noqa: PLR2004
                     raise ParsingError(f'Expect at least two white strips above the black line at '
                                        f'{black_line} on p.{page.number} in '
                                        f'{self.lap_analysis_file}. Found: {white_strip}')
@@ -1500,7 +1504,7 @@ class RaceParser(BaseParser):
             )
             page.set_rotation(0)
             # Should have at least one table, so two white strips to the left and right of it
-            if len(table_separators) < 2:
+            if len(table_separators) < 2:  # noqa: PLR2004
                 raise ParsingError(f'Expect at least two vertical white strips below driver names '
                                    f'on p.{page.number} in {self.lap_analysis_file}. Found: '
                                    f'{table_separators}')
@@ -1522,7 +1526,7 @@ class RaceParser(BaseParser):
                     car_no = driver.split('\n', 1)[0]
                     try:
                         car_no = int(car_no.strip())
-                    except:
+                    except:  # noqa: E722
                         raise ParsingError(f'Could not parse car No. in '
                                            f'({l_table:.2f}, {t_driver:.2f}, {r_table:.2f}, '
                                            f'{t_table_header:.2f}) on p.{page.number} in '
@@ -1535,7 +1539,8 @@ class RaceParser(BaseParser):
                         height=1  # Any height is fine
                     )
                     page.set_rotation(0)
-                    if len(white_strip) != 3:  # Table left, separator, and right. Three in total
+                    # Table left, separator, and right. Three in total
+                    if len(white_strip) != 3:  # noqa: PLR2004
                         raise ParsingError(f'Expected exactly three vertical white strips in '
                                            f'({l_table:.2f}, {t_table_header:.2f}, '
                                            f'{r_table:.2f}, {b_table:.2f}) on p.'
@@ -1570,7 +1575,7 @@ class RaceParser(BaseParser):
                             col_min_gap=3,
                             min_black_line_length=0.5
                         )
-                        if len(cols) != 2:
+                        if len(cols) != 2:  # noqa: PLR2004
                             raise ParsingError(f'Expected exactly two cols. in '
                                                f'({l_tab:.2f}, {t_table_header:.2f}, '
                                                f'{r_tab:.2f}, {b_table_header:.2f}) on p.'
@@ -1582,7 +1587,7 @@ class RaceParser(BaseParser):
                                                f'{r_tab:.2f}, {b_table_header:.2f}) on p.'
                                                f'{page.number} in {self.lap_analysis_file}. '
                                                f'Found: {cols}')
-                        l_tab = cols[0].l - 1  # More accurate table left boundary
+                        l_tab = cols[0].l - 1  # More accurate table left boundary  # noqa: PLW2901
 
                         # Vertical lines separating the two cols.
                         vlines = [l_tab, (cols[0].r + cols[1].l) / 2, r_tab]
@@ -1801,7 +1806,7 @@ class QualifyingParser(BaseParser):
         # Get col. names
         col_names = self._detect_cols(page,
                                       clip=(0, b_classification, page.w, t_table_body - 1),
-                                      col_min_gap=2)
+                                      col_min_gap=1)
         if not col_names:
             raise ParsingError(f'Could not detect cols. in the table header on p.{page.number} in '
                                f'{self.classification_file}')
@@ -1825,17 +1830,22 @@ class QualifyingParser(BaseParser):
         # Get col. vertical positions
         """
         All cols. can easily be located by the left or right boundary of the col. name, except for
-        the boundary between ENTRANT and Q1, Q1_TIME and Q2, and Q2_TIME and Q3. We cannot handle
-        them using `._detect_cols` with the entire table area, because the gaps between cols. are
-        tiny (NAT and ENTRANT are very close), so we need to use small `col_min_gap`. However, a
-        small `col_min_gap` will split some cols. into two (e.g., 1:23.456 into 1: and 23.456).
-        Therefore, we handle these three boundaries separately.
-        
+        the boundary between ENTRANT and Q1, Q1 % and Q1_TIME, Q1_TIME and Q2, and Q2_TIME and Q3.
+        We cannot handle them using `._detect_cols` with the entire table area, because the gaps
+        between cols. are tiny (NAT and ENTRANT are very close), so we need to use small
+        `col_min_gap`. However, a small `col_min_gap` will split some cols. into two (e.g.,
+        1:23.456 into 1: and 23.456). Therefore, we handle these three boundaries separately.
+
         ENTRANT and Q1:
         We look at the table body area between the left of ENTRANT and the left of Q1_LAPS. This
         area should contain the ENTRANT col. and the Q1 col. only. Between them is some sizable
         gap. We can use the gap as the boundary between the two cols.
-        
+
+        Q1 % and Q1_TIME:
+        We don't always have the Q1 % col. (the "%" as in the 107% rule). E.g., 2024 Chinese has
+        this col., but 2024 Las Vegas does not. If we do have it in `col_names`, then do it.
+        Otherwise all good.
+
         Q1_TIME and Q2, and Q2_TIME and Q3:
         There is a vertical thin line between them. The line is super thin so we need to use higher
         DPI (bigger `scaling_factor`) to detect it.
@@ -1844,17 +1854,35 @@ class QualifyingParser(BaseParser):
         cols = self._detect_cols(
             page,
             clip=(
-                col_names['ENTRANT'].bbox[0] - 1,
+                col_names['ENTRANT'].l - 1,
                 t_table_body + 1,
-                col_names['Q1_LAPS'].bbox[0],
+                col_names['Q1_LAPS'].l,
                 b_table + 1
             ),
-            col_min_gap=5
+            col_min_gap=1
         )
-        if not (len(cols) == 2 and re.match(r'[\d:\n.]+', cols[1].text)):
+        if not (len(cols) == 2 and re.match(r'[\d:\n.]+', cols[1].text)):  # noqa: PLR2004
             raise ParsingError(f'Could not locate the boundary between ENTRANT and Q1 on '
                                f'p.{page.number} in {self.classification_file}: {cols}')
         sep_entrant_q1 = (cols[0].r + cols[1].l) / 2
+        # Boundary between Q1 % and Q1_TIME
+        if '%' in col_names:
+            cols = self._detect_cols(
+                page,
+                clip=(
+                    col_names['%'].l,
+                    t_table_body + 1,
+                    col_names['Q1_TIME'].l,
+                    b_table + 1
+                ),
+                col_min_gap=1.1
+            )
+            if not (len(cols) == 2  # noqa: PLR2004
+                    and re.match(r'[\d.]+', cols[0].text)
+                    and re.match(r'[\d.]+', cols[1].text)):
+                raise ParsingError(f'Could not locate the boundary between Q1 % and Q1_TIME on '
+                                   f'p.{page.number} in {self.classification_file}: {cols}')
+            sep_q1_pct_q1time = (cols[0].r + cols[1].l) / 2
         # Boundary between Q1_TIME and Q2
         page.set_rotation(90)
         black_line = page.search_for_black_line(
@@ -1902,6 +1930,9 @@ class QualifyingParser(BaseParser):
             col_names['Q3_LAPS'].r,
             page.w
         ]
+        if '%' in col_names:
+            # TODO: this assumes dict is ordered. Not sure which Python version started this
+            vlines.insert(list(col_names.keys()).index('%') + 2, sep_q1_pct_q1time)
 
         # Row positions
         hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, page.w, b_table),
@@ -1960,6 +1991,7 @@ class QualifyingParser(BaseParser):
         del df['temp']
 
         # Clean up
+        df = df.replace('', None)  # So pd.isna will catch empty string as well
         df.NO = df.NO.astype(int)
         del df['NAT']
         df.position = df.position.astype(int)
@@ -2133,7 +2165,7 @@ class QualifyingParser(BaseParser):
         dfs = []
         for page in doc:
             # Find "Lap Times"
-            page = Page(page, file=self.lap_times_file)
+            page = Page(page, file=self.lap_times_file)  # noqa: PLW2901
             quali_lap_times = page.search_for('Lap Times')
             if len(quali_lap_times) != 1:
                 raise ParsingError(f'Find none or multiple "Lap Times" on p.{page.number} in '
@@ -2179,7 +2211,7 @@ class QualifyingParser(BaseParser):
                 t_table_headers.insert(0, t_table_header)
 
                 # The driver name is above the table header and the next white strip above
-                if len(white_strip) < 2:
+                if len(white_strip) < 2:  # noqa: PLR2004
                     raise ParsingError(f'Expect at least two white strips above the black line at '
                                        f'{black_line} on p.{page.number} in '
                                        f'{self.lap_times_file}. Found: {white_strip}')
@@ -2201,7 +2233,7 @@ class QualifyingParser(BaseParser):
             page.set_rotation(0)
             # A driver has at least one table, so at least two white strips: one to the left of the
             # table and the other to the right of it
-            if len(table_separators) < 2:
+            if len(table_separators) < 2:  # noqa: PLR2004
                 raise ParsingError(f'Expect at least two vertical white strips below driver names '
                                    f'on p.{page.number} in {self.lap_times_file}. Found: '
                                    f'{table_separators}')
@@ -2220,10 +2252,10 @@ class QualifyingParser(BaseParser):
                     driver = page.get_text(clip=(l_table, t_driver, r_table, t_table_header))
                     if not driver.strip():  # E.g., four tables on a page. The second row only has
                         continue            # one table, so we will have missing's here
-                    car_no = driver.split('\n', 1)[0]
-                    try:
-                        car_no = int(car_no.strip())
-                    except:
+                    car_no = re.match(r'^(\d+)\s+[A-Za-z ]+$', driver.strip())
+                    if car_no:
+                        car_no = int(car_no.group(1))
+                    else:
                         raise ParsingError(f'Could not parse car No. in '
                                            f'({l_table:.2f}, {t_driver:.2f}, {r_table:.2f}, '
                                            f'{t_table_header:.2f}) on p.{page.number} in '
@@ -2236,7 +2268,8 @@ class QualifyingParser(BaseParser):
                         height=1  # Any height is fine
                     )
                     page.set_rotation(0)
-                    if len(white_strip) != 3:  # Table left, separator, and right. Three in total
+                    # Table left, separator, and right. Three in total
+                    if len(white_strip) != 3:  # noqa: PLR2004
                         raise ParsingError(f'Expected exactly three vertical white strips in '
                                            f'({l_table:.2f}, {t_table_header:.2f}, '
                                            f'{r_table:.2f}, {b_table:.2f}) on p.'
@@ -2264,27 +2297,28 @@ class QualifyingParser(BaseParser):
                             col_min_gap=3,
                             min_black_line_length=0.5
                         )
-                        if len(cols) != 2:
+                        if len(cols) != 2:  # noqa: PLR2004
                             raise ParsingError(f'Expected exactly two cols. in '
                                                f'({l_tab:.2f}, {t_table_header:.2f}, '
                                                f'{r_tab:.2f}, {b_table_header:.2f}) on p.'
                                                f'{page.number} in {self.lap_times_file}. '
                                                f'Found: {cols}')
-                        if cols[0].text != 'LAP' or cols[1].text != 'TIME':
+                        if cols[0].text != 'NO' or cols[1].text != 'TIME':
                             raise ParsingError(f'Expected "LAP" and "TIME" to be the two col. '
                                                f'names in ({l_tab:.2f}, {t_table_header:.2f}, '
                                                f'{r_tab:.2f}, {b_table_header:.2f}) on p.'
                                                f'{page.number} in {self.lap_times_file}. '
                                                f'Found: {cols}')
-                        l_tab = cols[0].l - 1  # More accurate table left boundary
+                        l_tab = cols[0].l - 1  # More accurate table left boundary  # noqa: PLW2901
 
                         # Vertical lines separating the two cols.
                         vlines = [l_tab, (cols[0].r + cols[1].l) / 2, r_tab]
 
                         # Horizontal lines are located by the grey and white rows
                         hlines = page.search_for_grey_white_rows(
-                            clip=(l_tab, b_table_header, r_tab, b_table),
-                            min_height=np.mean([i.b - i.t for i in cols]) - 1
+                            clip=(l_tab, b_table_header - 1, r_tab, b_table + 1),
+                            min_height=np.mean([i.b - i.t for i in cols]) - 1,
+                            min_width=0.5
                         )
 
                         # Parse the table
@@ -2294,35 +2328,27 @@ class QualifyingParser(BaseParser):
                                                        header_included=False)
                         if df.empty:  # E.g., DNS so no lap at all
                             continue
-
-                        CONTINUE HERE PROCESSS CROSSOUT TEXT
-
                         df.columns = [i.text.lower() for i in cols]
+                        df = df.rename(columns={'no': 'lap_no', 'time': 'lap_time'})
+                        df['lap_time_deleted'] = False
 
-                        # TODO: testing on the cols. `lap` should has digits and "P", and `time`
-                        #       should be a time duration format
+                        # Check if any crossed-out lap times
+                        for k in range(len(hlines) - 1):
+                            clip = (vlines[1], hlines[k], vlines[2], hlines[k + 1])
+                            if page.has_horizontal_line(clip):
+                                df.loc[k, 'lap_time_deleted'] = True
 
-                        df['pit'] = df.lap.str.contains('P', regex=False)
-                        df.lap = df.lap.str.rstrip(' P').astype(int)
+                        # Indicator for pit stop
+                        df['pit'] = df.lap_no.str.contains('P', regex=False)
+                        df.lap_no = df.lap_no.str.rstrip(' P').astype(int)
                         df['car_no'] = int(car_no)
                         dfs.append(df)
 
-
-
-
-
-
-
         # Clean up
-        df = pd.concat(df, ignore_index=True)
-        if 'lap_time_deleted' not in df.columns:
-            df['lap_time_deleted'] = False
-        df = (df.fillna({'lap_time_deleted': False})
-              .rename(columns={0: 'lap_no', 1: 'pit', 2: 'lap_time'}))
+        df = pd.concat(dfs, ignore_index=True)
         df.lap_no = df.lap_no.astype(int)
         df.car_no = df.car_no.astype(int)
-        df = df.replace('', None)
-        df.pit = (df.pit == 'P').astype(bool)
+        df = df.replace('', None)  # So empty cell will become NaN when casted to float
         df = self._assign_session_to_lap(self.classification_df, df)
 
         # Check if any fastest laps are wrong
@@ -2457,11 +2483,18 @@ class PitStopParser(BaseParser):
         # TODO: would be nice to add a test for page numbers: if more than one page, we should have
         #       "page x of xx" at the bottom right of each page
         for page in doc:  # Can have multiple pages, though usually only one. E.g., 2023 Dutch
-            page = Page(page, file=self.file)
+            page = Page(page, file=self.file)  # noqa: PLW2901
+
+            # Locate "Pit Stop Summary" title
+            pit_stop_summary = page.search_for('Pit Stop Summary')
+            if len(pit_stop_summary) != 1:
+                raise ParsingError(f'Find none or multiple "Pit Stop Summary" on p.{page.number} '
+                                   f'in {self.file}')
+            b_title = pit_stop_summary[0].y1
 
             # Locate table header, vertically between the topmost black line and the white strip
             # immediately above the line
-            black_line = page.search_for_black_line()
+            black_line = page.search_for_black_line(clip=(0, b_title, page.w, page.h))
             if not black_line:
                 raise ParsingError(f'Could not find a black horizontal line on p.{page.number} in '
                                    f'{self.file}')
@@ -2476,7 +2509,7 @@ class PitStopParser(BaseParser):
             # Get col. names
             cols = self._detect_cols(page,
                                      clip=(0, t_table_header, page.w, b_table_header),
-                                     col_min_gap=5)  # Very wide cols., so allow larger gaps
+                                     col_min_gap=2)  # Very wide cols., so allow larger gaps
             if [i.text for i in cols] != ['NO', 'DRIVER', 'ENTRANT', 'LAP', 'TIME OF DAY', 'STOP',
                                           'DURATION', 'TOTAL TIME']:
                 raise ParsingError(f'Table cols. are not as expected on p.{page.number} in '
@@ -2492,7 +2525,7 @@ class PitStopParser(BaseParser):
             # Locate the horizontal positions of each col.
             col_pos = self._detect_cols(page,
                                         clip=(0, t_table_header, page.w, b_table),
-                                        col_min_gap=5)
+                                        col_min_gap=2)
             if len(cols) != len(col_pos):
                 raise ParsingError(f'Number of detected cols. does not match number of col. names '
                                    f'on p.{page.number} in {self.file}: {cols} vs. {col_pos}')
@@ -2559,13 +2592,8 @@ class PitStopParser(BaseParser):
                 axis=1
             ).tolist()
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(df.to_json(), f)
-            return
-
+        # TODO: bad practice
         df.to_json = to_json
-        df.to_pkl = to_pkl
         return df
 
 
