@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import warnings
 
 import pytest
 
@@ -54,12 +55,15 @@ def test_parse_pit_stop(prepare_pit_stop_data):
 
 
 @pytest.mark.full
-@pytest.mark.parametrize('year, round_no', [(2024, i) for i in range(1, 25)])
+@pytest.mark.parametrize('year, round_no',
+                         [(2024, i) for i in range(1, 25)]
+                         + [(2025, i) for i in range(1, 25)])
 def test_parse_pit_stop_full(year: int, round_no: int):
     pdfs = [f'data/pdf/{i}' for i in os.listdir('data/pdf')
            if i.startswith(f'{year}_{round_no}_') and i.endswith('_pit_stop_summary.pdf')]
     if len(pdfs) == 0:
-        raise FileNotFoundError(f"Pit stop PDF for {year} round {round_no} doesn't existed")
+        warnings.warn(f"Pit stop PDF for {year} round {round_no} doesn't existed. Skipping")
+        return
     for pdf in pdfs:
         session = re.findall(rf'{year}_{round_no}_(\w+)_pit', pdf)
         parser = PitStopParser(pdf, year, round_no, session[0])

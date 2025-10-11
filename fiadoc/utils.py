@@ -1,7 +1,6 @@
 import os
 import re
 import tempfile
-import warnings
 
 # import uuid
 from functools import cached_property
@@ -29,7 +28,9 @@ OCR = PaddleOCR(lang='en',
 # Correct common OCR mistakes
 # TODO: very fragile...
 OCR_ERRORS = {
-    'KMIH': 'KM/H'
+    'KMIH': 'KM/H',
+    'L': '1',
+    'I': '1'
 }
 
 rc = {'figure.figsize': (8, 6),

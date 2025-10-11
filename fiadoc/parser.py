@@ -545,12 +545,23 @@ class EntryListParser:
         line_gap = sorted([abs(car_nos[i + 1][1] - car_nos[i][3])
                            for i in range(len(car_nos) - 1)])[-2]
         """
-        The `abs` is not redundant! Some PDFs will have "overlapping" rows. E.g., the first car No.
-        spans from y = 10 to y = 20, and the second car No. spans from y = 19 to y = 30. In this
-        case, 19 - 20 needs an `abs`. E.g., 2024 Belgian.
+        We use 1/3 of the line height as a sanity check, here and throughout this repo. 1/3
+        basically means, if `line_gap` is 10px, then anything taller than 3.3px is fine. This seems
+        crazy but actually works quite well. Here are the two reasons (not only matters there but
+        everywhere in the parser):
+
+        1. false negative: will a text area be mistakenly excluded because it's short? Unlikely,
+           because if the area has any text, that text definitely needs to occupy 1/3 of a normal
+           line height. Think about the height of "o", "p", and "l": "o" is shorter than "l" but
+           still needs to occupy a significant portion of the line height
+        2. false negative: will a non-text area be mistakenly included? No, because text is always
+           in black, and sometimes has grey background. We always have such colour checks when
+           dealing with empty areas, so they won't be mistakenly included. Actually the opposite.
+           This is the reason why we use a very conservative 1/3 here, because some empty areas are
+           too short, so need to be very conservative when detecting these non-text empty areas
         """
         line_height = np.mean([i[3] - i[1] for i in car_nos])
-        assert line_gap < line_height / 2, (
+        assert line_gap < line_height / 3, (
             f'Line gap {line_gap} is too big relative to line height {line_height} in {self.file}'
         )
 
@@ -919,7 +930,7 @@ class RaceParser(BaseParser):
 
         # Find the first white strip below the table header. This is the bottom of the table
         white_strip = page.search_for_white_strip(clip=(0, t_table_body, w, page.bound()[3]),
-                                                  height=line_height / 2)
+                                                  height=line_height / 3)
         if white_strip:
             b_table = sorted(white_strip)[0]
         else:
@@ -958,8 +969,8 @@ class RaceParser(BaseParser):
         ]
 
         # Horizontal lines separating the rows
-        hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, w, b_table),
-                                                 min_height=line_height - 1)
+        hlines = page.search_for_grey_white_rows(clip=(0, t_table_body + 1, w, b_table + 1),
+                                                 min_height=line_height / 3)
 
         # Parse the table using the grid above
         df = self._parse_table_by_grid(
@@ -980,7 +991,7 @@ class RaceParser(BaseParser):
         if not_classified:
             t_table_body = not_classified[0].y1
             white_strip = page.search_for_white_strip(clip=(0, t_table_body, w, page.bound()[3]),
-                                                      height=line_height / 2)
+                                                      height=line_height / 3)
             if white_strip:
                 b_table = sorted(white_strip)[0]
             else:
@@ -989,7 +1000,7 @@ class RaceParser(BaseParser):
                     f'p.{page.number} in {self.classification_file}'
                 )
             hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, w, b_table),
-                                                     min_height=line_height - 1)
+                                                     min_height=line_height / 3)
             not_classified = self._parse_table_by_grid(
                 page=page,
                 vlines=vlines,
@@ -1216,7 +1227,7 @@ class RaceParser(BaseParser):
                 """
                 temp = self._detect_cols(page,
                                          clip=(l_table, b_history_chart, l_next_lap, b_table),
-                                         col_min_gap=2,
+                                         col_min_gap=1.1,
                                          min_black_line_length=0.6)
                 if len(temp) != 3:  # noqa: PLR2004
                     raise ParsingError(f'Expected 3 cols. in the table {i} on p.{page.number} in '
@@ -1231,7 +1242,7 @@ class RaceParser(BaseParser):
                 # Get row positions by checking white/grey background colours
                 hlines = page.search_for_grey_white_rows(
                     clip=(l_table, t_table_body, l_next_lap, b_table),
-                    min_height=line_height - 1
+                    min_height=line_height / 3
                 )
 
                 # Parse the table using the grid above
@@ -1330,9 +1341,12 @@ class RaceParser(BaseParser):
             b_table = white_strip[0]
 
             # Get col. names between the two y-coords. above
-            cols = self._detect_cols(page, clip=(0, b_lap_chart, page.w, t_table_body))
+            cols = self._detect_cols(page,
+                                     clip=(0, b_lap_chart + 1, page.w, t_table_body - 1),
+                                     col_min_gap=3,  # Col. names are quite far from each other
+                                     min_black_line_length=0.5)
             if len(cols) <= 1:
-                raise ParsingError(f'Expected at least two cols. in table on {page.number} in '
+                raise ParsingError(f'Expected at least two cols. in table on p.{page.number} in '
                                    f'{self.lap_chart_file}. Found: {cols}')
             if cols[0].text != 'POS':
                 raise ParsingError(f'Expected "POS" to be the zero-th col. on p.{page.number} '
@@ -1797,7 +1811,7 @@ class QualifyingParser(BaseParser):
 
         # Find the first white strip below the table header
         if white_strip:= page.search_for_white_strip(clip=(0, t_table_body, page.w, page.h),
-                                                     height=line_height / 2):
+                                                     height=line_height / 3):
             b_table = white_strip[0]
         else:
             raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
@@ -1936,7 +1950,7 @@ class QualifyingParser(BaseParser):
 
         # Row positions
         hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, page.w, b_table),
-                                                 min_height=line_height - 1)
+                                                 min_height=line_height / 3)
 
         # Get the table
         df = self._parse_table_by_grid(page, vlines=vlines, hlines=hlines, header_included=False)
@@ -1949,7 +1963,7 @@ class QualifyingParser(BaseParser):
         if not_classified := page.search_for('NOT CLASSIFIED', clip=(0, b_table, page.w, page.h)):
             t_table_body = not_classified[0].y1
             if white_strip:= page.search_for_white_strip(clip=(0, t_table_body, page.w, page.h),
-                                                         height=line_height / 2):
+                                                         height=line_height / 3):
                 b_table = white_strip[0]
             else:
                 raise ParsingError(
@@ -1957,7 +1971,7 @@ class QualifyingParser(BaseParser):
                     f'p.{page.number} in {self.classification_file}'
                 )
             hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, page.w, b_table),
-                                                     min_height=line_height - 1)
+                                                     min_height=line_height / 3)
             not_classified = self._parse_table_by_grid(page, vlines=vlines, hlines=hlines,
                                                        header_included=False)
             not_classified.columns = df.columns.drop(['finishing_status', 'original_order',

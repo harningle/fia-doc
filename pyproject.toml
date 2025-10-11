@@ -55,7 +55,9 @@ testpaths = [
 ]
 filterwarnings = [
   "ignore::DeprecationWarning:importlib.*:",  # See pymupdf/PyMuPDF#3931 and swig/swig#2881
-  "ignore::DeprecationWarning:sys.*:"
+  "ignore::DeprecationWarning:sys.*:",
+  "ignore:.*provisional.*:UserWarning",  # Ignore warnings like "using provisional classification"
+  "ignore:.*ccache.*:UserWarning"        # ccache not found warnings from paddleocr. No idea
 ]
 
 [tool.ruff]

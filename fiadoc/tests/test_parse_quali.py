@@ -1,5 +1,6 @@
 import json
 import os
+import warnings
 from contextlib import nullcontext
 from typing import Optional
 
@@ -248,36 +249,45 @@ def test_parse_quali(prepare_quali_data):
 
 
 @pytest.mark.full
-@pytest.mark.parametrize('year, round_no', [(2024, i) for i in range(1, 25)])
+@pytest.mark.parametrize('year, round_no',
+                         [(2024, i) for i in range(1, 25)]
+                         + [(2025, i) for i in range(1, 25)])
 def test_parse_quali_full(year: int, round_no: int):
-    classification_pdf = f'data/pdf/{year}_{round_no}_quali_provisional_classification.pdf'
-    lap_times_pdf = f'data/pdf/{year}_{round_no}_quali_lap_times.pdf'
-    if not os.path.exists(classification_pdf):
-        raise FileNotFoundError(f"Quali. classification PDF for {year} round {round_no} doesn't "
-                                f"exist")
-    if not os.path.exists(lap_times_pdf):
-        raise FileNotFoundError(f"Quali. lap times PDF for {year} round {round_no} doesn't exist")
-    parser = QualifyingParser(classification_pdf, lap_times_pdf, year, round_no, 'quali')
-    parser.classification_df.to_json()
-    parser.lap_times_df.to_json()
-    return
+    quali_classification_pdfs = [f'data/pdf/{i}' for i in os.listdir('data/pdf')
+                                 if i.startswith(f'{year}_{round_no}_')
+                                 and ('quali' in i) and ('sprint' not in i)
+                                 and i.endswith('classification.pdf')]
+    sprint_quali_classification_pdfs = [f'data/pdf/{i}' for i in os.listdir('data/pdf')
+                                        if i.startswith(f'{year}_{round_no}_')
+                                        and 'sprint_quali' in i
+                                        and i.endswith('classification.pdf')]
+    quali_lap_times_pdf = f'data/pdf/{year}_{round_no}_quali_lap_times.pdf'
+    sprint_quali_lap_times_pdf = f'data/pdf/{year}_{round_no}_sprint_quali_lap_times.pdf'
 
+    if len(quali_classification_pdfs) == 0:
+        warnings.warn(f"Quali. classification PDF for {year} round {round_no} doesn't existed. "
+                      f"Skipping")
+    else:
+        if not os.path.exists(quali_lap_times_pdf):
+            warnings.warn(f"Quali. lap times PDF for {year} round {round_no} doesn't "
+                          f"existed. Parsing classification only")
+            quali_lap_times_pdf = None
+        for pdf in quali_classification_pdfs:  # Can have a provisional and a final classification
+            parser = QualifyingParser(pdf, quali_lap_times_pdf, year, round_no, 'quali')
+            parser.classification_df.to_json()
+            parser.lap_times_df.to_json()
 
-@pytest.mark.full
-@pytest.mark.parametrize('year, round_no', [(2024, i) for i in [5, 6, 19, 21, 23]])
-# @pytest.mark.parametrize('year, round_no', [(2024, i) for i in [5, 6, 11, 19, 21, 23]])
-# Skip 2024 Austrian as no sprint lap time PDF available on FIA website
-# TODO: see #47. Need to add it back or even include it in the usual test above
-def test_parse_sprint_quali(year: int, round_no: int):
-    classification_pdf = f'data/pdf/{year}_{round_no}_sprint_quali_provisional_classification.pdf'
-    lap_times_pdf = f'data/pdf/{year}_{round_no}_sprint_quali_lap_times.pdf'
-    if not os.path.exists(classification_pdf):
-        raise FileNotFoundError(f"Sprint quali. classification PDF for {year} round {round_no} "
-                                f"doesn't exist")
-    if not os.path.exists(lap_times_pdf):
-        raise FileNotFoundError(f"Sprint quali. lap times PDF for {year} round {round_no} doesn't "
-                                f"exist")
-    parser = QualifyingParser(classification_pdf, lap_times_pdf, year, round_no, 'sprint_quali')
-    parser.classification_df.to_json()
-    parser.lap_times_df.to_json()
+    if len(sprint_quali_classification_pdfs) == 0:
+        warnings.warn(f"Sprint quali. classification PDF for {year} round {round_no} doesn't "
+                      f"existed. Skipping")
+    else:
+        if not os.path.exists(sprint_quali_lap_times_pdf):
+            warnings.warn(f"Sprint quali. lap times PDF for {year} round {round_no} "
+                          f"doesn't existed. Parsing classification only")
+            sprint_quali_lap_times_pdf = None
+        for pdf in sprint_quali_classification_pdfs:  # Can have a provisional and a final class.
+            parser = QualifyingParser(pdf, sprint_quali_lap_times_pdf, year, round_no,
+                                      'sprint_quali')
+            parser.classification_df.to_json()
+            parser.lap_times_df.to_json()
     return

@@ -1,6 +1,7 @@
-from contextlib import nullcontext
 import json
 import os
+import warnings
+from contextlib import nullcontext
 
 import pytest
 
@@ -109,13 +110,16 @@ def test_parse_entry_list(prepare_entry_list_data):
 
 
 @pytest.mark.full
-@pytest.mark.parametrize('year, round_no', [(2024, i) for i in range(1, 25)])
+@pytest.mark.parametrize('year, round_no',
+                         [(2024, i) for i in range(1, 25)]
+                         + [(2025, i) for i in range(1, 25)])
 def test_parse_entry_list_full(year: int, round_no: int):
     pdfs = [f'data/pdf/{i}' for i in os.listdir('data/pdf')
            if i.startswith(f'{year}_{round_no}_') and i.endswith('_entry_list.pdf')]
     if len(pdfs) == 0:
-        raise FileNotFoundError(f"Entry list PDF for {year} round {round_no} doesn't existed")
-    for pdf in pdfs:
-        parser = EntryListParser(pdf, 2024, round_no)
+        warnings.warn(f"Entry list PDF for {year} round {round_no} doesn't existed. Skipping")
+        return
+    for pdf in pdfs:  # May have the usual entry list and a revised entry list etc.
+        parser = EntryListParser(pdf, year, round_no)
         parser.df.to_json()
     return

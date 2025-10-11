@@ -1,6 +1,7 @@
-from contextlib import nullcontext
 import json
 import os
+import warnings
+from contextlib import nullcontext
 
 import pytest
 
@@ -204,63 +205,45 @@ def test_parse_race(prepare_race_data):
 
 
 @pytest.mark.full
-@pytest.mark.parametrize('year, round_no', [(2024, i) for i in range(1, 25)])
+@pytest.mark.parametrize('year, round_no',
+                         [(2024, i) for i in range(1, 25)]
+                         + [(2025, i) for i in range(1, 25)])
 def test_parse_race_full(year: int, round_no: int):
     pdf = {
-        'classification': f'data/pdf/{year}_{round_no}_race_final_classification.pdf',
-        'lap_analysis': f'data/pdf/{year}_{round_no}_race_lap_analysis.pdf',
-        'history_chart': f'data/pdf/{year}_{round_no}_race_history_chart.pdf',
-        'lap_chart': f'data/pdf/{year}_{round_no}_race_lap_chart.pdf'
+        'race': {
+            'classification': [
+                f'data/pdf/{year}_{round_no}_race_final_classification.pdf',
+                f'data/pdf/{year}_{round_no}_race_provisional_classification.pdf'
+            ],
+            'lap_analysis': f'data/pdf/{year}_{round_no}_race_lap_analysis.pdf',
+            'history_chart': f'data/pdf/{year}_{round_no}_race_history_chart.pdf',
+            'lap_chart': f'data/pdf/{year}_{round_no}_race_lap_chart.pdf'
+        },
+        'sprint': {
+            'classification': [
+                f'data/pdf/{year}_{round_no}_sprint_final_classification.pdf',
+                f'data/pdf/{year}_{round_no}_sprint_provisional_classification.pdf'
+            ],
+            'lap_analysis': f'data/pdf/{year}_{round_no}_sprint_lap_analysis.pdf',
+            'history_chart': f'data/pdf/{year}_{round_no}_sprint_history_chart.pdf',
+            'lap_chart': f'data/pdf/{year}_{round_no}_sprint_lap_chart.pdf'
+        }
     }
-    if year != 2024 or round_no != 20: # Skip 2024 Mexican as no race final classification PDF
-        for key in pdf:
-            if not os.path.exists(pdf[key]):
-                raise FileNotFoundError(f"Race {key} PDF for {year} round {round_no} doesn't "
-                                        f"exist")
-        parser = RaceParser(pdf['classification'], pdf['lap_analysis'], pdf['history_chart'],
-                            pdf['lap_chart'], year, round_no, 'race')
-        parser.classification_df.to_json()
-        parser.lap_times_df.to_json()
 
-    # Also test if works for provisional classification PDF
-    # Skip 2024 Australian and Japanese as no provisional classification PDF
-    if not ((year == 2024 and round_no == 3) or (year == 2024 and round_no == 4)):
-        pdf['classification'] = f'data/pdf/{year}_{round_no}_race_provisional_classification.pdf'
-        if not os.path.exists(pdf['classification']):
-            raise FileNotFoundError(f"Race provisional classification PDF for {year} round "
-                                    f"{round_no} doesn't exist")
-        parser = RaceParser(pdf['classification'], pdf['lap_analysis'], pdf['history_chart'],
-                            pdf['lap_chart'], year, round_no, 'race')
-        parser.classification_df.to_json()
-        parser.lap_times_df.to_json()
-    return
-
-
-@pytest.mark.full
-@pytest.mark.parametrize('year, round_no', [(2024, i) for i in [5, 6, 11, 19, 21, 23]])
-def test_parse_sprint_full(year: int, round_no: int):
-    pdf = {
-        'classification': f'data/pdf/{year}_{round_no}_sprint_final_classification.pdf',
-        'lap_analysis': f'data/pdf/{year}_{round_no}_sprint_lap_analysis.pdf',
-        'history_chart': f'data/pdf/{year}_{round_no}_sprint_history_chart.pdf',
-        'lap_chart': f'data/pdf/{year}_{round_no}_sprint_lap_chart.pdf'
-    }
-    for key in pdf:
-        if not os.path.exists(pdf[key]):
-            raise FileNotFoundError(f"Sprint {key} PDF for {year} round {round_no} doesn't "
-                                    f"exist")
-    parser = RaceParser(pdf['classification'], pdf['lap_analysis'], pdf['history_chart'],
-                        pdf['lap_chart'], year, round_no, 'sprint')
-    parser.classification_df.to_json()
-    parser.lap_times_df.to_json()
-
-    # Also test against provisional classification PDF
-    pdf['classification'] = f'data/pdf/{year}_{round_no}_sprint_provisional_classification.pdf'
-    if not os.path.exists(pdf['classification']):
-        raise FileNotFoundError(f"Sprint classification PDF for {year} round {round_no} "
-                                f"doesn't exist")
-    parser = RaceParser(pdf['classification'], pdf['lap_analysis'], pdf['history_chart'],
-                        pdf['lap_chart'], year, round_no, 'sprint')
-    parser.classification_df.to_json()
-    parser.lap_times_df.to_json()
+    for session in pdf:
+        for i in ['lap_analysis', 'history_chart', 'lap_chart']:
+            if not os.path.exists(pdf[session][i]):
+                warnings.warn(f"{i.replace('_', ' ').capitalize()} PDF for {year} round "
+                              f"{round_no} {session} doesn't exist. Parsing classification only")
+                pdf[session][i] = None
+        for classification in pdf[session]['classification']:
+            if not os.path.exists(classification):
+                warnings.warn(f"Classification PDF for {year} round {round_no} {session} "
+                              f"doesn't exist, skipping")
+            else:
+                parser = RaceParser(classification, pdf[session]['lap_analysis'],
+                                    pdf[session]['history_chart'], pdf[session]['lap_chart'],
+                                    year, round_no, session)
+                parser.classification_df.to_json()
+                parser.lap_times_df.to_json()
     return
