@@ -1,0 +1,342 @@
+[
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 1,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 1,
+                "is_classified": true,
+                "fastest_lap_rank": 1,
+                "laps_completed": 21
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 44,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 2,
+                "is_classified": true,
+                "fastest_lap_rank": 2,
+                "laps_completed": 19
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 11,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 3,
+                "is_classified": true,
+                "fastest_lap_rank": 3,
+                "laps_completed": 17
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 4,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 4,
+                "is_classified": true,
+                "fastest_lap_rank": 4,
+                "laps_completed": 18
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 55,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 5,
+                "is_classified": true,
+                "fastest_lap_rank": 5,
+                "laps_completed": 21
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 81,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 6,
+                "is_classified": true,
+                "fastest_lap_rank": 6,
+                "laps_completed": 18
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 14,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 7,
+                "is_classified": true,
+                "fastest_lap_rank": 7,
+                "laps_completed": 19
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 63,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 8,
+                "is_classified": true,
+                "fastest_lap_rank": 8,
+                "laps_completed": 18
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 16,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 9,
+                "is_classified": true,
+                "fastest_lap_rank": 9,
+                "laps_completed": 11
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 3,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 10,
+                "is_classified": true,
+                "fastest_lap_rank": 10,
+                "laps_completed": 23
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 50,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 11,
+                "is_classified": true,
+                "fastest_lap_rank": 11,
+                "laps_completed": 23
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 27,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 12,
+                "is_classified": true,
+                "fastest_lap_rank": 12,
+                "laps_completed": 20
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 18,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 13,
+                "is_classified": true,
+                "fastest_lap_rank": 13,
+                "laps_completed": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 77,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 14,
+                "is_classified": true,
+                "fastest_lap_rank": 14,
+                "laps_completed": 18
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 22,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 15,
+                "is_classified": true,
+                "fastest_lap_rank": 15,
+                "laps_completed": 21
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 43,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 16,
+                "is_classified": true,
+                "fastest_lap_rank": 16,
+                "laps_completed": 12
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 23,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 17,
+                "is_classified": true,
+                "fastest_lap_rank": 17,
+                "laps_completed": 17
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 10,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 18,
+                "is_classified": true,
+                "fastest_lap_rank": 18,
+                "laps_completed": 21
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 24,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 19,
+                "is_classified": true,
+                "fastest_lap_rank": 19,
+                "laps_completed": 19
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2024,
+            "round": 17,
+            "car_number": 31,
+            "session": "FP1"
+        },
+        "objects": [
+            {
+                "position": 20,
+                "is_classified": true,
+                "fastest_lap_rank": 20,
+                "laps_completed": 3
+            }
+        ]
+    }
+]

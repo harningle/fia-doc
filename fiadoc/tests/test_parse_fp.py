@@ -18,6 +18,28 @@ race_list = [
         None,
         nullcontext()
     ),
+    (
+        # A driver fails to set a time
+        '2024_17_aze_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
+        '2024_17_aze_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
+        2024,
+        17,
+        'fp1',
+        '2024_17_fp1_classification.json',
+        None,
+        nullcontext()
+    ),
+    (
+        # Lap times PDF unavailable
+        '2025_dutch_grand_prix_-_fp3_classification.pdf',
+        None,
+        2025,
+        15,
+        'fp3',
+        '2025_15_fp3_classification.json',
+        '2025_15_fp3_lap_times_fallback.json',
+        nullcontext()
+    )
 ]
 
 

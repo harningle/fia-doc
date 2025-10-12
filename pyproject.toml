@@ -10,11 +10,17 @@ readme = "README.md"
 
 requires-python = ">=3.12,<3.13"  # jolpica-schemas requires 3.12+
 dependencies = [
+  "beautifulsoup4>=4.0,<5.0",
   "matplotlib>=3.4.0,<4.0.0",
+  "lxml>=6.0,<7.0",
+  "opencv-python>=4.10.0,<5.0.0",
+  "paddleocr==3.2.0",
+  "paddlepaddle==3.2.0",
   "pandas>=2.0.0,<3.0.0",
   "pydantic>=2.0.0,<3.0.0",
   "pymupdf==1.26.0",
   "requests>=2.28.0,<3.0.0",
+  "scipy>=1.16.0,<1.17.0",
   "jolpica-schemas @ git+https://github.com/jolpica/jolpica-f1@71f12b1c9637aa838926abcb6f4840fbfac4d87c#egg=jolpica-schemas&subdirectory=jolpica/schemas",
 ]
 
@@ -47,9 +53,15 @@ minversion = "6.0"
 testpaths = [
     "fiadoc/tests"
 ]
+filterwarnings = [
+  "ignore::DeprecationWarning:importlib.*:",  # See pymupdf/PyMuPDF#3931 and swig/swig#2881
+  "ignore::DeprecationWarning:sys.*:",
+  "ignore:.*provisional.*:UserWarning",  # Ignore warnings like "using provisional classification"
+  "ignore:.*ccache.*:UserWarning"        # ccache not found warnings from paddleocr. No idea
+]
 
 [tool.ruff]
-line-length = 99
+line-length = 100
 exclude = [
   "fiadoc/tests",
   "parse_event_note.py",
@@ -73,6 +85,7 @@ ignore = [
   "PD901",    # Fine if `df` as a var. name
   "E741",     # Don't care about ambiguous var. name. We have comments
   "PLR1711",  # I prefer explicit `return` even if returns nothing
+  "PLR0911",  # I know too many `return`'s are not good, but...
   "PLR0912",  # TODO: skip too many branches or statements or func. args. for now. Need to refactor
   "PLR0915",
   "PLR0913",

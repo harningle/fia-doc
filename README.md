@@ -3,6 +3,19 @@
 PDF parsers to extract structured data from FIA F1 documents. This is part of [theOehrly/Fast-F1#445](https://github.com/theOehrly/Fast-F1/issues/445) and [jolpica/jolpica-f1](https://github.com/jolpica/jolpica-f1).
 
 
+## Pre-requisites
+
+[tesseract](https://github.com/tesseract-ocr/tesseract) need to be installed before using this package. To install it, see [https://tesseract-ocr.github.io/tessdoc/Installation.html](https://tesseract-ocr.github.io/tessdoc/Installation.html).
+
+On Ubuntu, you can install it with:
+
+```bash
+sudo apt-get update
+sudo apt-get install tesseract-ocr
+sudo apt-get install libtesseract-dev
+```
+
+
 ## Parsing procedure
 
 1. Wed/Thu: get tyre compound from ["Event Notes/Pirelli Preview"](https://www.fia.com/sites/default/files/decision-document/2023%20United%20States%20Grand%20Prix%20-%20Event%20Notes%20-%20Pirelli%20Preview.pdf)
