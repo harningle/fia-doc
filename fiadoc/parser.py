@@ -558,7 +558,9 @@ class EntryListParser:
            in black, and sometimes has grey background. We always have such colour checks when
            dealing with empty areas, so they won't be mistakenly included. Actually the opposite.
            This is the reason why we use a very conservative 1/3 here, because some empty areas are
-           too short, so need to be very conservative when detecting these non-text empty areas
+           too short, so need to be very conservative when detecting these non-text empty areas.
+           E.g., the empty area between the main table and fastest lap in 2024 Spanish vs the same
+           empty area in 2025 Austrian
         """
         line_height = np.mean([i[3] - i[1] for i in car_nos])
         assert line_gap < line_height / 3, (
@@ -644,7 +646,6 @@ class PracticeParser(BaseParser):
         self._check_session()
 
     def _check_session(self) -> None:
-        # TODO: why I created this method?
         if self.session not in get_args(PracticeSessionT):
             raise ValueError(f'Invalid session: {self.session}. '
                              f'Valid sessions are: {get_args(PracticeSessionT)}')
@@ -658,6 +659,15 @@ class PracticeParser(BaseParser):
     def classification_df(self) -> pd.DataFrame:
         return self._parse_classification()
 
+    @cached_property
+    def lap_times_df(self) -> Optional[pd.DataFrame]:
+        if self.lap_times_file:
+            return self._parse_lap_times()
+        else:
+            warnings.warn('Lap times PDF is missing. Can get fastest laps only from the '
+                          'classification PDF')
+            return self._apply_fallback_fastest_laps()
+
     def _parse_classification(self) -> pd.DataFrame:
         """Parse "(First/Second/Third) Practice Final Classification" PDF
 
@@ -666,96 +676,91 @@ class PracticeParser(BaseParser):
         """
         # Find the page with "Practice Session Classification", on which the table is located
         doc = pymupdf.open(self.classification_file)
-        found = []
+        classification = []
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)
-            found = page.search_for('Practice Session Classification')
-            if found:
+            classification = page.search_for('Practice Session Classification')
+            if classification:
                 break
-        if not found:
+        if not classification:
             doc.close()
             raise ValueError(f'"Practice Session Classification" not found on any page in '
                              f'{self.classification_file}')
 
-        # Page width. This is the rightmost x-coord. of the table
-        w = page.bound()[2]
+        # Position of "Practice Session Classification", below which is the table
+        b_classification = classification[0].y1
 
-        # Position of "Practice Session Classification", which is the topmost y-coord. of the table
-        y = found[0].y1
+        # Find the first black horizontal line below "Practice Session Classification"
+        if black_line := page.search_for_black_line(clip=(0, b_classification, page.w, page.h)):
+            t_table_body = sorted(black_line)[0]  # Topmost black line below "Final Classification"
+        else:
+            raise ParsingError(f'Cannot find the black line separating table header and table '
+                               f'body below "Practice Session Classification" on p.{page.number} '
+                               f'in {self.classification_file}')
 
-        # Bottommost y-coord. of the table, which is a big white strip below the table
-        # Go though the pixel map and find a wide horizontal white strip with 10+ px height
-        pixmap = page.get_pixmap(clip=(0, y + 50, w, page.bound()[3]))
-        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-        is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
-        white_strips = []
-        strip_start = None
-        for i, is_white in enumerate(is_white_row):
-            if is_white and strip_start is None:
-                strip_start = i
-            elif not is_white and strip_start is not None:
-                if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:  # At least 10 rows of white pixels
-                    white_strips.append(strip_start + t)
-                strip_start = None
-        if (strip_start is not None
-                and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
-            white_strips.append(strip_start + t)
-        if not white_strips:
-            raise ValueError(f'Could not find a white strip below the table on p.{page.number} in '
-                             f'{self.classification_file}')
-        strip_start = white_strips[0]  # The topmost one is the bottom of the table
-        b = strip_start
+        # Get text/line height
+        temp = page.get_text('blocks', clip=(0, b_classification, page.w, t_table_body))
+        if not temp:
+            raise ParsingError(f'Cound not find any text in the table header on p.{page.number} '
+                               f'in {self.classification_file}')
+        line_height = np.mean([i[3] - i[1] for i in temp])
 
-        # Table bounding box
-        bbox = pymupdf.Rect(0, y, w, b)
+        # The first white strip below the table header, which is the bottom of the table
+        white_strip = page.search_for_white_strip(clip=(0, t_table_body, page.w, page.h),
+                                                  height=line_height / 3)
+        if white_strip:
+            b_table = sorted(white_strip)[0]
+        else:
+            raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
+                               f'{self.classification_file}')
 
-        # Left and right x-coords. of table cols.
-        pos = {}
-        for col in ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'TIME', 'LAPS', 'GAP', 'INT', 'KM/H',
-                    'TIME OF DAY']:
-            pos[col] = {
-                'left': page.search_for(col, clip=bbox)[0].x0,
-                'right': page.search_for(col, clip=bbox)[0].x1
-            }
-            # TODO: will find "NORRIS" when searching for "NO"?
+        # Get table col. names and their positions
+        cols = self._detect_cols(page,
+                                 clip=(0, b_classification + 1, page.w, t_table_body - 1),
+                                 col_min_gap=1)
+        if not cols:
+            raise ParsingError(f'Could not detect cols. in the table header on p.{page.number} in '
+                               f'{self.classification_file}')
+        cols = {i.text: i for i in cols}
+        if set(cols.keys()) != {'NO', 'DRIVER', 'NAT', 'ENTRANT', 'TIME', 'LAPS', 'GAP', 'INT',
+                                'KM/H', 'TIME OF DAY'}:
+            raise ParsingError(f'Got unexpected or miss some table cols. on p.{page.number} in '
+                               f'{self.classification_file}: {cols}')
 
         # Vertical lines separating the columns
         vlines = [
             0,
-            pos['NO']['left'] - 1,
-            (pos['NO']['right'] + pos['DRIVER']['left']) / 2,
-            pos['NAT']['left'] - 1,
-            (pos['NAT']['right'] + pos['ENTRANT']['left']) / 2,
-            1.5 * pos['TIME']['left'] - 0.5 * pos['TIME']['right'],  # Left of "TIME" minus the
-            pos['LAPS']['left'],  # half-width of "TIME"
-            pos['LAPS']['right'],
-            (pos['GAP']['right'] + pos['INT']['left']) / 2,
-            (pos['INT']['right'] + pos['KM/H']['left']) / 2,
-            pos['TIME OF DAY']['left'],
-            pos['TIME OF DAY']['right']
+            cols['NO'].l,
+            (cols['NO'].r + cols['DRIVER'].l) / 2,
+            cols['NAT'].l - 1,
+            (cols['NAT'].r + cols['ENTRANT'].l) / 2,
+            1.5 * cols['TIME'].l - 0.5 * cols['TIME'].r,  # Left of "TIME" - half-width of "TIME"
+            cols['LAPS'].l,
+            cols['LAPS'].r,
+            (cols['GAP'].r + cols['INT'].l) / 2,
+            (cols['INT'].r + cols['KM/H'].l) / 2,
+            cols['TIME OF DAY'].l,
+            cols['TIME OF DAY'].r
         ]
 
         # Horizontal lines separating the rows
-        car_nos = page.get_text('blocks', clip=(pos['NO']['left'], y, pos['NO']['right'], b))
-        hlines = [y]
-        for i in range(len(car_nos) - 1):
-            hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
-        hlines.append(b)
+        hlines = page.search_for_grey_white_rows(clip=(0, t_table_body + 1, page.w, b_table + 1),
+                                                 min_height=line_height / 3)
 
         # Parse the table using the grid above
         df = self._parse_table_by_grid(
             page=page,
             vlines=vlines,
             hlines=hlines,
-            header_included=True
+            header_included=False
         )
         assert df.shape[1] == 11, (  # noqa: PLR2004
-            f'Expected 11 cols on p.{page.number} in {self.classification_file}. Got '
+            f'Expected 11 cols. on p.{page.number} in {self.classification_file}. Got '
             f'{df.columns.tolist()}'
         )
-        df.columns.to_numpy()[0] = 'position'  # zero-th col. has no name in PDF, so name it
-
+        df.columns = ['position'] + list(cols.keys())
+        df = df.replace('', None)  # Empty strings --> None, so `duration_to_millisecond` can skip
+                                   # e.g. empty "TIME" cells without error
         # Set col. names
         del df['NAT']
         df = df.rename(columns={
@@ -802,7 +807,7 @@ class PracticeParser(BaseParser):
                             status=None,
                             laps_completed=x.laps_completed,
                             fastest_lap_rank=x.finishing_position  # It's FP so finishing position
-                        )  # is the fastest lap ranking
+                        )                                          # is the fastest lap ranking
                     ]
                 ).model_dump(exclude_none=True, exclude_unset=True),
                 axis=1
@@ -810,6 +815,297 @@ class PracticeParser(BaseParser):
 
         df.to_json = to_json
         return df
+
+    def _parse_lap_times(self) -> pd.DataFrame:
+        """Parse "Practice Session Lap Times" PDF"""
+        # TODO: this is identical to race lap analysis and quali. lap times parser. Consider
+        #       refactor/unify them
+        doc = pymupdf.open(self.lap_times_file)
+        dfs = []
+        for page in doc:
+            # Find "Lap Times"
+            page = Page(page, file=self.lap_times_file)  # noqa: PLW2901
+            quali_lap_times = page.search_for('Lap Times')
+            if len(quali_lap_times) != 1:
+                raise ParsingError(f'Find none or multiple "Lap Times" on p.{page.number} in '
+                                   f'{self.lap_times_file}')
+            b_lap_times = quali_lap_times[0].y1
+
+            # Find the white strip immediately below "Lap Times", below which are the tables
+            white_strip = page.search_for_white_strip(clip=(0, b_lap_times, page.w, page.h))
+            if not white_strip:
+                raise ParsingError(f'Expect at least a white strip below "Lap Times" on '
+                                   f'p.{page.number} in {self.lap_times_file}. Found: '
+                                   f'{white_strip}')
+            t_all_drivers = white_strip[0]
+
+            # Find all black horizontal lines (see RaceParser._parse_lap_analysis for details)
+            black_lines = page.search_for_black_line(clip=(0, t_all_drivers, page.w, page.h),
+                                                     min_length=0.25)
+            if not black_lines:
+                raise ParsingError(f'Could not find any black line below "Lap Times" on '
+                                   f'p.{page.number} in {self.lap_times_file}')
+
+            # Each line should be the separator between a table header and its body
+            t_table_headers = []
+            t_drivers = []
+            b_tables = []
+            for i in range(len(black_lines) - 1, -1, -1):
+                # Table header is vertically between the black line and the white strip immediately
+                # above the black line
+                black_line = black_lines[i]
+                white_strip = page.search_for_white_strip(clip=(0, 0, page.w, black_line))
+                if not white_strip:
+                    raise ParsingError(f'Could not find any white strips above the black line '
+                                       f'at {black_line} on p.{page.number} in '
+                                       f'{self.lap_times_file}. Found: {white_strip}')
+                t_table_header = sorted(white_strip)[-1]
+                header = page.get_text(clip=(0, t_table_header, page.w, black_line))
+
+                # If no table header found, then it's the last black line at the bottom of the
+                # page. Drop it
+                if not ('NO' in header and 'TIME' in header):
+                    black_lines.pop(i)
+                    continue
+                t_table_headers.insert(0, t_table_header)
+
+                # The driver name is above the table header and the next white strip above
+                if len(white_strip) < 2:  # noqa: PLR2004
+                    raise ParsingError(f'Expect at least two white strips above the black line at '
+                                       f'{black_line} on p.{page.number} in '
+                                       f'{self.lap_times_file}. Found: {white_strip}')
+                t_drivers.insert(0, white_strip[-2])
+
+                # Table bottom is the next white strip below the black line
+                white_strip = page.search_for_white_strip(clip=(0, black_line, page.w, page.h))
+                if not white_strip:
+                    raise ParsingError(f'Could not find any white strip below the black line at '
+                                       f'{black_line} on p.{page.number} in {self.lap_times_file}')
+                b_tables.insert(0, white_strip[0])
+
+            # Two tables are vertically separated by a vertical white strip
+            page.set_rotation(90)
+            table_separators = page.search_for_white_strip(
+                clip=(page.h - b_tables[-1], 0, page.h - t_drivers[0], page.w),
+                height=0.03 * page.w  # White strip should occupy at least 3% of the page width
+            )
+            page.set_rotation(0)
+            # A driver has at least one table, so at least two white strips: one to the left of the
+            # table and the other to the right of it
+            if len(table_separators) < 2:  # noqa: PLR2004
+                raise ParsingError(f'Expect at least two vertical white strips below driver names '
+                                   f'on p.{page.number} in {self.lap_times_file}. Found: '
+                                   f'{table_separators}')
+
+            # Loop through each table
+            for i in range(len(t_drivers)):
+                t_driver = t_drivers[i] + 1
+                t_table_header = t_table_headers[i] + 1
+                b_table_header = black_lines[i] - 1
+                b_table = b_tables[i] + 1
+                for j in range(0, len(table_separators) - 1):
+                    l_table = max(0, table_separators[j] - 1)
+                    r_table = table_separators[j + 1] + 1
+
+                    # Get the driver name and car No.
+                    driver = page.get_text(clip=(l_table, t_driver, r_table, t_table_header))
+                    if not driver.strip():  # E.g., four tables on a page. The second row only has
+                        continue            # one table, so we will have missing's here
+                    car_no = re.match(r'^(\d+)\s+[A-Za-z ]+$', driver.strip())
+                    if car_no:
+                        car_no = int(car_no.group(1))
+                    else:
+                        raise ParsingError(f'Could not parse car No. in '
+                                           f'({l_table:.2f}, {t_driver:.2f}, {r_table:.2f}, '
+                                           f'{t_table_header:.2f}) on p.{page.number} in '
+                                           f'{self.lap_times_file}: {driver}')
+
+                    # Find the vertical white strip separating the two tables for the driver
+                    page.set_rotation(90)
+                    white_strip = page.search_for_white_strip(
+                        clip=(page.h - b_table, l_table, page.h - t_table_header, r_table),
+                        height=1  # Any height is fine
+                    )
+                    page.set_rotation(0)
+                    # Table left, separator, and right. Three in total
+                    if len(white_strip) != 3:  # noqa: PLR2004
+                        raise ParsingError(f'Expected exactly three vertical white strips in '
+                                           f'({l_table:.2f}, {t_table_header:.2f}, '
+                                           f'{r_table:.2f}, {b_table:.2f}) on p.'
+                                           f'{page.number} in {self.lap_times_file}. '
+                                           f'Found: {white_strip}')
+                    m_table = white_strip[1] + 1
+
+                    # Parse each of the two tables of the driver
+                    for l_tab, r_tab in [(l_table, m_table), (m_table, r_table)]:
+                        # Refine table bottom
+                        white_strip = page.search_for_white_strip(
+                            clip=(l_tab, b_table_header, r_tab, page.h)
+                        )
+                        if not white_strip:
+                            raise ParsingError(f'Could not find any white strip below the table in '
+                                               f'({l_tab:.2f}, {b_table_header:.2f}, '
+                                               f'{r_tab:.2f}, {b_table:.2f}) on p.'
+                                               f'{page.number} in {self.lap_times_file}')
+                        b_table = white_strip[0]
+
+                        # Get table header
+                        cols = self._detect_cols(
+                            page,
+                            clip=(l_tab, t_table_header, r_tab, b_table_header),
+                            col_min_gap=3,
+                            min_black_line_length=0.5
+                        )
+                        if len(cols) != 2:  # noqa: PLR2004
+                            raise ParsingError(f'Expected exactly two cols. in '
+                                               f'({l_tab:.2f}, {t_table_header:.2f}, '
+                                               f'{r_tab:.2f}, {b_table_header:.2f}) on p.'
+                                               f'{page.number} in {self.lap_times_file}. '
+                                               f'Found: {cols}')
+                        if cols[0].text != 'NO' or cols[1].text != 'TIME':
+                            raise ParsingError(f'Expected "LAP" and "TIME" to be the two col. '
+                                               f'names in ({l_tab:.2f}, {t_table_header:.2f}, '
+                                               f'{r_tab:.2f}, {b_table_header:.2f}) on p.'
+                                               f'{page.number} in {self.lap_times_file}. '
+                                               f'Found: {cols}')
+                        l_tab = cols[0].l - 1  # More accurate table left boundary  # noqa: PLW2901
+
+                        # Vertical lines separating the two cols.
+                        vlines = [l_tab, (cols[0].r + cols[1].l) / 2, r_tab]
+
+                        # Horizontal lines are located by the grey and white rows
+                        hlines = page.search_for_grey_white_rows(
+                            clip=(l_tab, b_table_header - 1, r_tab, b_table + 1),
+                            min_height=np.mean([i.b - i.t for i in cols]) - 1,
+                            min_width=0.5
+                        )
+
+                        # Parse the table
+                        df = self._parse_table_by_grid(page=page,
+                                                       vlines=vlines,
+                                                       hlines=hlines,
+                                                       header_included=False)
+                        if df.empty:  # E.g., DNS so no lap at all
+                            continue
+                        df.columns = [i.text.lower() for i in cols]
+                        df = df.rename(columns={'no': 'lap_no', 'time': 'lap_time'})
+                        df['lap_time_deleted'] = False
+
+                        # Check if any crossed-out lap times
+                        for k in range(len(hlines) - 1):
+                            clip = (vlines[1], hlines[k], vlines[2], hlines[k + 1])
+                            if page.has_horizontal_line(clip):
+                                df.loc[k, 'lap_time_deleted'] = True
+
+                        # Indicator for pit stop
+                        df['pit'] = df.lap_no.str.contains('P', regex=False)
+                        df.lap_no = df.lap_no.str.rstrip(' P').astype(int)
+                        df['car_no'] = int(car_no)
+                        dfs.append(df)
+
+        # Clean up
+        df = pd.concat(dfs, ignore_index=True)
+        df.lap_no = df.lap_no.astype(int)
+        df = df[df.lap_no != 1]  # First lap's lap time is calendar time of the lap, not lap time
+        df.car_no = df.car_no.astype(int)
+        df = df.replace('', None)  # So empty cell will become NaN when cast to float
+        df.lap_time = df.lap_time.apply(duration_to_millisecond)
+
+        # Check if fastest lap here is the same as that in classification PDF
+        classification_df = self.classification_df[['car_no', 'fastest_lap_time']]
+        temp = (df[(df.lap_time_deleted == False) & (df.pit == False)]  # noqa: E712
+                .assign(lap_time_milliseconds=lambda x: x.lap_time.str['milliseconds'])
+                .sort_values(['car_no', 'lap_time_milliseconds'], ascending=True)
+                .groupby('car_no', as_index=False)
+                .first()[['car_no', 'lap_no', 'lap_time']]
+                .merge(classification_df[classification_df.fastest_lap_time.notna()],
+                       on='car_no',  # The above `.notna()` excludes drivers without any valid lap
+                       how='outer',  # time, e.g. 2024 Azerbaijan FP1 Ocon
+                       validate='1:1',
+                       indicator=True))
+        # TODO: what if a driver has two laps with identical fastest lap time? Label the first one
+        #       as the fastest lap and second as not?
+        if (temp._merge != 'both').any():
+            raise AssertionError(f'Found some cars only appearing in one but not both of the lap '
+                                 f'times and classification PDFs:\n'
+                                 f'{temp[temp._merge != "both"].to_string(index=False)}')
+        if (temp.lap_time != temp.fastest_lap_time).any():
+            diff = temp[temp.lap_time != temp.fastest_lap_time]
+            raise AssertionError(f'Fastest lap time in lap times PDF does not match the one in '
+                                 f'classification PDF\n:{diff.to_string(index=False)}')
+
+        # Create the indicator for fastest lap
+        df = df.merge(temp[['car_no', 'lap_no']],
+                      on=['car_no', 'lap_no'],
+                      how='left',
+                      validate='m:1',
+                      indicator=True)
+        df['is_fastest_lap'] = (df._merge == 'both')
+        del df['_merge']
+
+        def to_json() -> list[dict]:
+            temp = df.copy()
+            temp['lap'] = temp.apply(
+                lambda x: LapObject(
+                    number=x.lap_no,
+                    time=x.lap_time,
+                    is_deleted=x.lap_time_deleted,
+                    is_entry_fastest_lap=x.is_fastest_lap
+                ),
+                axis=1
+            )
+            temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
+            temp['session_entry'] = temp.car_no.map(
+                lambda x: SessionEntryForeignKeys(
+                    year=self.year,
+                    round=self.round_no,
+                    session=self.session,
+                    car_number=x
+                )
+            )
+            return temp.apply(
+                lambda x: LapImport(
+                    object_type='Lap',
+                    foreign_keys=x.session_entry,
+                    objects=x.lap
+                ).model_dump(exclude_unset=True),
+                axis=1
+            ).tolist()
+
+        df.to_json = to_json  # TODO: bad practice
+        return df
+
+    def _apply_fallback_fastest_laps(self) -> pd.DataFrame:
+        """
+        Get fastest laps (and no other lap at all) from classification PDF, in case lap times PDF
+        is not available.
+        """
+        fastest_laps = self.classification_df[['car_no', 'fastest_lap_time']].dropna(how='any')
+
+        def to_json() -> list[dict]:
+            return fastest_laps.apply(
+                lambda x: LapImport(
+                    object_type='Lap',
+                    foreign_keys=SessionEntryForeignKeys(
+                        year=self.year,
+                        round=self.round_no,
+                        session=self.session,
+                        car_number=x.car_no
+                    ),
+                    objects=[
+                        LapObject(
+                            number=None,  # can't know the lap No. from classification PDF
+                            time=x.fastest_lap_time,
+                            is_deleted=False,
+                            is_entry_fastest_lap=True
+                        )
+                    ]
+                ).model_dump(exclude_unset=True),
+                axis=1
+            ).tolist()
+
+        fastest_laps.to_json = to_json  # TODO: bad practice
+        return fastest_laps
 
 
 class RaceParser(BaseParser):
@@ -1709,12 +2005,7 @@ class RaceParser(BaseParser):
                 axis=1
             ).tolist()
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(df.to_json(), f)
-
         df.to_json = to_json
-        df.to_pkl = to_pkl
         return df
 
     def _cross_validate(self) -> None:
@@ -1743,6 +2034,7 @@ class QualifyingParser(BaseParser):
 
     @cached_property
     def is_pdf_complete(self) -> bool:
+        # TODO: need this property?
         if self.lap_times_file is None:
             return False
         return True
