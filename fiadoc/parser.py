@@ -2277,6 +2277,48 @@ class QualifyingParser(BaseParser):
             not_classified = pd.DataFrame(columns=df.columns)
         df = pd.concat([df, not_classified], ignore_index=True)
 
+        # Parse "DISQUALIFIED" table, if any
+        if disqualified := page.search_for('DISQUALIFIED', clip=(0, b_table, page.w, page.h)):
+            """
+            There can be multiple "DISQUALIFIED" text. E.g., in the penalty notes, we may have
+            "DISQUALIFIED", and we may have "DISQUALIFIED" as the table title. The table title
+            should be horizontally centred on the page, so we do the following check.
+            """
+            disqualified.sort(key=lambda x: x.y0)  # The topmost "DISQUALIFIED"
+            disqualified = disqualified[0]
+            if np.isclose((disqualified.x0 + disqualified.x1) / 2, page.w / 2, rtol=0.1):
+                t_table_body = disqualified.y1
+                if white_strip := page.search_for_white_strip(
+                        clip=(0, t_table_body, page.w, page.h),
+                        height=line_height / 3
+                ):
+                    b_table = white_strip[0]
+                else:
+                    raise ParsingError(
+                        f'Could not find the bottom of "DISQUALIFIED" table by white strip on '
+                        f'p.{page.number} in {self.classification_file}'
+                    )
+                hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, page.w, b_table),
+                                                         min_height=line_height / 3)
+                disqualified = self._parse_table_by_grid(page, vlines=vlines, hlines=hlines,
+                                                         header_included=False)
+                disqualified.columns = df.columns.drop(['finishing_status', 'original_order',
+                                                        'is_classified'])
+                disqualified.position = None  # No finishing position for DSQ drivers
+                n = len(df)
+                disqualified['original_order'] = range(n + 1, n + len(disqualified) + 1)
+                disqualified['finishing_status'] = 20  # TODO: should clean up the code later
+                disqualified['is_classified'] = False
+            else:
+                warnings.warn(f'Found "DISQUALIFIED" on p.{page.number} in '
+                              f'{self.classification_file}, but it is not horizontally '
+                              f'centred. May be a penalty note instead of a DISQUALIFIED table. '
+                              f'Ignored')
+                disqualified = pd.DataFrame(columns=df.columns)
+        else:
+            disqualified = pd.DataFrame(columns=df.columns)
+        df = pd.concat([df, disqualified], ignore_index=True)
+
         """
         `is_classified` here is simply a flag to indicate whether the driver belongs to the "NOT
         CLASSIFIED" table. It doesn't mean a driver is classified or not in F1 sense.. Basically
@@ -2622,7 +2664,7 @@ class QualifyingParser(BaseParser):
 
                         # Horizontal lines are located by the grey and white rows
                         hlines = page.search_for_grey_white_rows(
-                            clip=(l_tab, b_table_header - 1, r_tab, b_table + 1),
+                            clip=(l_tab, b_table_header + 1, r_tab, b_table + 1),
                             min_height=np.mean([i.b - i.t for i in cols]) - 1,
                             min_width=0.5
                         )
