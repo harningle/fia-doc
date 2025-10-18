@@ -1462,7 +1462,7 @@ class RaceParser(BaseParser):
 
     def _parse_lap_times(self) -> pd.DataFrame:
         # Get lap times from Race Lap Analysis PDF
-        df = self._parse_lap_analysis()
+        df = self._parse_lap_analysis().drop_duplicates()
 
         # Lap 1's lap times are calendar time in Race Lap Analysis. To get the actual lap time for
         # lap 1, we parse Race History Chart PDF
