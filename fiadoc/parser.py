@@ -399,29 +399,24 @@ class EntryListParser:
             for x in df.itertuples():
                 try:
                     drivers.append(RoundEntryImport(
-                            object_type="RoundEntry",
-                            foreign_keys=RoundEntry(
-                                year=self.year,
-                                round=self.round_no,
-                                team_reference=x.constructor,
-                                driver_reference=x.driver
-                            ),
-                            objects=[
-                                RoundEntryObject(
-                                    car_number=x.car_no
-                                )
-                            ]
-                        ).model_dump(exclude_unset=True))
+                        object_type='RoundEntry',
+                        foreign_keys=RoundEntry(
+                            year=self.year,
+                            round=self.round_no,
+                            team_reference=x.constructor,
+                            driver_reference=x.driver
+                        ),
+                        objects=[
+                            RoundEntryObject(
+                                car_number=x.car_no
+                            )
+                        ]
+                    ).model_dump(exclude_unset=True))
                 except ValidationError as e:
                     warnings.warn(f'Error when parsing driver {x.driver} in {self.file}: {e}')
             return drivers
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(df.to_json(), f)
-
         df.to_json = to_json
-        df.to_pkl = to_pkl
         return df
 
 

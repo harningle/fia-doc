@@ -137,7 +137,7 @@ def quali_lap_times_to_json(df, year, round_no, session) -> list[dict]:
         )
         temp['lap_data'] = temp.apply(
             lambda x: LapImport(
-                object_type="Lap",
+                object_type='Lap',
                 foreign_keys=x['session_entry'],
                 objects=x['lap']
             ).model_dump(exclude_unset=True),
@@ -333,4 +333,3 @@ class Page:
             return images[0]['rect']
         else:
             return None
-

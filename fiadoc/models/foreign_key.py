@@ -5,7 +5,7 @@ from typing import Self
 from jolpica.schemas import data_import
 from pydantic import ConfigDict, field_validator, model_validator
 
-from .._constants import DRIVERS, TEAMS
+from .._constants import TEAMS
 
 
 class SessionValidatorMixin:
@@ -41,50 +41,26 @@ class SessionValidatorMixin:
 class SessionEntryForeignKeys(
     data_import.SessionEntryForeignKeys, SessionValidatorMixin
 ):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class PitStopForeignKeys(data_import.PitStopForeignKeys, SessionValidatorMixin):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class RoundEntry(data_import.RoundEntryForeignKeys):
-    @model_validator(mode="before")
+    @model_validator(mode='before')
     def get_team_reference(self) -> Self:
-        if self["year"] in TEAMS:
-            if self["team_reference"] in TEAMS[self["year"]]:
-                self["team_reference"] = TEAMS[self["year"]][self["team_reference"]]
+        if self['year'] in TEAMS:
+            if self['team_reference'] in TEAMS[self['year']]:
+                self['team_reference'] = TEAMS[self['year']][self['team_reference']]
                 return self
             else:
                 raise ValueError(
-                    f"team {self['team_reference']} not found in year "
-                    f"{self['year']}'s team name mapping. Available teams: "
-                    f"{TEAMS[self['year']].keys()}"
+                    f"team {self['team_reference']} not found in year {self['year']}'s team name "
+                    f"mapping. Available teams: {TEAMS[self['year']].keys()}"
                 )
         else:
-            raise ValueError(
-                f"year {self['year']} not found in team name mapping. Available "
-                f"years: {TEAMS.keys()}"
-            )
+            raise ValueError(f'year {self["year"]} not supported. Available years: {TEAMS.keys()}')
 
-    @model_validator(mode="before")
-    def get_driver_name(self) -> Self:
-        if self["year"] in DRIVERS:
-            if self["driver_reference"] in DRIVERS[self["year"]]:
-                self["driver_reference"] = DRIVERS[self["year"]][
-                    self["driver_reference"]
-                ]
-                return self
-            else:
-                raise ValueError(
-                    f"driver {self['driver_reference']} not found in year "
-                    f"{self['year']}'s driver name mapping. Available drivers: "
-                    f"{DRIVERS[self['year']].keys()}"
-                )
-        else:
-            raise ValueError(
-                f"year {self['year']} not found in driver name mapping. Available "
-                f"years: {DRIVERS.keys()}"
-            )
-
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
