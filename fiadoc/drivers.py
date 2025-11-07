@@ -25,82 +25,83 @@ class Drivers:
     @cached_property
     def regular_drivers(self) -> dict[int, dict[str, str]]:
         """Manually maintained once a year for regular drivers. Will default to this to speed up"""
+        # TODO: move this huge dict to a json file?
         return {
             2023: {
-                'Max Verstappen': 'max_verstappen',
-                'Sergio Perez': 'perez',
-                'Charles Leclerc': 'leclerc',
-                'Carlos Sainz': 'sainz',
-                'George Russell': 'russell',
-                'Lewis Hamilton': 'hamilton',
-                'Esteban Ocon': 'ocon',
-                'Pierre Gasly': 'gasly',
-                'Oscar Piastri': 'piastri',
-                'Lando Norris': 'norris',
-                'Valtteri Bottas': 'bottas',
-                'Zhou Guanyu': 'zhou',
-                'Lance Stroll': 'stroll',
-                'Fernando Alonso': 'alonso',
-                'Kevin Magnussen': 'kevin_magnussen',
-                'Nico Hulkenberg': 'hulkenberg',
-                'Daniel Ricciardo': 'ricciardo',
-                'Yuki Tsunoda': 'tsunoda',
-                'Alexander Albon': 'albon',
-                'Logan Sargeant': 'sargeant',
-                'Nyck de Vries': 'de_vries',
-                'Liam Lawson': 'lawson'
+                'max verstappen': 'max_verstappen',
+                'sergio perez': 'perez',
+                'charles leclerc': 'leclerc',
+                'carlos sainz': 'sainz',
+                'george russell': 'russell',
+                'lewis hamilton': 'hamilton',
+                'esteban ocon': 'ocon',
+                'pierre gasly': 'gasly',
+                'oscar piastri': 'piastri',
+                'lando norris': 'norris',
+                'valtteri bottas': 'bottas',
+                'zhou guanyu': 'zhou',
+                'lance stroll': 'stroll',
+                'fernando alonso': 'alonso',
+                'kevin magnussen': 'kevin_magnussen',
+                'nico hulkenberg': 'hulkenberg',
+                'daniel ricciardo': 'ricciardo',
+                'yuki tsunoda': 'tsunoda',
+                'alexander albon': 'albon',
+                'logan sargeant': 'sargeant',
+                'nyck de vries': 'de_vries',
+                'liam lawson': 'lawson'
             },
             2024: {
-                'Max Verstappen': 'max_verstappen',
-                'Sergio Perez': 'perez',
-                'George Russell': 'russell',
-                'Lewis Hamilton': 'hamilton',
-                'Charles Leclerc': 'leclerc',
-                'Carlos Sainz': 'sainz',
-                'Oscar Piastri': 'piastri',
-                'Lando Norris': 'norris',
-                'Lance Stroll': 'stroll',
-                'Fernando Alonso': 'alonso',
-                'Esteban Ocon': 'ocon',
-                'Pierre Gasly': 'gasly',
-                'Alexander Albon': 'albon',
-                'Logan Sargeant': 'sargeant',
-                'Daniel Ricciardo': 'ricciardo',
-                'Yuki Tsunoda': 'tsunoda',
-                'Valtteri Bottas': 'bottas',
-                'Zhou Guanyu': 'zhou',
-                'Kevin Magnussen': 'kevin_magnussen',
-                'Nico Hulkenberg': 'hulkenberg',
-                'Oliver Bearman': 'bearman',
-                'Franco Colapinto': 'colapinto',
-                'Jack Doohan': 'doohan',
-                'Liam Lawson': 'lawson',
-                'Andrea Kimi Antonelli': 'antonelli'
+                'max verstappen': 'max_verstappen',
+                'sergio perez': 'perez',
+                'george russell': 'russell',
+                'lewis hamilton': 'hamilton',
+                'charles leclerc': 'leclerc',
+                'carlos sainz': 'sainz',
+                'oscar piastri': 'piastri',
+                'lando norris': 'norris',
+                'lance stroll': 'stroll',
+                'fernando alonso': 'alonso',
+                'esteban ocon': 'ocon',
+                'pierre gasly': 'gasly',
+                'alexander albon': 'albon',
+                'logan sargeant': 'sargeant',
+                'daniel ricciardo': 'ricciardo',
+                'yuki tsunoda': 'tsunoda',
+                'valtteri bottas': 'bottas',
+                'zhou guanyu': 'zhou',
+                'kevin magnussen': 'kevin_magnussen',
+                'nico hulkenberg': 'hulkenberg',
+                'oliver bearman': 'bearman',
+                'franco colapinto': 'colapinto',
+                'jack doohan': 'doohan',
+                'liam lawson': 'lawson',
+                'andrea kimi antonelli': 'antonelli'
             },
             2025: {
-                'Oscar Piastri': 'piastri',
-                'Lando Norris': 'norris',
-                'Charles Leclerc': 'leclerc',
-                'Lewis Hamilton': 'hamilton',
-                'Max Verstappen': 'max_verstappen',
-                'Liam Lawson': 'lawson',
-                'George Russell': 'russell',
-                'Andrea Kimi Antonelli': 'antonelli',
-                'Kimi Antonelli': 'antonelli',
-                'Lance Stroll': 'stroll',
-                'Fernando Alonso': 'alonso',
-                'Pierre Gasly': 'gasly',
-                'Jack Doohan': 'doohan',
-                'Esteban Ocon': 'ocon',
-                'Oliver Bearman': 'bearman',
-                'Isack Hadjar': 'hadjar',
-                'Yuki Tsunoda': 'tsunoda',
-                'Alexander Albon': 'albon',
-                'Carlos Sainz': 'sainz',
-                'Nico Hulkenberg': 'hulkenberg',
-                'Gabriel Bortoleto': 'bortoleto',
-                'Garbiel Bortoleto': 'bortoleto',  # Typo in entry list in 2025 Australian
-                'Franco Colapinto': 'colapinto'
+                'oscar piastri': 'piastri',
+                'lando norris': 'norris',
+                'charles leclerc': 'leclerc',
+                'lewis hamilton': 'hamilton',
+                'max verstappen': 'max_verstappen',
+                'liam lawson': 'lawson',
+                'george russell': 'russell',
+                'andrea kimi antonelli': 'antonelli',
+                'kimi antonelli': 'antonelli',
+                'lance stroll': 'stroll',
+                'fernando alonso': 'alonso',
+                'pierre gasly': 'gasly',
+                'jack doohan': 'doohan',
+                'esteban ocon': 'ocon',
+                'oliver bearman': 'bearman',
+                'isack hadjar': 'hadjar',
+                'yuki tsunoda': 'tsunoda',
+                'alexander albon': 'albon',
+                'carlos sainz': 'sainz',
+                'nico hulkenberg': 'hulkenberg',
+                'gabriel bortoleto': 'bortoleto',
+                'garbiel bortoleto': 'bortoleto',  # typo in entry list in 2025 australian
+                'franco colapinto': 'colapinto'
             }
         }
 
@@ -123,13 +124,13 @@ class Drivers:
         cached_file = self._cache_dir / 'driver_mapping.json'
         if cached_file.exists():
             self._refresh_cache()
+            with open(cached_file, 'r', encoding='utf8') as f:
+                return json.load(f)
         else:
             drivers = self._get_all_drivers_from_jolpica()
             with open(cached_file, 'w', encoding='utf8') as f:
                 json.dump(drivers, f, indent=4)
-
-        with open(cached_file, 'r', encoding='utf8') as f:
-            return json.load(f)
+            return drivers
 
     @classmethod
     def _get_driver_count(cls):
@@ -154,6 +155,7 @@ class Drivers:
         params = {'format': 'json', 'limit': limit, 'offset': offset}
 
         while True:
+            params['offset'] = offset
             resp = requests.get(f'{BASE_URL}/drivers', params=params)
             if resp.status_code != 200:
                 raise JolpicaApiError(f'/ergast/f1/drivers failure: '
@@ -168,7 +170,7 @@ class Drivers:
                     full_name = 'Zhou Guanyu'
                 else:
                     full_name = f'{driver['givenName']} {driver['familyName']}'
-                drivers[full_name] = driver['driverId']
+                drivers[full_name.lower()] = driver['driverId']
 
             offset += limit
             if offset >= int(data['MRData']['total']):
@@ -176,21 +178,29 @@ class Drivers:
             time.sleep(0.25)  # Rate limit 4 requests per second
         return drivers
 
-    def _refresh_cache(self) -> None:
+    def _refresh_cache(self, force_overwrite: bool = False) -> None:
         """Refresh cached driver mapping ONLY IF Jolpica's total driver count is different"""
-        cached_drivers = self.cached_drivers
-        jolpica_total_count = self._get_driver_count()
-        if len(cached_drivers) == jolpica_total_count:
-            return
+        cached_file = self._cache_dir / 'driver_mapping.json'
+
+        if not force_overwrite:
+            with open(cached_file, 'r', encoding='utf8') as f:
+                cached_drivers = json.load(f)
+            jolpica_total_count = self._get_driver_count()
+            if len(cached_drivers) == jolpica_total_count:
+                return
 
         drivers = self._get_all_drivers_from_jolpica()
-        cached_file = self._cache_dir / 'driver_mapping.json'
         with open(cached_file, 'w', encoding='utf8') as f:
             json.dump(drivers, f, indent=4)
         return
 
     def get(self, year: int, full_name: str) -> str:
         """Get driver ID from full name"""
+        # Exception for ZHOU Guanyu
+        full_name = full_name.lower()
+        if full_name == 'guanyu zhou':
+            full_name = 'zhou guanyu'
+
         if year in self.regular_drivers and full_name in self.regular_drivers[year]:
             return self.regular_drivers[year][full_name]
         elif year not in self.regular_drivers:
@@ -201,6 +211,7 @@ class Drivers:
                           f'Going to Jolpica for driver ID')
 
         drivers = self.cached_drivers
+
         if full_name in drivers:
             return drivers[full_name]
         else:
