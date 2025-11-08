@@ -45,7 +45,7 @@ def test_not_in_current_year_but_exists_in_jolpica(year: int, full_name: str, ex
     ]
 )
 def test_not_in_maintained_years_but_exists_in_jolpica(year: int, full_name: str, expected: str):
-    """In case we backfill earlier years' data and I don't want to manually maintain these years"""
+    """In case we do a year whose regular drivers are not manually maintained"""
     with pytest.warns(UserWarning,
                       match=f'Year {year} not maintained in regular drivers mapping. Going to '
                             f'Jolpica for driver ID'):
@@ -61,8 +61,13 @@ def test_not_in_maintained_years_but_exists_in_jolpica(year: int, full_name: str
     ]
 )
 def test_create_new_driver_id(year: int, full_name: str, expected: str):
-    with pytest.warns(UserWarning,
-                      match=f'Driver {full_name.lower()} not found in Jolpica. Creating a new '
-                            f'driver ID "{expected}" for {full_name.lower()}'):
+    with pytest.warns(Warning) as record:
         driver_id = DRIVERS.get(year, full_name)
+
+    assert len(record) == 2
+    assert record[0].message.args[0] == f'Driver {full_name.lower()} not found in year {year} ' \
+                                        f'regular drivers mapping. Going to Jolpica for driver ID'
+    assert record[1].message.args[0] == (f'Driver {full_name.lower()} not found in Jolpica. '
+                                         f'Creating a new driver ID "{expected}" for '
+                                         f'{full_name.lower()}')
     assert driver_id == expected
