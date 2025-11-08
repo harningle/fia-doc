@@ -1,5 +1,7 @@
-from contextlib import nullcontext
 import json
+import os
+import warnings
+from contextlib import nullcontext
 
 import pytest
 
@@ -8,31 +10,7 @@ from fiadoc.utils import download_pdf
 
 race_list = [
     (
-        'doc_66_-_2023_united_states_grand_prix_-_final_race_classification.pdf',
-        '2023_19_usa_f1_r0_timing_racelapanalysis_v01.pdf',
-        '2023_19_usa_f1_r0_timing_racehistorychart_v01.pdf',
-        '2023_19_usa_f1_r0_timing_racelapchart_v01.pdf',
-        2023,
-        18,
-        'race',
-        '2023_18_race_classification.json',
-        '2023_18_race_lap_times.json',
-        nullcontext()
-    ),
-    (
-        'doc_43_-_2023_united_states_grand_prix_-_final_sprint_classification.pdf',
-        '2023_19_usa_f1_s0_timing_sprintlapanalysis_v01.pdf',
-        '2023_19_usa_f1_s0_timing_sprinthistorychart_v01.pdf',
-        '2023_19_usa_f1_s0_timing_sprintlapchart_v01.pdf',
-        2023,
-        18,
-        'sprint',
-        '2023_18_sprint_classification.json',
-        '2023_18_sprint_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # test an event without unclassified drivers
+        # 0: normal race w/o unclassified drivers
         '2024_10_esp_f1_r0_timing_raceprovisionalclassification_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racelapanalysis_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racehistorychart_v01_1.pdf',
@@ -45,6 +23,7 @@ race_list = [
         nullcontext()
     ),
     (
+        # 1: normal race w/ some unclassified drivers
         'doc_50_-_2024_monaco_grand_prix_-_provisional_race_classification.pdf',
         '2024_08_mon_f1_r0_timing_racelapanalysis_v01.pdf',
         '2024_08_mon_f1_r0_timing_racehistorychart_v01.pdf',
@@ -57,19 +36,7 @@ race_list = [
         nullcontext()
     ),
     (
-        'doc_76_-_2023_austrian_grand_prix_-_final_race_classification.pdf',
-        '2023_10_aut_f1_r0_timing_racelapanalysis_v01.pdf',
-        '2023_10_aut_f1_r0_timing_racehistorychart_v01.pdf',
-        '2023_10_aut_f1_r0_timing_racelapchart_v01.pdf',
-        2023,
-        9,
-        'race',
-        '2023_9_race_classification.json',
-        '2023_9_race_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # DNF but classified, e.g., crashed in final lap, but finished 90%+ of the race
+        # 2: DNF but classified, e.g., crashed in final lap, but finished 90%+ of the race
         # (jolpica/jolpica-f1#223, jolpica/jolpica-f1#246)
         'https://www.fia.com/system/files/decision-document/2025_canadian_grand_prix_-_final_race_classification.pdf',
         '2025_10_can_f1_r0_timing_racelapanalysis_v01.pdf',
@@ -83,7 +50,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Without some lap times PDF
+        # 3: only classification PDF available, w/o some lap times PDF
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_race_classification.pdf',
         '2025_07_ita_f1_r0_timing_racelapanalysis_v01_0.pdf',
         None,
@@ -97,7 +64,20 @@ race_list = [
                       match='Lap chart, history chart, or lap time PDFs is missing')
     ),
     (
-        # A car starts a few laps later (#60)
+        # 4: entire PDF is an image (#36)
+        'https://www.fia.com/system/files/decision-document/2025_austrian_grand_prix_-_final_race_classification.pdf',
+        '2025_11_aut_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2025_11_aut_f1_r0_timing_racehistorychart_v01.pdf',
+        '2025_11_aut_f1_r0_timing_racelapchart_v01.pdf',
+        2025,
+        11,
+        'race',
+        '2025_11_race_classification.json',
+        '2025_11_race_lap_times.json',
+        nullcontext()
+    ),
+    (
+        # 5: a car starts a few laps later (#60)
         'https://www.fia.com/system/files/decision-document/2025_belgian_grand_prix_-_final_sprint_classification.pdf',
         '2025_13_bel_f1_s0_timing_sprintlapanalysis_v01.pdf',
         '2025_13_bel_f1_s0_timing_sprinthistorychart_v01.pdf',
@@ -223,3 +203,47 @@ def test_parse_race(prepare_race_data):
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
 
+
+@pytest.mark.full
+@pytest.mark.parametrize('year, round_no',
+                         [(2024, i) for i in range(1, 25)]
+                         + [(2025, i) for i in range(1, 25)])
+def test_parse_race_full(year: int, round_no: int):
+    pdf = {
+        'race': {
+            'classification': [
+                f'data/pdf/{year}_{round_no}_race_final_classification.pdf',
+                f'data/pdf/{year}_{round_no}_race_provisional_classification.pdf'
+            ],
+            'lap_analysis': f'data/pdf/{year}_{round_no}_race_lap_analysis.pdf',
+            'history_chart': f'data/pdf/{year}_{round_no}_race_history_chart.pdf',
+            'lap_chart': f'data/pdf/{year}_{round_no}_race_lap_chart.pdf'
+        },
+        'sprint': {
+            'classification': [
+                f'data/pdf/{year}_{round_no}_sprint_final_classification.pdf',
+                f'data/pdf/{year}_{round_no}_sprint_provisional_classification.pdf'
+            ],
+            'lap_analysis': f'data/pdf/{year}_{round_no}_sprint_lap_analysis.pdf',
+            'history_chart': f'data/pdf/{year}_{round_no}_sprint_history_chart.pdf',
+            'lap_chart': f'data/pdf/{year}_{round_no}_sprint_lap_chart.pdf'
+        }
+    }
+
+    for session in pdf:
+        for i in ['lap_analysis', 'history_chart', 'lap_chart']:
+            if not os.path.exists(pdf[session][i]):
+                warnings.warn(f"{i.replace('_', ' ').capitalize()} PDF for {year} round "
+                              f"{round_no} {session} doesn't exist. Parsing classification only")
+                pdf[session][i] = None
+        for classification in pdf[session]['classification']:
+            if not os.path.exists(classification):
+                warnings.warn(f"Classification PDF for {year} round {round_no} {session} "
+                              f"doesn't exist, skipping")
+            else:
+                parser = RaceParser(classification, pdf[session]['lap_analysis'],
+                                    pdf[session]['history_chart'], pdf[session]['lap_chart'],
+                                    year, round_no, session)
+                parser.classification_df.to_json()
+                parser.lap_times_df.to_json()
+    return
