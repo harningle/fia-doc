@@ -9,13 +9,25 @@ from typing import Literal, Optional, get_args
 import numpy as np
 import pandas as pd
 import pymupdf
-from pydantic import ValidationError
 from scipy.ndimage import find_objects, label
 
 from ._constants import QUALI_DRIVERS
+from .drivers import Drivers
 from .models.classification import SessionEntryImport, SessionEntryObject
-from .models.driver import RoundEntryImport, RoundEntryObject
-from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
+from .models.driver import (
+    DriverImport,
+    DriverObject,
+    RoundEntryImport,
+    RoundEntryObject,
+    TeamDriverImport,
+    TeamDriverObject
+)
+from .models.foreign_key import (
+    PitStopForeignKeys,
+    RoundEntryForeignKeys,
+    SessionEntryForeignKeys,
+    TeamDriverForeignKeys
+)
 from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
 from .utils import (
@@ -25,7 +37,7 @@ from .utils import (
     TextBlock,
     duration_to_millisecond,
     quali_lap_times_to_json,
-    time_to_timedelta,
+    time_to_timedelta
 )
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -33,6 +45,8 @@ pd.set_option('future.no_silent_downcasting', True)
 PracticeSessionT = Literal['fp', 'fp1', 'fp2', 'fp3']
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
+
+DRIVERS = Drivers()
 
 WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
 LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
@@ -599,25 +613,64 @@ class EntryListParser:
         df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, line_height, tol)
 
         def to_json() -> list[dict]:
-            drivers = []
+            """
+            Create RoundEntry for each driver in the entry list, and create DriverObject for
+            drivers that are not yet in Jolpica
+            """
+            drivers: list[dict] = []
+            new_drivers: list[DriverObject] = []
+            new_team_drivers: list[dict] = []
             for x in df.itertuples():
-                try:
-                    drivers.append(RoundEntryImport(
-                        object_type='RoundEntry',
-                        foreign_keys=RoundEntry(
-                            year=self.year,
-                            round=self.round_no,
-                            team_reference=x.constructor,
-                            driver_reference=x.driver
-                        ),
-                        objects=[
-                            RoundEntryObject(
-                                car_number=x.car_no
+                # Check if the driver exists in Jolpica. If not, create a DriverObject and
+                # TeamDriverObject (mark him as a junior driver) for him
+                with warnings.catch_warnings(record=True) as w:
+                    warnings.simplefilter('always')
+                    driver_id = DRIVERS.get(year=self.year, full_name=x.driver)
+                    for warn in w:
+                        if 'Creating a new driver ID' in str(warn.message):
+                            new_drivers.append(
+                                DriverObject(
+                                    reference=driver_id,
+                                    forename=' '.join(x.driver.split(' ')[:-1]),
+                                    surname=x.driver.split(' ')[-1],
+                                    country_code=x.nat
+                                )
                             )
-                        ]
-                    ).model_dump(exclude_unset=True))
-                except ValidationError as e:
-                    warnings.warn(f'Error when parsing driver {x.driver} in {self.file}: {e}')
+                            new_team_drivers.append(
+                                TeamDriverImport(
+                                    object_type='TeamDriver',
+                                    foreign_keys=TeamDriverForeignKeys(
+                                        year=self.year,
+                                        team_reference=x.constructor,
+                                        driver_reference=driver_id
+                                    ),
+                                    objects=[
+                                        TeamDriverObject(
+                                            role=2
+                                        )
+                                    ]
+                                ).model_dump(exclude_unset=True)
+                            )
+
+                drivers.append(RoundEntryImport(
+                    object_type='RoundEntry',
+                    foreign_keys=RoundEntryForeignKeys(
+                        year=self.year,
+                        round=self.round_no,
+                        team_reference=x.constructor,
+                        driver_reference=driver_id
+                    ),
+                    objects=[
+                        RoundEntryObject(
+                            car_number=x.car_no
+                        )
+                    ]
+                ).model_dump(exclude_unset=True))
+
+            if new_drivers:
+                warnings.warn('New drivers found in entry list PDF')
+                drivers.append(DriverImport(objects=new_drivers).model_dump(exclude_none=True))
+                drivers.extend(new_team_drivers)
             return drivers
 
         df.to_json = to_json
@@ -906,7 +959,7 @@ class PracticeParser(BaseParser):
                     driver = page.get_text(clip=(l_table, t_driver, r_table, t_table_header))
                     if not driver.strip():  # E.g., four tables on a page. The second row only has
                         continue            # one table, so we will have missing's here
-                    car_no = re.match(r'^(\d+)\s+[A-Za-z ]+$', driver.strip())
+                    car_no = re.match(r'^(\d+)\s+\D+$', driver.strip())
                     if car_no:
                         car_no = int(car_no.group(1))
                     else:
