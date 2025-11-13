@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+from typing import Any
 
 # import uuid
 from functools import cached_property
@@ -1015,3 +1016,25 @@ class ParsingError(Exception):
 
 class OCRError(Exception):
     pass
+
+
+def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort a list of dicts by their keys and values, for comparison purposes"""
+    def _sort_dict(d: dict) -> dict:
+        sorted_dict = {}  # Need Python >= 3.7 for ordered dict.
+        for key in sorted(d.keys()):
+            if isinstance(d[key], dict):
+                sorted_dict[key] = _sort_dict(d[key])
+            elif isinstance(d[key], list):
+                sorted_list = []
+                for item in d[key]:
+                    if isinstance(item, dict):
+                        sorted_list.append(_sort_dict(item))
+                    else:
+                        sorted_list.append(item)
+                sorted_dict[key] = sorted_list
+            else:
+                sorted_dict[key] = d[key]
+        return sorted_dict
+
+    return [_sort_dict(i) for i in j]
