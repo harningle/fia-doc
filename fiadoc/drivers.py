@@ -10,12 +10,26 @@ from pathlib import Path
 from typing import Optional
 
 import requests
+from filelock import FileLock
 
 BASE_URL = 'https://api.jolpi.ca/ergast/f1'
+TIMEOUT = 10  # Seconds
 
 
 class Drivers:
+    """
+    Class to handle driver full name to ID mapping. Will first look up the manually maintained
+    regular drivers. If not found, will check (locally cached and the latest) Jolpica. If still not
+    found, create a new driver ID based on the full name.
+    """
     def __init__(self, cache_dir: Optional[str | os.PathLike] = None):
+        """Initialise Drivers class
+
+        :param cache_dir: Path to cache directory. The default is
+                          * Windows: %LocalAppData%/fiadoc/Cache
+                          * macOS: ~/Library/Caches/fiadoc
+                          * Linux: ~/.cache/fiadoc
+        """
         if cache_dir:
             self._cache_dir = Path(cache_dir)
             self._cache_dir.mkdir(parents=True, exist_ok=True)
@@ -107,6 +121,11 @@ class Drivers:
 
     @cached_property
     def _default_cache_dir(self) -> Path:
+        """
+        * Windows: %LocalAppData%/fiadoc/Cache
+        * macOS: ~/Library/Caches/fiadoc
+        * Linux: ~/.cache/fiadoc
+        """
         match sys.platform:
             case 'linux':
                 cache_dir = Path.home() / '.cache' / 'fiadoc'
@@ -120,17 +139,23 @@ class Drivers:
         return cache_dir
 
     @property
+    # TODO: cached_property?
     def cached_drivers(self) -> dict[str, str]:
+        """Get cached drivers from Jolpica, and refresh it if needed"""
         cached_file = self._cache_dir / 'driver_mapping.json'
-        if cached_file.exists():
-            self._refresh_cache()
-            with open(cached_file, 'r', encoding='utf8') as f:
-                return json.load(f)
-        else:
-            drivers = self._get_all_drivers_from_jolpica()
-            with open(cached_file, 'w', encoding='utf8') as f:
-                json.dump(drivers, f, indent=4)
-            return drivers
+        lock_file = self._cache_dir / 'driver_mapping.json.lock'
+        with FileLock(lock_file, timeout=60):
+            if cached_file.exists():
+                self._refresh_cache()
+                with open(cached_file, 'r', encoding='utf8') as f:
+                    return json.load(f)
+            else:
+                drivers = self._get_all_drivers_from_jolpica()
+                with open(cached_file.with_suffix('.tmp'), 'w', encoding='utf8') as f:
+                    json.dump(drivers, f, indent=4)
+                os.replace(cached_file.with_suffix('.tmp'), cached_file)  # Atomic write
+                os.remove(cached_file.with_suffix('.tmp'))
+                return drivers
 
     @classmethod
     def _get_driver_count(cls):
@@ -139,9 +164,11 @@ class Drivers:
         decide whether to refresh the local cache
         """
         url = f'{BASE_URL}/drivers/?format=json&limit=1'
-        resp = requests.get(url)
-        if resp.status_code != 200:
-            raise JolpicaApiError(f'/ergast/f1/drivers failure: {resp.status_code}\n{resp.text}')
+        try:
+            resp = requests.get(url, timeout=TIMEOUT)
+        except requests.exceptions.RequestException as e:
+            raise JolpicaApiError(f'/ergast/f1/drivers failure: {e}')
+        time.sleep(0.25)  # Rate limit
         return int(resp.json()['MRData']['total'])
 
     @classmethod
@@ -156,10 +183,10 @@ class Drivers:
 
         while True:
             params['offset'] = offset
-            resp = requests.get(f'{BASE_URL}/drivers', params=params)
-            if resp.status_code != 200:
-                raise JolpicaApiError(f'/ergast/f1/drivers failure: '
-                                      f'{resp.status_code}\n{resp.text}')
+            try:
+                resp = requests.get(f'{BASE_URL}/drivers', params=params, timeout=TIMEOUT)
+            except requests.exceptions.RequestException as e:
+                raise JolpicaApiError(f'/ergast/f1/drivers failure: {e}')
             data = resp.json()
 
             driver_list = data['MRData']['DriverTable']['Drivers']
@@ -183,12 +210,17 @@ class Drivers:
         cached_file = self._cache_dir / 'driver_mapping.json'
 
         if not force_overwrite:
-            with open(cached_file, 'r', encoding='utf8') as f:
-                cached_drivers = json.load(f)
-            jolpica_total_count = self._get_driver_count()
-            if len(cached_drivers) == jolpica_total_count:
-                return
+            try:
+                with open(cached_file, 'r', encoding='utf8') as f:
+                    cached_drivers = json.load(f)
+                jolpica_total_count = self._get_driver_count()
+                if len(cached_drivers) == jolpica_total_count:
+                    return
+            except Exception as e:
+                warnings.warn(f'Failed to read existing driver cache; force refreshing it: {e}')
 
+        # If reaches here, either we want to force overwrite/update the cache, or something is
+        # wrong with the existing cache (e.g., JSONDecodeError)
         drivers = self._get_all_drivers_from_jolpica()
         with open(cached_file, 'w', encoding='utf8') as f:
             json.dump(drivers, f, indent=4)

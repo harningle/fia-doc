@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-import pickle
 import re
 import warnings
 from functools import cached_property, partial

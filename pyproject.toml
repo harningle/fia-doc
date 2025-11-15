@@ -10,9 +10,8 @@ readme = "README.md"
 
 requires-python = ">=3.12,<3.13"  # jolpica-schemas requires 3.12+
 dependencies = [
-  "beautifulsoup4>=4.0,<5.0",
+  "filelock>=3.19.0,<4.0.0",
   "matplotlib>=3.4.0,<4.0.0",
-  "lxml>=6.0,<7.0",
   "opencv-python>=4.10.0,<5.0.0",
   "paddleocr==3.2.0",
   "paddlepaddle==3.2.0",
@@ -92,5 +91,6 @@ ignore = [
   "PLR1714",  # Write out all comparisons for readability
   "UP009",    # UTF-8 encoding
   "UP007",    # I prefer `Optional[xxx]` over xxx | None
-  "UP045"     # I prefer `Optional[xxx]` over xxx | None
+  "UP045",    # I prefer `Optional[xxx]` over xxx | None
+  "UP015"     # Explicitly write out file mode even if it's the default
 ]
