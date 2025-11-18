@@ -1018,22 +1018,13 @@ class OCRError(Exception):
 
 
 def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Sort a list of dicts by their keys and values, for comparison purposes"""
-    def _sort_dict(d: dict) -> dict:
-        sorted_dict = {}  # Need Python >= 3.7 for ordered dict.
-        for key in sorted(d.keys()):
-            if isinstance(d[key], dict):
-                sorted_dict[key] = _sort_dict(d[key])
-            elif isinstance(d[key], list):
-                sorted_list = []
-                for item in d[key]:
-                    if isinstance(item, dict):
-                        sorted_list.append(_sort_dict(item))
-                    else:
-                        sorted_list.append(item)
-                sorted_dict[key] = sorted_list
-            else:
-                sorted_dict[key] = d[key]
-        return sorted_dict
-
-    return [_sort_dict(i) for i in j]
+    """Sort a list of dicts by their keys and values, for comparison used in tests"""
+    def _sort_recursively(i: Any) -> Any:
+        """Helper function to sort lists/dicts recursively"""
+        if isinstance(i, dict):
+            return {k: _sort_recursively(v) for k, v in sorted(i.items())}
+        elif isinstance(i, list):
+            return sorted([_sort_recursively(k) for k in i], key=lambda x: str(x))
+        else:
+            return i
+    return _sort_recursively(j)

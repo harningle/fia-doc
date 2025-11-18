@@ -19,13 +19,13 @@ from .models.driver import (
     RoundEntryImport,
     RoundEntryObject,
     TeamDriverImport,
-    TeamDriverObject
+    TeamDriverObject,
 )
 from .models.foreign_key import (
     PitStopForeignKeys,
     RoundEntryForeignKeys,
     SessionEntryForeignKeys,
-    TeamDriverForeignKeys
+    TeamDriverForeignKeys,
 )
 from .models.lap import LapImport, LapObject
 from .models.pit_stop import PitStopData, PitStopObject
@@ -36,7 +36,7 @@ from .utils import (
     TextBlock,
     duration_to_millisecond,
     quali_lap_times_to_json,
-    time_to_timedelta
+    time_to_timedelta,
 )
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -617,7 +617,7 @@ class EntryListParser:
             drivers that are not yet in Jolpica
             """
             drivers: list[dict] = []
-            new_drivers: list[DriverObject] = []
+            new_driver_objects: list[DriverObject] = []
             new_team_drivers: list[dict] = []
             for x in df.itertuples():
                 # Check if the driver exists in Jolpica. If not, create a DriverObject and
@@ -627,7 +627,7 @@ class EntryListParser:
                     driver_id = DRIVERS.get(year=self.year, full_name=x.driver)
                     for warn in w:
                         if 'Creating a new driver ID' in str(warn.message):
-                            new_drivers.append(
+                            new_driver_objects.append(
                                 DriverObject(
                                     reference=driver_id,
                                     forename=' '.join(x.driver.split(' ')[:-1]),
@@ -666,10 +666,11 @@ class EntryListParser:
                     ]
                 ).model_dump(exclude_unset=True))
 
-            if new_drivers:
+            if new_driver_objects:
                 warnings.warn('New drivers found in entry list PDF')
-                drivers.append(DriverImport(objects=new_drivers).model_dump(exclude_none=True))
-                drivers.extend(new_team_drivers)
+                drivers.append(DriverImport(objects=new_driver_objects)
+                               .model_dump(exclude_none=True))  # Need default foreign key here so
+                drivers.extend(new_team_drivers)                # can't `exclude_unset`
             return drivers
 
         df.to_json = to_json

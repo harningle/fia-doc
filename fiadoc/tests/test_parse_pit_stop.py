@@ -6,7 +6,7 @@ import warnings
 import pytest
 
 from fiadoc.parser import PitStopParser
-from fiadoc.utils import download_pdf
+from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
@@ -39,14 +39,7 @@ def prepare_pit_stop_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
     with open('fiadoc/tests/fixtures/' + expected, encoding='utf-8') as f:
         expected = json.load(f)
 
-    # Sort data
-    data.sort(key=lambda x: (x['foreign_keys']['car_number']))
-    expected.sort(key=lambda x: (x['foreign_keys']['car_number']))
-    for i in data:
-        i['objects'].sort(key=lambda x: x['number'])
-    for i in expected:
-        i['objects'].sort(key=lambda x: x['number'])
-    return data, expected
+    return sort_json(data), sort_json(expected)
 
 
 def test_parse_pit_stop(prepare_pit_stop_data):

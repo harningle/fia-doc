@@ -138,8 +138,7 @@ class Drivers:
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir
 
-    @property
-    # TODO: cached_property?
+    @cached_property
     def cached_drivers(self) -> dict[str, str]:
         """Get cached drivers from Jolpica, and refresh it if needed"""
         cached_file = self._cache_dir / 'driver_mapping.json'
@@ -154,11 +153,10 @@ class Drivers:
                 with open(cached_file.with_suffix('.tmp'), 'w', encoding='utf8') as f:
                     json.dump(drivers, f, indent=4)
                 os.replace(cached_file.with_suffix('.tmp'), cached_file)  # Atomic write
-                os.remove(cached_file.with_suffix('.tmp'))
                 return drivers
 
-    @classmethod
-    def _get_driver_count(cls):
+    @staticmethod
+    def _get_driver_count():
         """
         Get the total #. of drivers from jolpica API. Will use this count as the sole criteria to
         decide whether to refresh the local cache
@@ -171,8 +169,8 @@ class Drivers:
         time.sleep(0.25)  # Rate limit
         return int(resp.json()['MRData']['total'])
 
-    @classmethod
-    def _get_all_drivers_from_jolpica(cls) -> dict[str, str]:
+    @staticmethod
+    def _get_all_drivers_from_jolpica() -> dict[str, str]:
         """
         Get all drivers from Jolpica and return as a driver full name to ID dict.
         """
