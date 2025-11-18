@@ -164,10 +164,11 @@ class Drivers:
         url = f'{BASE_URL}/drivers/?format=json&limit=1'
         try:
             resp = requests.get(url, timeout=TIMEOUT)
-        except requests.exceptions.RequestException as e:
+            n_drivers = int(resp.json()['MRData']['total'])
+        except Exception as e:
             raise JolpicaApiError(f'/ergast/f1/drivers failure: {e}')
         time.sleep(0.25)  # Rate limit
-        return int(resp.json()['MRData']['total'])
+        return n_drivers
 
     @staticmethod
     def _get_all_drivers_from_jolpica() -> dict[str, str]:
@@ -183,9 +184,9 @@ class Drivers:
             params['offset'] = offset
             try:
                 resp = requests.get(f'{BASE_URL}/drivers', params=params, timeout=TIMEOUT)
-            except requests.exceptions.RequestException as e:
+                data = resp.json()
+            except Exception as e:
                 raise JolpicaApiError(f'/ergast/f1/drivers failure: {e}')
-            data = resp.json()
 
             driver_list = data['MRData']['DriverTable']['Drivers']
             if not driver_list:
