@@ -1,13 +1,44 @@
 # -*- coding: utf-8 -*-
 """If we can handle usual drivers and create driver references for new guys not in Jolpica"""
-import pytest
+import json
+from tempfile import TemporaryDirectory
 
-from fiadoc.drivers import Drivers
+import pytest
+import requests_mock
+
+from fiadoc.drivers import Drivers, BASE_URL
+
+CACHE_DIR = TemporaryDirectory().name
 
 
 @pytest.fixture
 def drivers() -> Drivers:
-    return Drivers()
+    return Drivers(cache_dir=CACHE_DIR)
+
+
+@pytest.fixture
+def jolpica_mock(requests_mock: requests_mock.Mocker):
+    """Mock Jolpica API endpoints"""
+    with open('fiadoc/tests/fixtures/cached_drivers.json', 'r', encoding='utf8') as f:
+        cached_drivers = json.loads(f.read())
+    n_cached_drivers = str(len(cached_drivers))
+
+    requests_mock.get(
+        f'{BASE_URL}/drivers/?format=json&limit=1',
+        json={'MRData': {'total': n_cached_drivers}}
+    )
+    requests_mock.get(
+        f'{BASE_URL}/drivers',
+        json={
+            'MRData': {
+                'total': n_cached_drivers,
+                'DriverTable': {
+                    'Drivers': cached_drivers
+                }
+            }
+        }
+    )
+
 
 @pytest.mark.parametrize(
     'year, full_name, expected',
@@ -31,7 +62,7 @@ def test_regular(drivers: Drivers, year: int, full_name: str, expected: str):
     ]
 )
 def test_not_in_current_year_but_exists_in_jolpica(
-        drivers: Drivers, year: int, full_name: str, expected: str
+        drivers: Drivers, year: int, full_name: str, expected: str, jolpica_mock
 ):
     """E.g., Hulkenberg replaced Stroll in 2020 Eifel, but he was not a regular driver that year"""
     with pytest.warns(UserWarning,
@@ -49,7 +80,7 @@ def test_not_in_current_year_but_exists_in_jolpica(
     ]
 )
 def test_not_in_maintained_years_but_exists_in_jolpica(
-        drivers: Drivers, year: int, full_name: str, expected: str
+        drivers: Drivers, year: int, full_name: str, expected: str, jolpica_mock
 ):
     """In case we do a year whose regular drivers are not manually maintained"""
     with pytest.warns(UserWarning,
@@ -66,7 +97,7 @@ def test_not_in_maintained_years_but_exists_in_jolpica(
         (2024, 'Have Three Names', 'have_three_names')
     ]
 )
-def test_create_new_driver_id(drivers: Drivers, year: int, full_name: str, expected: str):
+def test_create_new_driver_id(drivers: Drivers, year: int, full_name: str, expected: str, jolpica_mock):
     with pytest.warns(Warning) as record:
         driver_id = drivers.get(year, full_name)
 

@@ -2,9 +2,12 @@ import json
 import os
 import warnings
 from contextlib import nullcontext
+from tempfile import TemporaryDirectory
 
 import pytest
+import requests_mock
 
+from fiadoc.drivers import BASE_URL
 from fiadoc.parser import EntryListParser
 from fiadoc.utils import download_pdf, sort_json
 
@@ -79,9 +82,37 @@ race_list = [
 # Not going to test year 2023 for entry list, as their PDF format is different, and we are not
 # interested in retrospectively parsing old entry list PDFs
 
+os.environ['FIADOC_CACHE_DIR'] = TemporaryDirectory().name
+
+
+@pytest.fixture
+def jolpica_mock(requests_mock: requests_mock.Mocker):
+    """Mock Jolpica API endpoints"""
+    requests_mock.real_http = True  # Allow unmocked requests to pass through
+
+    with open('fiadoc/tests/fixtures/cached_drivers.json', 'r', encoding='utf8') as f:
+        cached_drivers = json.loads(f.read())
+    n_cached_drivers = str(len(cached_drivers))
+
+    requests_mock.get(
+        f'{BASE_URL}/drivers/?format=json&limit=1',
+        json={'MRData': {'total': n_cached_drivers}}
+    )
+    requests_mock.get(
+        f'{BASE_URL}/drivers',
+        json={
+            'MRData': {
+                'total': n_cached_drivers,
+                'DriverTable': {
+                    'Drivers': cached_drivers
+                }
+            }
+        }
+    )
+
 
 @pytest.fixture(params=race_list)
-def prepare_entry_list_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
+def prepare_entry_list_data(request, tmp_path, jolpica_mock) -> tuple[list[dict], list[dict]]:
     # Download and parse entry list PDF
     url, year, round_no, expected, context = request.param
     if year <= 2024:

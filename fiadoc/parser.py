@@ -45,7 +45,7 @@ PracticeSessionT = Literal['fp', 'fp1', 'fp2', 'fp3']
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
 
-DRIVERS = Drivers()
+DRIVERS = Drivers(cache_dir=os.environ.get('FIADOC_CACHE_DIR', None))
 
 WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
 LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
