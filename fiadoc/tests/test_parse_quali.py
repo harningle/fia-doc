@@ -1,11 +1,13 @@
-from contextlib import nullcontext
 import json
+import os
+import warnings
+from contextlib import nullcontext
 from typing import Optional
 
 import pytest
 
 from fiadoc.parser import QualifyingParser
-from fiadoc.utils import download_pdf
+from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
@@ -17,28 +19,6 @@ race_list = [
         'quali',
         '2024_22_quali_classification.json',
         '2024_22_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # Normal quali.
-        'doc_20_-_2023_united_states_grand_prix_-_final_qualifying_classification.pdf',
-        '2023_19_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
-        2023,
-        18,
-        'quali',
-        '2023_18_quali_classification.json',
-        '2023_18_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # No "POLE POSITION" in quali. classification
-        'doc_32_-_2023_united_states_grand_prix_-_final_sprint_shootout_classification.pdf',
-        '2023_19_usa_f1_sq0_timing_sprintshootoutsessionlaptimes_v01.pdf',
-        2023,
-        18,
-        'sprint_quali',
-        '2023_18_sprint_quali_classification.json',
-        '2023_18_sprint_quali_lap_times.json',
         nullcontext()
     ),
     (
@@ -64,7 +44,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # DNF drivers in quali.
+        # DNF drivers in sprint quali.
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionprovisionalclassification_v01.pdf',
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -72,17 +52,6 @@ race_list = [
         'sprint_quali',
         '2024_21_sprint_quali_classification.json',
         '2024_21_sprint_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # No "POLE POSITION" in quali. classification
-        'doc_37_-_2023_spanish_grand_prix_-_final_qualifying_classification.pdf',
-        '2023_08_esp_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
-        2023,
-        7,
-        'quali',
-        '2023_7_quali_classification.json',
-        '2023_7_quali_lap_times.json',
         nullcontext()
     ),
     (
@@ -117,6 +86,17 @@ race_list = [
         'quali',
         '2024_3_quali_classification.json',
         '2024_3_quali_lap_times.json',
+        nullcontext()
+    ),
+    (
+        # Text is image in classification PDF
+        'https://www.fia.com/system/files/decision-document/2025_australian_grand_prix_-_final_qualifying_classification.pdf',
+        '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        2025,
+        1,
+        'quali',
+        '2025_1_quali_final_classification.json',
+        '2025_1_quali_lap_times.json',
         nullcontext()
     ),
     (
@@ -203,29 +183,12 @@ def prepare_quali_data(request, tmp_path) \
     with open('fiadoc/tests/fixtures/' + expected_lap_times, encoding='utf-8') as f:
         expected_lap_times = json.load(f)
 
-    # Sort data
-    classification_data.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    expected_classification.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    lap_times_data.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    for i in lap_times_data:
-        i['objects'].sort(key=lambda x: x['number'])
-    expected_lap_times.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    for i in expected_lap_times:
-        i['objects'].sort(key=lambda x: x['number'])
-
     # TODO: currently manually tested against fastf1 lap times. The test data should be generated
     #       automatically later. Also need to manually add if the lap time is deleted and if the
     #       lap is fastest manually. Also need to add the laps where PDFs have data but fastf1
     #       doesn't
-    return classification_data, lap_times_data, expected_classification, expected_lap_times
+    return (sort_json(classification_data),     sort_json(lap_times_data),
+            sort_json(expected_classification), sort_json(expected_lap_times))
 
 
 def test_parse_quali(prepare_quali_data):
@@ -276,4 +239,49 @@ def test_parse_quali(prepare_quali_data):
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
     """
+    return
+
+
+@pytest.mark.full
+@pytest.mark.parametrize('year, round_no',
+                         [(2024, i) for i in range(1, 25)]
+                         + [(2025, i) for i in range(1, 25)])
+def test_parse_quali_full(year: int, round_no: int):
+    quali_classification_pdfs = [f'data/pdf/{i}' for i in os.listdir('data/pdf')
+                                 if i.startswith(f'{year}_{round_no}_')
+                                 and ('quali' in i) and ('sprint' not in i)
+                                 and i.endswith('classification.pdf')]
+    sprint_quali_classification_pdfs = [f'data/pdf/{i}' for i in os.listdir('data/pdf')
+                                        if i.startswith(f'{year}_{round_no}_')
+                                        and 'sprint_quali' in i
+                                        and i.endswith('classification.pdf')]
+    quali_lap_times_pdf = f'data/pdf/{year}_{round_no}_quali_lap_times.pdf'
+    sprint_quali_lap_times_pdf = f'data/pdf/{year}_{round_no}_sprint_quali_lap_times.pdf'
+
+    if len(quali_classification_pdfs) == 0:
+        warnings.warn(f"Quali. classification PDF for {year} round {round_no} doesn't existed. "
+                      f"Skipping")
+    else:
+        if not os.path.exists(quali_lap_times_pdf):
+            warnings.warn(f"Quali. lap times PDF for {year} round {round_no} doesn't "
+                          f"existed. Parsing classification only")
+            quali_lap_times_pdf = None
+        for pdf in quali_classification_pdfs:  # Can have a provisional and a final classification
+            parser = QualifyingParser(pdf, quali_lap_times_pdf, year, round_no, 'quali')
+            parser.classification_df.to_json()
+            parser.lap_times_df.to_json()
+
+    if len(sprint_quali_classification_pdfs) == 0:
+        warnings.warn(f"Sprint quali. classification PDF for {year} round {round_no} doesn't "
+                      f"existed. Skipping")
+    else:
+        if not os.path.exists(sprint_quali_lap_times_pdf):
+            warnings.warn(f"Sprint quali. lap times PDF for {year} round {round_no} "
+                          f"doesn't existed. Parsing classification only")
+            sprint_quali_lap_times_pdf = None
+        for pdf in sprint_quali_classification_pdfs:  # Can have a provisional and a final class.
+            parser = QualifyingParser(pdf, sprint_quali_lap_times_pdf, year, round_no,
+                                      'sprint_quali')
+            parser.classification_df.to_json()
+            parser.lap_times_df.to_json()
     return

@@ -278,5 +278,77 @@
                 "car_number": 5
             }
         ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "victor_martins",
+            "team_reference": "williams",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 45
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "ryo_hirakawa",
+            "team_reference": "haas",
+            "round": 9
+        },
+        "objects": [
+            {
+                "car_number": 50
+            }
+        ]
+    },
+    {
+        "object_type": "Driver",
+        "foreign_keys": {},
+        "objects": [
+            {
+                "reference": "victor_martins",
+                "forename": "Victor",
+                "surname": "Martins",
+                "country_code": "FRA"
+            },
+            {
+                "reference": "ryo_hirakawa",
+                "forename": "Ryo",
+                "surname": "Hirakawa",
+                "country_code": "JPN"
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "victor_martins",
+            "team_reference": "williams",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "ryo_hirakawa",
+            "team_reference": "haas",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
     }
 ]
