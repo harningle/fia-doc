@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import warnings
+import unicodedata
 from functools import cached_property
 from pathlib import Path
 from typing import Optional
@@ -299,11 +300,14 @@ class Drivers:
         >>> Drivers.create_driver_id('Max Verstappen')
         'max_verstappen'
         >>> Drivers.create_driver_id('René Arnoux')
-        'rené_arnoux'
+        'rene_arnoux'
         >>> Drivers.create_driver_id('Nyck de Vries')
         'nyck_de_vries'
         """
-        normalised = ''.join(ch.lower() if ch.isalpha() else '_' for ch in full_name)
+        nfkd = unicodedata.normalize('NFKD', full_name)
+        ascii_name = ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+        normalised = ''.join(ch.lower() if ch.isalpha() else '_' for ch in ascii_name)
         while '__' in normalised:
             normalised = normalised.replace('__', '_')
         return normalised.strip('_')

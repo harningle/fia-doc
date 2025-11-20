@@ -95,7 +95,7 @@ def test_not_in_maintained_years_but_exists_in_jolpica(
     [
         (2025, 'New Guy', 'new_guy'),
         (2024, 'Have Three Names', 'have_three_names'),
-        (2023, 'With Accént', 'with_accént'),
+        (2023, 'With Accént', 'with_accent'),
         (2025, "Has apostr‘oph’'e", 'has_apostr_oph_e')
     ]
 )
