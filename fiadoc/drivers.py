@@ -5,17 +5,32 @@ import os
 import sys
 import time
 import warnings
+import unicodedata
 from functools import cached_property
 from pathlib import Path
 from typing import Optional
 
 import requests
+from filelock import FileLock
 
 BASE_URL = 'https://api.jolpi.ca/ergast/f1'
+TIMEOUT = 10  # Seconds
 
 
 class Drivers:
+    """
+    Class to handle driver full name to ID mapping. Will first look up the manually maintained
+    regular drivers. If not found, will check (locally cached and the latest) Jolpica. If still not
+    found, create a new driver ID based on the full name.
+    """
     def __init__(self, cache_dir: Optional[str | os.PathLike] = None):
+        """Initialise Drivers class
+
+        :param cache_dir: Path to cache directory. The default is
+                          * Windows: %LocalAppData%/fiadoc/Cache
+                          * macOS: ~/Library/Caches/fiadoc
+                          * Linux: ~/.cache/fiadoc
+        """
         if cache_dir:
             self._cache_dir = Path(cache_dir)
             self._cache_dir.mkdir(parents=True, exist_ok=True)
@@ -107,6 +122,11 @@ class Drivers:
 
     @cached_property
     def _default_cache_dir(self) -> Path:
+        """
+        * Windows: %LocalAppData%/fiadoc/Cache
+        * macOS: ~/Library/Caches/fiadoc
+        * Linux: ~/.cache/fiadoc
+        """
         match sys.platform:
             case 'linux':
                 cache_dir = Path.home() / '.cache' / 'fiadoc'
@@ -119,33 +139,40 @@ class Drivers:
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir
 
-    @property
+    @cached_property
     def cached_drivers(self) -> dict[str, str]:
+        """Get cached drivers from Jolpica, and refresh it if needed"""
         cached_file = self._cache_dir / 'driver_mapping.json'
-        if cached_file.exists():
-            self._refresh_cache()
-            with open(cached_file, 'r', encoding='utf8') as f:
-                return json.load(f)
-        else:
-            drivers = self._get_all_drivers_from_jolpica()
-            with open(cached_file, 'w', encoding='utf8') as f:
-                json.dump(drivers, f, indent=4)
-            return drivers
+        lock_file = self._cache_dir / 'driver_mapping.json.lock'
+        with FileLock(lock_file, timeout=60):
+            if cached_file.exists():
+                self._refresh_cache()
+                with open(cached_file, 'r', encoding='utf8') as f:
+                    return json.load(f)
+            else:
+                drivers = self._get_all_drivers_from_jolpica()
+                with open(cached_file.with_suffix('.tmp'), 'w', encoding='utf8') as f:
+                    json.dump(drivers, f, indent=4)
+                os.replace(cached_file.with_suffix('.tmp'), cached_file)  # Atomic write
+                return drivers
 
-    @classmethod
-    def _get_driver_count(cls):
+    @staticmethod
+    def _get_driver_count():
         """
         Get the total #. of drivers from jolpica API. Will use this count as the sole criteria to
         decide whether to refresh the local cache
         """
         url = f'{BASE_URL}/drivers/?format=json&limit=1'
-        resp = requests.get(url)
-        if resp.status_code != 200:
-            raise JolpicaApiError(f'/ergast/f1/drivers failure: {resp.status_code}\n{resp.text}')
-        return int(resp.json()['MRData']['total'])
+        try:
+            resp = requests.get(url, timeout=TIMEOUT)
+            n_drivers = int(resp.json()['MRData']['total'])
+        except Exception as e:
+            raise JolpicaApiError(f'/ergast/f1/drivers failure: {e}')
+        time.sleep(0.25)  # Rate limit
+        return n_drivers
 
-    @classmethod
-    def _get_all_drivers_from_jolpica(cls) -> dict[str, str]:
+    @staticmethod
+    def _get_all_drivers_from_jolpica() -> dict[str, str]:
         """
         Get all drivers from Jolpica and return as a driver full name to ID dict.
         """
@@ -156,11 +183,11 @@ class Drivers:
 
         while True:
             params['offset'] = offset
-            resp = requests.get(f'{BASE_URL}/drivers', params=params)
-            if resp.status_code != 200:
-                raise JolpicaApiError(f'/ergast/f1/drivers failure: '
-                                      f'{resp.status_code}\n{resp.text}')
-            data = resp.json()
+            try:
+                resp = requests.get(f'{BASE_URL}/drivers', params=params, timeout=TIMEOUT)
+                data = resp.json()
+            except Exception as e:
+                raise JolpicaApiError(f'/ergast/f1/drivers failure: {e}')
 
             driver_list = data['MRData']['DriverTable']['Drivers']
             if not driver_list:
@@ -183,18 +210,23 @@ class Drivers:
         cached_file = self._cache_dir / 'driver_mapping.json'
 
         if not force_overwrite:
-            with open(cached_file, 'r', encoding='utf8') as f:
-                cached_drivers = json.load(f)
-            jolpica_total_count = self._get_driver_count()
-            if len(cached_drivers) == jolpica_total_count:
-                return
+            try:
+                with open(cached_file, 'r', encoding='utf8') as f:
+                    cached_drivers = json.load(f)
+                jolpica_total_count = self._get_driver_count()
+                if len(cached_drivers) == jolpica_total_count:
+                    return
+            except Exception as e:
+                warnings.warn(f'Failed to read existing driver cache; force refreshing it: {e}')
 
+        # If reaches here, either we want to force overwrite/update the cache, or something is
+        # wrong with the existing cache (e.g., JSONDecodeError)
         drivers = self._get_all_drivers_from_jolpica()
         with open(cached_file, 'w', encoding='utf8') as f:
             json.dump(drivers, f, indent=4)
         return
 
-    def get(self, year: int, full_name: str) -> str:
+    def get_driver_id(self, year: int, full_name: str) -> str:
         """Get driver ID from full name"""
         # Exception for ZHOU Guanyu
         full_name = full_name.lower()
@@ -221,9 +253,64 @@ class Drivers:
             return driver_id
 
     @staticmethod
+    def get_first_name(full_name: str) -> str:
+        """Get first name from full name
+
+        The first name is defined as the first word before the first whitespace, so it can
+        sometimes be wrong, e.g. ZHOU Guanyu -> ZHOU. Curly single quotes will be replaced with
+        straight ones.
+
+        >>> Drivers.get_first_name('Max Verstappen')
+        'Max'
+        >>> Drivers.get_first_name('René Arnoux')
+        'René'
+        >>> Drivers.get_first_name('Nyck de Vries')
+        'Nyck'
+        >>> Drivers.get_first_name('Ha’rry Potter')
+        "Ha'rry"
+        >>> Drivers.get_first_name("Zhou Guanyu")
+        'Zhou'
+        """
+        return full_name.split(' ')[0].replace('’', "'")
+
+    @staticmethod
+    def get_last_name(full_name: str) -> str:
+        """Get last name from full name
+
+        The last name is defined as everything after the first whitespace, so it can sometimes be
+        wrong, e.g. ZHOU Guanyu -> Guanyu. Curly single quotes will be replaced with straight ones.
+
+        >>> Drivers.get_last_name('Max Verstappen')
+        'Verstappen'
+        >>> Drivers.get_last_name('René Arnoux')
+        'Arnoux'
+        >>> Drivers.get_last_name('Nyck de Vries')
+        'de Vries'
+        >>> Drivers.get_last_name('Patricio O’Ward')
+        "O'Ward"
+        >>> Drivers.get_last_name("Zhou Guanyu")
+        'Guanyu'
+        """
+        return ' '.join(full_name.split(' ')[1:]).replace('’', "'")
+
+    @staticmethod
     def create_driver_id(full_name: str) -> str:
-        """Create an ID for new drivers that are not in Jolpica DB. Format is first_last"""
-        return '_'.join(full_name.lower().split(' '))
+        """Create an ID for new drivers that are not in Jolpica DB. Format is first_last
+
+        >>> Drivers.create_driver_id('Max Verstappen')
+        'max_verstappen'
+        >>> Drivers.create_driver_id('René Arnoux')
+        'rene_arnoux'
+        >>> Drivers.create_driver_id('Nyck de Vries')
+        'nyck_de_vries'
+        """
+        nfkd = unicodedata.normalize('NFKD', full_name)
+        ascii_name = ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+        normalised = ''.join(ch.lower() if ch.isalpha() else '_' for ch in ascii_name)
+        while '__' in normalised:
+            normalised = normalised.replace('__', '_')
+        return normalised.strip('_')
 
 
 class JolpicaApiError(Exception):

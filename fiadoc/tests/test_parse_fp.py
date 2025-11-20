@@ -4,7 +4,7 @@ import json
 import pytest
 
 from fiadoc.parser import PracticeParser
-from fiadoc.utils import download_pdf
+from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
@@ -70,18 +70,8 @@ def prepare_fp_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dic
     else:
         expected_lap_times = None
 
-    # Sort data
-    classification_data.sort(key=lambda x: x['foreign_keys']['car_number'])
-    expected_classification.sort(key=lambda x: x['foreign_keys']['car_number'])
-    if lap_times_data:
-        lap_times_data.sort(key=lambda x: x['foreign_keys']['car_number'])
-        for i in lap_times_data:
-            i['objects'].sort(key=lambda x: x['number'])
-    if expected_lap_times:
-        expected_lap_times.sort(key=lambda x: x['foreign_keys']['car_number'])
-        for i in expected_lap_times:
-            i['objects'].sort(key=lambda x: x['number'])
-    return classification_data, lap_times_data, expected_classification, expected_lap_times
+    return (sort_json(classification_data),     sort_json(lap_times_data),
+            sort_json(expected_classification), sort_json(expected_lap_times))
 
 
 def test_parse_fp(prepare_fp_data):

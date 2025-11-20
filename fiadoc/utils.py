@@ -7,7 +7,7 @@ from functools import cached_property
 from pathlib import Path
 from string import printable
 from types import SimpleNamespace
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1015,3 +1015,16 @@ class ParsingError(Exception):
 
 class OCRError(Exception):
     pass
+
+
+def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort a list of dicts by their keys and values, for comparison used in tests"""
+    def _sort_recursively(i: Any) -> Any:
+        """Helper function to sort lists/dicts recursively"""
+        if isinstance(i, dict):
+            return {k: _sort_recursively(v) for k, v in sorted(i.items())}
+        elif isinstance(i, list):
+            return sorted([_sort_recursively(k) for k in i], key=lambda x: str(x))
+        else:
+            return i
+    return _sort_recursively(j)
