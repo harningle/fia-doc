@@ -624,14 +624,14 @@ class EntryListParser:
                 # TeamDriverObject (mark him as a junior driver) for him
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter('always')
-                    driver_id = DRIVERS.get(year=self.year, full_name=x.driver)
+                    driver_id = DRIVERS.get_driver_id(year=self.year, full_name=x.driver)
                     for warn in w:
                         if 'Creating a new driver ID' in str(warn.message):
                             new_driver_objects.append(
                                 DriverObject(
                                     reference=driver_id,
-                                    forename=' '.join(x.driver.split(' ')[:-1]),
-                                    surname=x.driver.split(' ')[-1],
+                                    forename=DRIVERS.get_first_name(x.driver),
+                                    surname=DRIVERS.get_last_name(x.driver),
                                     country_code=x.nat
                                 )
                             )

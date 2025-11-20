@@ -283,7 +283,7 @@
         "object_type": "RoundEntry",
         "foreign_keys": {
             "year": 2024,
-            "driver_reference": "patricio_o’ward",
+            "driver_reference": "patricio_o_ward",
             "team_reference": "mclaren",
             "round": 20
         },
@@ -354,9 +354,9 @@
         "foreign_keys": {},
         "objects": [
             {
-                "reference": "patricio_o’ward",
+                "reference": "patricio_o_ward",
                 "forename": "Patricio",
-                "surname": "O’Ward",
+                "surname": "O'Ward",
                 "country_code": "MEX"
             },
             {
@@ -376,7 +376,7 @@
     {
         "object_type": "TeamDriver",
         "foreign_keys": {
-            "driver_reference": "patricio_o’ward",
+            "driver_reference": "patricio_o_ward",
             "team_reference": "mclaren",
             "year": 2024
         },

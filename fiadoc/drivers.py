@@ -225,7 +225,7 @@ class Drivers:
             json.dump(drivers, f, indent=4)
         return
 
-    def get(self, year: int, full_name: str) -> str:
+    def get_driver_id(self, year: int, full_name: str) -> str:
         """Get driver ID from full name"""
         # Exception for ZHOU Guanyu
         full_name = full_name.lower()
@@ -252,9 +252,61 @@ class Drivers:
             return driver_id
 
     @staticmethod
+    def get_first_name(full_name: str) -> str:
+        """Get first name from full name
+
+        The first name is defined as the first word before the first whitespace, so it can
+        sometimes be wrong, e.g. ZHOU Guanyu -> ZHOU. Curly single quotes will be replaced with
+        straight ones.
+
+        >>> Drivers.get_first_name('Max Verstappen')
+        'Max'
+        >>> Drivers.get_first_name('René Arnoux')
+        'René'
+        >>> Drivers.get_first_name('Nyck de Vries')
+        'Nyck'
+        >>> Drivers.get_first_name('Ha’rry Potter')
+        "Ha'rry"
+        >>> Drivers.get_first_name("Zhou Guanyu")
+        'Zhou'
+        """
+        return full_name.split(' ')[0].replace('’', "'")
+
+    @staticmethod
+    def get_last_name(full_name: str) -> str:
+        """Get last name from full name
+
+        The last name is defined as everything after the first whitespace, so it can sometimes be
+        wrong, e.g. ZHOU Guanyu -> Guanyu. Curly single quotes will be replaced with straight ones.
+
+        >>> Drivers.get_last_name('Max Verstappen')
+        'Verstappen'
+        >>> Drivers.get_last_name('René Arnoux')
+        'Arnoux'
+        >>> Drivers.get_last_name('Nyck de Vries')
+        'de Vries'
+        >>> Drivers.get_last_name('Patricio O’Ward')
+        "O'Ward"
+        >>> Drivers.get_last_name("Zhou Guanyu")
+        'Guanyu'
+        """
+        return ' '.join(full_name.split(' ')[1:]).replace('’', "'")
+
+    @staticmethod
     def create_driver_id(full_name: str) -> str:
-        """Create an ID for new drivers that are not in Jolpica DB. Format is first_last"""
-        return '_'.join(full_name.lower().split(' '))
+        """Create an ID for new drivers that are not in Jolpica DB. Format is first_last
+
+        >>> Drivers.create_driver_id('Max Verstappen')
+        'max_verstappen'
+        >>> Drivers.create_driver_id('René Arnoux')
+        'rené_arnoux'
+        >>> Drivers.create_driver_id('Nyck de Vries')
+        'nyck_de_vries'
+        """
+        normalised = ''.join(ch.lower() if ch.isalpha() else '_' for ch in full_name)
+        while '__' in normalised:
+            normalised = normalised.replace('__', '_')
+        return normalised.strip('_')
 
 
 class JolpicaApiError(Exception):

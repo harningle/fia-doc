@@ -50,7 +50,7 @@ def jolpica_mock(requests_mock: requests_mock.Mocker):
     ]
 )
 def test_regular(drivers: Drivers, year: int, full_name: str, expected: str):
-    driver_id = drivers.get(year, full_name)
+    driver_id = drivers.get_driver_id(year, full_name)
     assert driver_id == expected
 
 
@@ -68,7 +68,7 @@ def test_not_in_current_year_but_exists_in_jolpica(
     with pytest.warns(UserWarning,
                       match=f'Driver {full_name.lower()} not found in year {year} regular drivers '
                             f'mapping. Going to Jolpica for driver ID'):
-        driver_id = drivers.get(year, full_name)
+        driver_id = drivers.get_driver_id(year, full_name)
     assert driver_id == expected
 
 
@@ -86,7 +86,7 @@ def test_not_in_maintained_years_but_exists_in_jolpica(
     with pytest.warns(UserWarning,
                       match=f'Year {year} not maintained in regular drivers mapping. Going to '
                             f'Jolpica for driver ID'):
-        driver_id = drivers.get(year, full_name)
+        driver_id = drivers.get_driver_id(year, full_name)
     assert driver_id == expected
 
 
@@ -94,12 +94,14 @@ def test_not_in_maintained_years_but_exists_in_jolpica(
     'year, full_name, expected',
     [
         (2025, 'New Guy', 'new_guy'),
-        (2024, 'Have Three Names', 'have_three_names')
+        (2024, 'Have Three Names', 'have_three_names'),
+        (2023, 'With Accént', 'with_accént'),
+        (2025, "Has apostr‘oph’'e", 'has_apostr_oph_e')
     ]
 )
 def test_create_new_driver_id(drivers: Drivers, year: int, full_name: str, expected: str, jolpica_mock):
     with pytest.warns(Warning) as record:
-        driver_id = drivers.get(year, full_name)
+        driver_id = drivers.get_driver_id(year, full_name)
 
     assert len(record) == 2
     assert record[0].message.args[0] == f'Driver {full_name.lower()} not found in year {year} ' \
@@ -108,3 +110,29 @@ def test_create_new_driver_id(drivers: Drivers, year: int, full_name: str, expec
                                          f'Creating a new driver ID "{expected}" for '
                                          f'{full_name.lower()}')
     assert driver_id == expected
+
+
+@pytest.mark.parametrize(
+    'full_name, expected',
+    [
+        ('Jean-Éric Vergne', 'Jean-Éric'),
+        ('Ha’rry James Potter', "Ha'rry"),
+        ('Zhou Guanyu', 'Zhou')
+    ]
+)
+def test_get_first_name(drivers: Drivers, full_name: str, expected: str):
+    assert drivers.get_first_name(full_name) == expected
+
+
+@pytest.mark.parametrize(
+    'full_name, expected',
+    [
+        ('Jean-Éric Vergne', 'Vergne'),
+        ('Ha’rry James Potter', 'James Potter'),
+        ('Zhou Guanyu', 'Guanyu'),
+        ('Patricio O’Ward', "O'Ward"),
+        ("Patricio O'Ward", "O'Ward")
+    ]
+)
+def test_get_last_name(drivers: Drivers, full_name: str, expected: str):
+    assert drivers.get_last_name(full_name) == expected

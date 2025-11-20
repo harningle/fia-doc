@@ -138,5 +138,10 @@
         "driverId": "de_vries",
         "givenName": "Nyck",
         "familyName": "de Vries"
+    },
+    {
+        "driverId": "mick_schumacher",
+        "givenName": "Mick",
+        "familyName": "Schumacher"
     }
 ]
