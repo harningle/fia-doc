@@ -108,6 +108,19 @@ race_list = [
         '2025_13_sprint_classification.json',
         '2025_13_sprint_lap_times.json',
         nullcontext()
+    ),
+    (
+        # DSQ drivers in a separate table, rather than in the normal table (#61)
+        'https://www.fia.com/system/files/decision-document/2025_las_vegas_grand_prix_-_final_race_classification.pdf',
+        '2025_22_usa_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2025_22_usa_f1_r0_timing_racehistorychart_v01.pdf',
+        '2025_22_usa_f1_r0_timing_racelapchart_v01.pdf',
+        2025,
+        22,
+        'race',
+        '2025_22_race_classification.json',
+        '2025_22_race_lap_times.json',
+        nullcontext()
     )
 ]
 
