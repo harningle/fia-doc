@@ -667,7 +667,7 @@ class RaceParser(BaseParser):
 
     @cached_property
     def lap_times_df(self) -> pd.DataFrame:
-        if self.is_pdf_complete is False:
+        if not self.is_pdf_complete:
             raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
                                     "parse starting grid or lap times")
         self.starting_grid = None
@@ -811,12 +811,67 @@ class RaceParser(BaseParser):
             # no unclassified drivers
             not_classified = pd.DataFrame(columns=df.columns)
 
-        df['is_classified'] = True # Set all drivers from the main table as classified
+        # Do the same for "DISQUALIFIED" table
+        disqualified = page.search_for('DISQUALIFIED')
+        if disqualified:
+            disqualified.sort(key=lambda x: x.y0)  # Can have multiple "DISQUALIFIED" on one page
+            disqualified = disqualified[0]         # The topmost one should be the table header
+            if np.isclose((disqualified.x0 + disqualified.x1) / 2, w / 2, rtol=0.1):
+                # "DISQUALIFIED" as table header should be centred
+                pixmap = page.get_pixmap(clip=(0, disqualified.y1, w, page.bound()[3]))
+                l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
+                pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
+                is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
+                white_strips = []
+                strip_start = None
+                for i, is_white in enumerate(is_white_row):
+                    if is_white and strip_start is None:
+                        strip_start = i
+                    elif not is_white and strip_start is not None:
+                        if i - strip_start >= WHITE_STRIP_MIN_HEIGHT:
+                            white_strips.append(strip_start + t)
+                        strip_start = None
+                if (strip_start is not None
+                        and len(is_white_row) - strip_start >= WHITE_STRIP_MIN_HEIGHT):
+                    white_strips.append(strip_start + t)
+                if not white_strips:
+                    raise ValueError(f'Could not find a white strip below the "DISQUALIFIED" '
+                                     f'table in {self.classification_file}')
+                b = white_strips[0]
 
+                # Identify row locations using grey and white background
+                t = disqualified.y1
+                rects = []
+                for i in page.get_drawings_in_bbox(bbox=(0, t, w, b)):
+                    if i['fill'] is not None and np.allclose(i['fill'], 0.9, rtol=0.05):
+                        rects.append(i['rect'].y0 + 1)
+                        rects.append(i['rect'].y1 - 1)
+                rects.sort()
+                hlines = [t + 1]
+                for i in rects:
+                    if i - hlines[-1] > LINE_MIN_VGAP:
+                        hlines.append(i)
+                if b - hlines[-1] > LINE_MIN_VGAP:
+                    hlines.append(b)
+                disqualified = self._parse_table_by_grid(
+                    file=self.classification_file,
+                    page=page,
+                    vlines=vlines,
+                    hlines=hlines,
+                    header_included=False
+                )
+                disqualified.columns = df.columns
+            else:
+                disqualified = pd.DataFrame(columns=df.columns)
+        else:
+            disqualified = pd.DataFrame(columns=df.columns)
+
+        df['is_classified'] = True # Set all drivers from the main table as classified
         not_classified['finishing_status'] = 11  # TODO: should clean up the code later
         not_classified['is_classified'] = False
-
-        df = pd.concat([df, not_classified], ignore_index=True)
+        disqualified['finishing_status'] = 20  # TODO: should clean up the code later
+        disqualified['is_classified'] = False
+        df = pd.concat([df, not_classified, disqualified], ignore_index=True)
 
         # Set col. names
         del df['NAT']
@@ -862,8 +917,8 @@ class RaceParser(BaseParser):
         del df['temp']
 
         df.car_no = df.car_no.astype(int)
-        df.laps_completed = df.laps_completed.fillna(0).astype(int)
-        df.time = df.time.apply(duration_to_millisecond)
+        df.laps_completed = df.laps_completed.astype(float)  # Can be empty, e.g. DSQ drivers, so
+        df.time = df.time.apply(duration_to_millisecond)     # float not int
         # TODO: gap to the leader is to be cleaned later, so we can use it for cross validation
         # TODO: is the `.fillna(0)` safe? See 2024 Brazil race Hulkenberg
 
@@ -912,7 +967,9 @@ class RaceParser(BaseParser):
                             status=x.finishing_status,
                             points=x.points,
                             time=x.time,
-                            laps_completed=x.laps_completed,
+                            laps_completed=x.laps_completed
+                                           if not pd.isnull(x.laps_completed)
+                                           else None,
                             fastest_lap_rank=x.fastest_lap_rank if x.fastest_lap_time else None,
                             grid=x.starting_grid
                             # TODO: replace the rank with missing or -1 in self.classification_df
