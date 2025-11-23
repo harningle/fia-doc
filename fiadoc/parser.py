@@ -968,7 +968,7 @@ class RaceParser(BaseParser):
                             points=x.points,
                             time=x.time,
                             laps_completed=x.laps_completed
-                                           if not pd.isnull(x.laps_completed)
+                                           if not pd.isna(x.laps_completed)
                                            else None,
                             fastest_lap_rank=x.fastest_lap_rank if x.fastest_lap_time else None,
                             grid=x.starting_grid
