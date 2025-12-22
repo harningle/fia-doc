@@ -1,8 +1,7 @@
 import os
 import re
 import tempfile
-
-# import uuid
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from string import printable
@@ -990,23 +989,63 @@ class Page:
         return hlines
 
 
+@dataclass
 class TextBlock:
-    """A text block on a PDF page, with its bounding box and text content
+    """A text block, with its text, (if any) bounding box, superscripts, and strikeout texts
 
-    :param bbox: The bounding box of the text block in the format (l, t, r, b)
     :param text: Text
+    :param bbox: The bounding box of the text block in the format (l, t, r, b). If not provided,
+                 defaults to (-1, -1, -1, -1)
+    :param superscript: A list of superscript texts as strings
+    :param strikeout: A list of strikeout texts as strings
     """
-    def __init__(self, bbox: tuple[float, float, float, float], text: str):
-        self.text = text
-        self.l = self.x0 = bbox[0]
-        self.t = self.y0 = bbox[1]
-        self.r = self.x1 = bbox[2]
-        self.b = self.y1 = bbox[3]
-        self.bbox = (self.l, self.t, self.r, self.b)
+    text: str
+    bbox: Optional[tuple[float, float, float, float]] = field(default_factory=list)
+    l: Optional[float] = field(init=False, default=None)
+    t: Optional[float] = field(init=False, default=None)
+    r: Optional[float] = field(init=False, default=None)
+    b: Optional[float] = field(init=False, default=None)
+    x0: Optional[float] = field(init=False, default=None)
+    y0: Optional[float] = field(init=False, default=None)
+    x1: Optional[float] = field(init=False, default=None)
+    y1: Optional[float] = field(init=False, default=None)
+    superscript: Optional[list[str]] = field(default_factory=list)
+    strikeout: Optional[list[str]] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not isinstance(self.text, str):
+            raise ValueError(f'Invalid `text`: {self.text}. Expected a string')
+
+        if self.bbox:
+            if len(self.bbox) != 4:
+                raise ValueError(f'Invalid `bbox`: {self.bbox}. Expected a tuple of four floats '
+                                 f'representing (l, t, r, b)')
+            self.l, self.t, self.r, self.b = self.bbox
+            self.x0, self.y0, self.x1, self.y1 = self.bbox
+
+        if self.superscript:
+            if isinstance(self.superscript, str):
+                self.superscript = [self.superscript]
+            elif not isinstance(self.superscript, list):
+                raise ValueError(f'Invalid `superscript`: {self.superscript}. Expected a list of '
+                                 f'strings')
+        if self.strikeout:
+            if isinstance(self.strikeout, str):
+                self.strikeout = [self.strikeout]
+            elif not isinstance(self.strikeout, list):
+                raise ValueError(f'Invalid `strikeout`: {self.strikeout}. Expected a list of '
+                                 f'strings')
 
     def __repr__(self) -> str:
-        return (f'TextBlock(text="{self.text}", '
-                f'bbox=({self.l:.2f}, {self.t:.2f}, {self.r:.2f}, {self.b:.2f}))')
+        ret = f'TextBlock(text="{self.text}"'
+        if self.bbox:
+            ret += f', bbox=({self.l:.2f}, {self.t:.2f}, {self.r:.2f}, {self.b:.2f})'
+        if self.superscript:
+            ret += f', superscript={self.superscript}'
+        if self.strikeout:
+            ret += f', strikeout={self.strikeout}'
+        ret += ')'
+        return ret
 
 
 class ParsingError(Exception):
