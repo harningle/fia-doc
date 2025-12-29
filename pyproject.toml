@@ -15,7 +15,7 @@ dependencies = [
   "pydantic>=2.0.0,<3.0.0",
   "pymupdf==1.26.0",
   "requests>=2.28.0,<3.0.0",
-  "jolpica-schemas @ git+https://github.com/jolpica/jolpica-f1@71f12b1c9637aa838926abcb6f4840fbfac4d87c#egg=jolpica-schemas&subdirectory=jolpica/schemas",
+  "jolpica-schemas @ git+https://github.com/jolpica/jolpica-f1@1c8a251fd9f682773487a7c51bc11ded5115b36a#egg=jolpica-schemas&subdirectory=libraries/jolpica-schemas",
 ]
 
 [build-system]
