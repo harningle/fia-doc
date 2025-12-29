@@ -2344,6 +2344,10 @@ class QualifyingParser(BaseParser):
             max_idx = n_colon[n_colon == 2].index.max()
             df.drop(index=range(min_idx, max_idx), inplace=True)
 
+            # the dropped laps aren't actual laps -> adjust the lap number accordingly
+            n_dropped = max_idx - min_idx
+            df.loc[df.car_no == car_no, 'lap_no'] -= n_dropped
+
         df = self._assign_session_to_lap(self.classification_df, df)
 
         # Check if any fastest laps are wrong
