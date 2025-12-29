@@ -35,7 +35,10 @@ def duration_to_millisecond(s: str | None) -> dict[str, str | int] | None:
     {'_type': 'timedelta', 'milliseconds': 12345}
     """
     if s is None:
-        return None
+        return {
+            '_type': 'timedelta',
+            'milliseconds': 0
+        }
 
     match s.count(':'):
         case 0:  # 12.345
@@ -86,6 +89,9 @@ def time_to_timedelta(d: str) -> pd.Timedelta:
     1. hh:mm:ss, e.g. 18:05:42. This is simply the local calendar time
     2. mm:ss.SSS, e.g. 1:24.160. This is the lap time
     """
+    if d is None:
+        return pd.Timedelta(0)
+
     n_colon = d.count(':')
     if n_colon == 2:  # noqa: PLR2004
         h, m, s = d.split(':')
@@ -94,8 +100,6 @@ def time_to_timedelta(d: str) -> pd.Timedelta:
         m, s = d.split(':')
         s, ms = s.split('.')
         return pd.Timedelta(minutes=int(m), seconds=int(s), milliseconds=int(ms))
-    elif d == "":
-        return pd.Timedelta(0)
     else:
         raise ValueError(f'unknown date format: {d}')
 

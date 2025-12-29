@@ -2101,7 +2101,7 @@ class QualifyingParser(BaseParser):
         """
         lap_times['calendar_time'] = lap_times.lap_time.apply(time_to_timedelta)
         lap_times.calendar_time = lap_times.groupby('car_no')['calendar_time'].cumsum()
-        lap_times.calendar_time[lap_times.lap_time == ""] = pd.NaT
+        lap_times.loc[lap_times.lap_time == "", "calendar_time"] = pd.NaT
 
         lap_times['is_fastest_lap'] = False
         for q in [1, 2, 3]:
@@ -2142,10 +2142,6 @@ class QualifyingParser(BaseParser):
                 f"Some drivers' fastest laps in Q{q} cannot be found in lap times PDF: " \
                 f"{', '.join([str(i) for i in temp[temp._merge != 'both']['NO']])}"
             lap_times.loc[lap_times[f'Q{q}_TIME'].notna(), 'is_fastest_lap'] = True
-            # lap_times.loc[
-            #     lap_times[f'Q{q}_TIME'].notna() & (lap_times['lap_time'] != ""),
-            #     'is_fastest_lap'
-            # ] = True
             del lap_times[f'Q{q}_TIME']
         return lap_times
 
@@ -2334,15 +2330,16 @@ class QualifyingParser(BaseParser):
         df.car_no = df.car_no.astype(int)
         df = df.replace('', None)
         df.pit = (df.pit == 'P').astype(bool)
-        df.lap_time = df.lap_time.replace("INCOMPLETE", "")
+        df.lap_time = df.lap_time.replace("INCOMPLETE", None)
 
         # The very first lap has a timestamp (hh:mm:ss) for its lap time. All subsequent laps
         # of a driver have a proper lap time (mm:ss.ms). There may be one or multiple additional
-        # empty rows at the beginning of the table that only contain a timestamp. Drop all empty
-        # rows like this. Rows are categorized by counting the number of colons in the
-        # "lap_time" value.
+        # empty rows at the beginning of the table that only contain a timestamp. Drop all "first"
+        # laps that contain a time stamp instead of an actual lap time.
         for car_no in df.car_no.unique():
-            n_colon = df.loc[df.car_no == car_no, 'lap_time'].apply(lambda t: t.count(':'))
+            n_colon = df.loc[df.car_no == car_no, 'lap_time'].apply(
+                lambda t: t.count(':') if t else 0
+            )
             min_idx = n_colon[n_colon == 2].index.min()
             max_idx = n_colon[n_colon == 2].index.max()
             df.drop(index=range(min_idx, max_idx), inplace=True)
