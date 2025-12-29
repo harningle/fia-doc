@@ -2330,7 +2330,7 @@ class QualifyingParser(BaseParser):
         df.car_no = df.car_no.astype(int)
         df = df.replace('', None)
         df.pit = (df.pit == 'P').astype(bool)
-        df.lap_time = df.lap_time.replace("INCOMPLETE", None)
+        df.loc[df['lap_time'] == 'INCOMPLETE', ('lap_time', 'lap_time_deleted')] = (None, True)
 
         # The very first lap has a timestamp (hh:mm:ss) for its lap time. All subsequent laps
         # of a driver have a proper lap time (mm:ss.ms). There may be one or multiple additional
