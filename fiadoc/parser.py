@@ -2101,6 +2101,8 @@ class QualifyingParser(BaseParser):
         """
         lap_times['calendar_time'] = lap_times.lap_time.apply(time_to_timedelta)
         lap_times.calendar_time = lap_times.groupby('car_no')['calendar_time'].cumsum()
+        lap_times.calendar_time[lap_times.lap_time == ""] = pd.NaT
+
         lap_times['is_fastest_lap'] = False
         for q in [1, 2, 3]:
             # Round to the floor
@@ -2140,6 +2142,10 @@ class QualifyingParser(BaseParser):
                 f"Some drivers' fastest laps in Q{q} cannot be found in lap times PDF: " \
                 f"{', '.join([str(i) for i in temp[temp._merge != 'both']['NO']])}"
             lap_times.loc[lap_times[f'Q{q}_TIME'].notna(), 'is_fastest_lap'] = True
+            # lap_times.loc[
+            #     lap_times[f'Q{q}_TIME'].notna() & (lap_times['lap_time'] != ""),
+            #     'is_fastest_lap'
+            # ] = True
             del lap_times[f'Q{q}_TIME']
         return lap_times
 
@@ -2152,25 +2158,25 @@ class QualifyingParser(BaseParser):
             page = Page(page)  # noqa: PLW2901
             w = page.bound()[2]
 
-            # Positions of "NO" and "TIME". They are the top of each table. One driver may have
+            # Positions of "LAP" and "TIME". They are the top of each table. One driver may have
             # multiple tables starting from roughly the same top y-position
-            no_time_pos = page.search_for('NO TIME')
-            assert len(no_time_pos) >= 1, \
-                f'Expected at least one "NO TIME", got {len(no_time_pos)} in {self.lap_times_file}'
-            ys = [i.y1 for i in no_time_pos]
-            ys.sort()  # Sort these "NO"'s from top to bottom
+            lap_time_pos = page.search_for('LAP TIME')
+            assert len(lap_time_pos) >= 1, \
+                f'Expected at least one "LAP TIME", got {len(lap_time_pos)} in {self.lap_times_file}'
+            ys = [i.y1 for i in lap_time_pos]
+            ys.sort()  # Sort these "LAP"'s from top to bottom
             top_pos = [ys[0]]
             for y in ys[1:]:
-                # Many "NO"'s are roughly at the same height (usually three drivers share the full
-                # width of the page, and each of them have two tables side by side, so six tables
-                # and six "NO"'s are vertically at the same y-position). We only need those at
+                # Many "LAP"'s are roughly at the same height (usually two drivers share the full
+                # width of the page, and each of them have one table, so two tables
+                # and two "LAP"'s are vertically at the same y-position). We only need those at
                 # different/unique y-positions. If there is a 10+ px vertical gap, we take it as a
-                # "NO" at a lower y-position
+                # "LAP" at a lower y-position
                 if y - top_pos[-1] > LINE_MIN_VGAP:
                     top_pos.append(y)
 
-            # Bottom of the table is the next "NO TIME", or the bottom of the page
-            ys = [i.y0 for i in no_time_pos]
+            # Bottom of the table is the next "LAP TIME", or the bottom of the page
+            ys = [i.y0 for i in lap_time_pos]
             ys.sort()
             bottom_pos = [ys[0]]
             for y in ys[1:]:
@@ -2178,32 +2184,32 @@ class QualifyingParser(BaseParser):
                     bottom_pos.append(y)
             b = page.bound()[3]
             bottom_pos.append(b)
-            bottom_pos = bottom_pos[1:]  # The first "NO TIME" is not the bottom of any table
+            bottom_pos = bottom_pos[1:]  # The first "LAP TIME" is not the bottom of any table
 
             # Find the tables located between each `top_pos` and `bottom_pos`
             for row in range(len(top_pos)):
-                # Each row usually has three drivers. Iterate over each driver
-                for col in range(3):
+                # Each row usually has two drivers. Iterate over each driver
+                for col in range(2):
 
                     # Find the driver name, which is located immediately above the table
                     driver = page.get_text(
                         'text',
                         clip=(
                             col * w / 3,        # Each driver occupies ~1/3 of the page width
-                            top_pos[row] - 30,  # Driver name is usually 20-30 px above the table
+                            top_pos[row] - 50,  # Driver name is usually 30-50 px above the table
                             (col + 1) * w / 3,
-                            top_pos[row] - 10
+                            top_pos[row] - 30
                         )
                     ).strip()
-                    if not driver:  # In the very last row may not have all three drivers. E.g., 20
-                        continue    # drivers, 3 per row, so the last row only has 2 drivers
-                                    # TODO: may want a test here. Every row above should have
-                                    #       precisely three drivers
+                    if not driver:  # In the very last row may not have both drivers if the
+                        continue  # number of drivers is not even.
+                                  # TODO: may want a test here. Every row above should have
+                                  #       precisely two drivers
                     car_no, driver = driver.split(maxsplit=1)
 
-                    # Find the horizontal line(s) below "NO" and "TIME". This is the top of the
+                    # Find the horizontal line(s) below "LAP" and "TIME". This is the top of the
                     # table(s)
-                    bbox = (col * w / 3, top_pos[row], (col + 1) * w / 3, bottom_pos[row])
+                    bbox = (col * w / 2, top_pos[row], (col + 1) * w / 2, bottom_pos[row])
                     lines = [i for i in page.get_drawings_in_bbox(bbox)
                              if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
                              and i['fill'] is None]
@@ -2229,6 +2235,10 @@ class QualifyingParser(BaseParser):
                     and another is from x = 101 to x = 200. The two lines are basically one line,
                     so we want to horizontally concatenate them
                     """
+                    assert len(lines) <= 8, \
+                        f'Expected at most eight horizontal lines for table(s) in row {row}, ' \
+                        f'col {col} in page {page.number} in {self.lap_times_file}. Found ' \
+                        f'{len(lines)}'
                     lines.sort(key=lambda x: x['rect'].x0)
                     rect = lines[0]['rect']
                     top_lines = [(rect.x0, rect.y0, rect.x1, rect.y1)]
@@ -2244,16 +2254,12 @@ class QualifyingParser(BaseParser):
                         # Otherwise, it's a new line
                         else:
                             top_lines.append((rect.x0, rect.y0, rect.x1, rect.y1))
-                    assert len(top_lines) in [1, 2], \
-                        f'Expected at most two horizontal lines for table(s) in row {row}, ' \
-                        f'col {col} in page {page.number} in {self.lap_times_file}. Found ' \
-                        f'{len(top_lines)}'
 
                     # Find the column separators
                     """
                     The left and right boundary of each table is simply the left and right end of
-                    the top line. The right of column 0, which is "NO", is the right boundary of
-                    the text "NO". We don't really know the right boundary for the pit column, but
+                    the top line. The right of column 0, which is "LAP", is the right boundary of
+                    the text "LAP". We don't really know the right boundary for the pit column, but
                     that's roughly at the mid point of top line. Then from the mid point to the
                     right end is the "TIME" column. In practice, we use mid point - 5 as the right
                     boundary for the pit column.
@@ -2263,14 +2269,18 @@ class QualifyingParser(BaseParser):
                     """
                     col_seps = []
                     for line in top_lines:
-                        no = page.search_for('NO',clip=(line[0], line[1] - 15, line[2], line[3]))
-                        assert len(no) == 1, f'Expected exactly one "NO" above the top line at ' \
+                        lap = page.search_for('LAP',clip=(line[0], line[1] - 15, line[2], line[3]))
+                        assert len(lap) == 1, f'Expected exactly one "LAP" above the top line at ' \
                             f'({line[0], line[1], line[2], line[3]}) on p.{page.number} in ' \
-                            f'{self.lap_times_file}. Found {len(no)}'
+                            f'{self.lap_times_file}. Found {len(lap)}'
+                        kmh = page.search_for('KM/H',clip=(line[0], line[1] - 15, line[2], line[3]))
+                        assert len(kmh) == 3, f'Expected exactly three "KM/H" above the top line at ' \
+                            f'({line[0], line[1], line[2], line[3]}) on p.{page.number} in ' \
+                            f'{self.lap_times_file}. Found {len(lap)}'
                         col_seps.append([
-                            (line[0], no[0].x1),
-                            (no[0].x1, (line[0] + line[2]) / 2 - 5),
-                            ((line[0] + line[2]) / 2 - 5, line[2])
+                            (line[0], lap[0].x1),
+                            (lap[0].x1, lap[0].x1 + 5),
+                            (kmh[-1].x1 + 5, line[2])
                         ])
 
                     # Find the white and grey rectangles under the top lines. Each row is either
@@ -2324,6 +2334,19 @@ class QualifyingParser(BaseParser):
         df.car_no = df.car_no.astype(int)
         df = df.replace('', None)
         df.pit = (df.pit == 'P').astype(bool)
+        df.lap_time = df.lap_time.replace("INCOMPLETE", "")
+
+        # The very first lap has a timestamp (hh:mm:ss) for its lap time. All subsequent laps
+        # of a driver have a proper lap time (mm:ss.ms). There may be one or multiple additional
+        # empty rows at the beginning of the table that only contain a timestamp. Drop all empty
+        # rows like this. Rows are categorized by counting the number of colons in the
+        # "lap_time" value.
+        for car_no in df.car_no.unique():
+            n_colon = df.loc[df.car_no == car_no, 'lap_time'].apply(lambda t: t.count(':'))
+            min_idx = n_colon[n_colon == 2].index.min()
+            max_idx = n_colon[n_colon == 2].index.max()
+            df.drop(index=range(min_idx, max_idx), inplace=True)
+
         df = self._assign_session_to_lap(self.classification_df, df)
 
         # Check if any fastest laps are wrong

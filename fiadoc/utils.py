@@ -94,6 +94,8 @@ def time_to_timedelta(d: str) -> pd.Timedelta:
         m, s = d.split(':')
         s, ms = s.split('.')
         return pd.Timedelta(minutes=int(m), seconds=int(s), milliseconds=int(ms))
+    elif d == "":
+        return pd.Timedelta(0)
     else:
         raise ValueError(f'unknown date format: {d}')
 
