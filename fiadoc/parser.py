@@ -2304,14 +2304,7 @@ class QualifyingParser(BaseParser):
                             f'page {page.number} in {self.lap_times_file}. But we expect none'
                         for i, _, _ in cross_out:
                             tab.loc[i, 'lap_time_deleted'] = True
-                        # Drop empty row
-                        """
-                        This is because the two side-by-side tables may not have the same amount of
-                        rows. E.g., there are 11 laps, and the left table will have 6 and the right
-                        table has 5 rows. The right table will have an empty row at the bottom, so
-                        drop it here
-                        """
-                        tab = tab[tab[0] != '']
+
                         temp.append(tab)
 
                     # One driver may have multiple tables. Concatenate them
@@ -2326,7 +2319,6 @@ class QualifyingParser(BaseParser):
             df['lap_time_deleted'] = False
         df = (df.fillna({'lap_time_deleted': False})
               .rename(columns={0: 'lap_no', 1: 'pit', 2: 'lap_time'}))
-        df.lap_no = df.lap_no.astype(int)
         df.car_no = df.car_no.astype(int)
         df = df.replace('', None)
         df.pit = (df.pit == 'P').astype(bool)
@@ -2344,9 +2336,11 @@ class QualifyingParser(BaseParser):
             max_idx = n_colon[n_colon == 2].index.max()
             df.drop(index=range(min_idx, max_idx), inplace=True)
 
-            # the dropped laps aren't actual laps -> adjust the lap number accordingly
-            n_dropped = max_idx - min_idx
-            df.loc[df.car_no == car_no, 'lap_no'] -= n_dropped
+            # lap numbers are offset for no apparent reason, just recreate them now correctly
+            n_laps = (df.car_no == car_no).sum()
+            df.loc[df.car_no == car_no, 'lap_no'] = range(1, n_laps + 1)
+
+        df.lap_no = df.lap_no.astype(int)
 
         df = self._assign_session_to_lap(self.classification_df, df)
 
