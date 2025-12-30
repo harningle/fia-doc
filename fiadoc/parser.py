@@ -2141,7 +2141,10 @@ class QualifyingParser(BaseParser):
             assert (temp['_merge'] == 'both').all(), \
                 f"Some drivers' fastest laps in Q{q} cannot be found in lap times PDF: " \
                 f"{', '.join([str(i) for i in temp[temp._merge != 'both']['NO']])}"
-            lap_times.loc[lap_times[f'Q{q}_TIME'].notna(), 'is_fastest_lap'] = True
+            lap_times.loc[
+                lap_times[f'Q{q}_TIME'].notna() & lap_times['lap_time'].notna(),
+                'is_fastest_lap'
+            ] = True
             del lap_times[f'Q{q}_TIME']
         return lap_times
 
