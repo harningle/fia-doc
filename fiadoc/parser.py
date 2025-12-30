@@ -2152,7 +2152,7 @@ class QualifyingParser(BaseParser):
         """Parse "Qualifying/Sprint Quali./Shootout Session Lap Times" PDF"""
         doc = pymupdf.open(self.lap_times_file)
         df = []
-        for page in doc:
+        for page_n, page in enumerate(doc):
             # Page width
             page = Page(page)  # noqa: PLW2901
             w = page.bound()[2]
@@ -2160,6 +2160,11 @@ class QualifyingParser(BaseParser):
             # Positions of "LAP" and "TIME". They are the top of each table. One driver may have
             # multiple tables starting from roughly the same top y-position
             lap_time_pos = page.search_for('LAP TIME')
+
+            if not lap_time_pos and (page_n + 1) == len(doc):
+                # the last page may be emtpy
+                continue
+
             assert len(lap_time_pos) >= 1, \
                 f'Expected at least one "LAP TIME", got {len(lap_time_pos)} in {self.lap_times_file}'
             ys = [i.y1 for i in lap_time_pos]
@@ -2312,6 +2317,11 @@ class QualifyingParser(BaseParser):
 
                     # One driver may have multiple tables. Concatenate them
                     temp = pd.concat(temp, ignore_index=True)
+
+                    if (temp == "").all().all():
+                        # driver has no laps
+                        continue
+
                     temp['car_no'] = car_no
                     temp['driver'] = driver
                     df.append(temp)
@@ -2337,6 +2347,11 @@ class QualifyingParser(BaseParser):
             )
             min_idx = n_colon[n_colon == 2].index.min()
             max_idx = n_colon[n_colon == 2].index.max()
+
+            if pd.isna(min_idx) or pd.isna(max_idx):
+                # the driver hasn't done any good quali laps
+                continue
+
             df.drop(index=range(min_idx, max_idx), inplace=True)
 
             # lap numbers are offset for no apparent reason, just recreate them now correctly
