@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from functools import cached_property
 from types import SimpleNamespace
-from typing import Optional
+from typing import Literal, Optional
 from string import printable
 
 import matplotlib.pyplot as plt
@@ -149,15 +149,16 @@ class Page:
             to_list=lambda: ocred_page
         )
 
-    def show_page(self) -> None:
+    def show_page(self, clip: Optional[tuple[float, float, float, float]] = None) -> None:
         """May not work well depending on screen resolution and/or DPI. For debug process only
 
         See https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/table-analysis/show_image.py
         """
-        pix = self.get_pixmap(dpi=DPI)
-        img = np.ndarray([pix.h, pix.w, 3], dtype=np.uint8, buffer=pix.samples_mv)
+        pixmap = self.get_pixmap(clip=clip, dpi=DPI)
+        img = np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8) \
+            .reshape((pixmap.height, pixmap.width, 3))
         plt.figure(dpi=DPI)
-        plt.imshow(img, extent=(0, pix.w * 72 / DPI, pix.h * 72 / DPI, 0))
+        plt.imshow(img, extent=(0, pixmap.w * 72 / DPI, pixmap.h * 72 / DPI, 0))
         plt.show()
         return
 
@@ -199,89 +200,105 @@ class Page:
                 to_page_bound[0] + (bbox[2] - from_page_bound[0]) * scale_x,
                 to_page_bound[1] + (bbox[3] - from_page_bound[1]) * scale_y)
 
-    def _native_get_text(self, option: str='text', **kwargs) -> list['TextBlock']:
+    def _native_get_text(
+            self,
+            option: Literal['text', 'words', 'blocks', 'dict'] = 'text',
+            **kwargs
+    ) -> list['TextBlock']:
         """
         Same as `pymupdf.Page.get_text`, but the return type, no matter whichever `option` is
         specified, is changed to a list of `TextBlock` for easier processing later
 
         This is highly customised to our use case. For example, we assume that when `option=dict`,
         there can be at most one superscript and at most one regular text in one `.get_text()`
-        call, etc.
+        call, etc. That is, whenever we call `.get_text()` with `option=dict`, we are getting the
+        text within a small area, e.g. a table cell
         """
+        if option not in {'text', 'words', 'blocks', 'dict'}:
+            raise NotImplementedError(f'`option` can only be one of "text", "words", '
+                                      f'"blocks", or "dict". Got "{option}"')
         res = self._pymupdf_page.get_text(option=option, **kwargs)
-        match option:
-            case 'text':
-                if text := self._clean_get_text_result(res):
-                    return [TextBlock(text=text)]
-                else:
-                    return []
-            case 'blocks' | 'words':
-                textblocks = []
-                for i in res:
-                    if text := self._clean_get_text_result(i[4]):
-                        textblocks.append(TextBlock(text=text, bbox=i[:4]))
-                return textblocks
-            case 'dict':
-                # First, clean everything found
-                spans = []
-                for i in res['blocks']:
-                    if 'lines' in i:
-                        for j in i['lines']:
-                            for k in j['spans']:
-                                if text := self._clean_get_text_result(k['text']):
-                                    k['text'] = text
-                                    spans.append(k)
-                if not spans:
-                    return []
 
-                # When `option=dict`, we need to check if any text is a superscript
+        textblocks: list[TextBlock]
+        if option == 'text':
+            if text := self._clean_get_text_result(res):
+                return [TextBlock(text=text)]
+            else:
+                return []
+
+        elif option in {'blocks', 'words'}:
+            textblocks = []
+            for i in res:
+                if text := self._clean_get_text_result(i[4]):
+                    textblocks.append(TextBlock(text=text, bbox=i[:4]))
+            return textblocks
+
+        else:  # option == 'dict'
+            # First, clean everything found
+            spans = []
+            for i in res['blocks']:
+                if 'lines' in i:
+                    for j in i['lines']:
+                        for k in j['spans']:
+                            if text := self._clean_get_text_result(k['text']):
+                                k['text'] = text
+                                spans.append(k)
+            if not spans:
+                return []
+
+            # When `option = dict`, we need to check if any text is a superscript
+            error_message: str = (f'Unable to infer whether a text is a regular text or a '
+                                  f'superscript: {res}. Error occurred on p. {self.number} in '
+                                  f'{self.file}')
+            match len(spans):
                 # If only one text found, this should be a usual/non-superscript text
-                if len(spans) == 1:
-                    return [TextBlock(text=spans[0]['text'], bbox=spans[0]['bbox'])]
-
+                case 1:
+                    textblocks = [TextBlock(text=spans[0]['text'], bbox=spans[0]['bbox'])]
+                # Two texts found. Should be one usual text and one superscript
+                case 2:
+                    n_superscripts: int = 0
+                    n_regular_texts: int = 0
+                    for span in spans:  # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-font-characteristics  # noqa: E501
+                        if span['flags'] == 1:
+                            n_superscripts += 1
+                            superscript = span
+                        else:
+                            n_regular_texts += 1
+                            regular_text = span
+                    """
+                    If the PDF is formatted correctly, then we should have one superscript and
+                    one regular text, and we are done. However, FIA is stupid and occasionally
+                    use a smaller font size for the superscript, but do not set the superscript
+                    flag. So if we found two regular texts above, then have to decide which is
+                    the superscript using font size (#48). In principle superscript font size
+                    should be sufficiently smaller than the regular text. We use 20% diff. in
+                    font size as a cutoff
+                    """
+                    size_cutoff: float = 0.2
+                    if (n_superscripts == 2) or (n_regular_texts == 2):   # noqa: PLR2004
+                        temp = (spans[0]['size'] + spans[1]['size']) / 2  # Avg. font size
+                        if (spans[0]['size'] - spans[1]['size']) / temp > size_cutoff:
+                            superscript = spans[1]
+                            regular_text = spans[0]
+                        elif (spans[1]['size'] - spans[0]['size']) / temp > size_cutoff:
+                            superscript = spans[0]
+                            regular_text = spans[1]
+                        else:
+                            raise ParsingError(error_message)
+                    textblocks = [
+                        TextBlock(text=regular_text['text'], bbox=regular_text['bbox']),
+                        TextBlock(text=superscript['text'], bbox=superscript['bbox'],
+                                  superscript=True)
+                    ]
                 # Should never have three or more texts in one `.get_text()` in our parsing
-                error_message: str = (f'Unable to infer whether a text is a regular text or a '
-                                      f'superscript: {res}. Error occurred on p. {self.number} in '
-                                      f'{self.file}')
-                if len(spans) >= 3:
+                case _:
                     raise ParsingError(error_message)
 
-                # Two texts found. Should be one usual text and one superscript
-                n_superscripts: int = 0
-                n_regular_texts: int = 0
-                for span in spans:  # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-font-characteristics  # noqa: E501
-                    if span['flags'] == 0:
-                        n_regular_texts += 1
-                        regular_text = span
-                    elif span['flags'] == 1:
-                        n_superscripts += 1
-                        superscript = span
-                    else:
-                        raise ParsingError(error_message)
-                """
-                If the PDF is formatted correctly, then we should have one superscript and one
-                regular text, and we are done. However, FIA is stupid and occasionally use a
-                smaller font size for the superscript, but do not set the superscript flag. So if
-                we found two regular texts above, then have to decide which is the superscript
-                using font size (#48). In principle superscript font size should be sufficiently
-                smaller than the regular text. We use 20% diff. as a cutoff
-                """
-                if (n_superscripts == 2) or (n_regular_texts == 2):   # noqa: PLR2004
-                    temp = (spans[0]['size'] + spans[1]['size']) / 2  # Avg. font size of two texts
-                    if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:    # noqa: PLR2004
-                        superscript = spans[1]
-                        regular_text = spans[0]
-                    elif (spans[1]['size'] - spans[0]['size']) / temp > 0.2:  # noqa: PLR2004
-                        superscript = spans[0]
-                        regular_text = spans[1]
-                    else:
-                        raise ParsingError(error_message)
-                return [TextBlock(text=regular_text['text'], bbox=regular_text['bbox']),
-                        TextBlock(text=superscript['text'], bbox=superscript['bbox'],
-                                  superscript=True)]
-            case _:
-                raise NotImplementedError(f'`option` can only be one of "text", "words", '
-                                          f'"blocks", or "dict". Got "{option}"')
+            # When `option = dict`, also need to check if any strikeout text
+            for textblock in textblocks:
+                if self.search_for_black_lines(clip=textblock.bbox, rgb=192):
+                    textblock.strikeout = True
+            return textblocks
 
     @staticmethod
     def _clean_get_text_result(text: str, expected: Optional[re.Pattern] = None) -> Optional[str]:
@@ -307,7 +324,7 @@ class Page:
 
     def get_text(
             self,
-            option: str = 'text',
+            option: Literal['text', 'words', 'blocks', 'dict'] = 'text',
             clip: Optional[tuple[float, float, float, float]] = None,
             small_area: bool = False,
             expected: Optional[re.Pattern] = None,
@@ -442,106 +459,101 @@ class Page:
         #     _return_empty()
         return textblocks
 
-    def has_horizontal_line(
+    def search_for_black_lines(
             self,
-            clip: tuple[float, float, float, float],
-            length: float = 0.5,
-            colour: tuple[int, int, int] = (128, 128, 128),
-            colour_tol: float = 10
-    )-> bool:
-        """Check if there is a long enough horizontal line in the given `clip` area
+            clip: Optional[tuple[float, float, float, float]] = None,
+            max_thickness: float = 2,
+            min_length: float = 0.8,
+            scaling_factor: int = 4,
+            rgb: float = 50
+    ) -> list[float]:
+        """Search for long black horizontal lines in the `clip` area and return their y-coords.
 
-        This method implicitly requires `clip` to be accurate enough. That is, if `clip` has a
-        width of 100px, then only a horizontal line with a length of at least `length` * 100px will
-        be considered as a horizontal line here. This method is often used to detect the strikeout
-        text.
-
-        TODO: combine with `.search_for_black_line`?
-
-        :param clip: (x0, y0, x1, y1)
-        :param length: The minimum length of the horizontal line as a share of the width of `clip`.
-                       Lines shorter than this are ignored. Default is 0.5, i.e. 50% of the width
-        :param colour: RGB colour of the horizontal line. Default is (128, 128, 128). Quali. lap
-                       times PDFs use this colour. We allow for +/-10 tolerance for each channel
-        :param colour_tol: Tolerance for each channel of the `colour`. Default is 10
-        :return: True if found
+        :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
+                     whole page
+        :param max_thickness: The max. thickness of the line in pixels. This helps to distinguish
+                              rectangles filled in black vs black line. Default is 2px. This is
+                              very fragile...
+        :param min_length: The minimum length of the line as a proportion of the `clip` width. The
+                           default is 0.8, i.e., the line should span at least 80% of the width of
+                           the `clip` area
+        :param scaling_factor: Upsample the `clip` area by this factor before searching for lines.
+                               This helps to detect thin lines. Default is 4, which means 1px line
+                               in the original image becomes 4px in the upsampled image
+        :param rgb: The max. RGB value for a pixel to be considered as black. Default is 50. If we
+                    want to find grey lines as well, can increase this value
+        :return: The y-coords. of the found lines as a list. If found multiple, will be sorted in
+                 from top to bottom
         """
-        # Pixels with the specified colour --> 1; 0 otherwise
-        pixmap = self.get_pixmap(clip=clip, dpi=DPI)
-        pixmap = np.ndarray(
-            [pixmap.height, pixmap.width, 3], dtype=np.uint8, buffer=pixmap.samples
-        ).copy()
-        pixmap = np.all(np.abs(pixmap - colour) <= colour_tol, axis=2)
+        # Get the pixmap of the clipped area
+        pixmap: pymupdf.Pixmap = self.get_pixmap(
+            clip=clip,
+            matrix=pymupdf.Matrix(scaling_factor, 0, 0, scaling_factor, 0, 0)
+        )
+        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
+                                                           dtype=np.uint8)
+                                             .reshape((pixmap.height, pixmap.width, 3))
+                                             .copy())
 
-        # Drop the first 20% and last 20% rows, to avoid table header or bottom lines. These won't
-        # be the horizontal lines we want
+        # Find rows with sufficiently many contiguous black pixels
+        n_rows, n_cols, _ = pixmap_arr.shape
+        # Whether a pixel is black (RGB < `rgb`). Shape = (n_rows, n_cols)
+        is_black_pixel: npt.NDArray[np.bool_] = np.all(pixmap_arr < rgb, axis=2)
+        # Add white border to left and right to simplify diff calculation later
+        # Shape = (n_rows, n_cols + 2)
+        padded: npt.NDArray[np.bool_] = np.pad(is_black_pixel,
+                                               ((0, 0), (1, 1)),
+                                               mode='constant',
+                                               constant_values=False)
+        # Whether a pixel has a white or black pixel to the left of it
+        # Shape = (n_rows, n_cols + 1)
+        # 1  = left pixel is white, this pixel is black --> start of a black run
+        # -1 = left pixel is black, this pixel is white --> end of a black run
+        # 0  = same colour as left pixel                --> inside a run or all white pixels
+        diff: npt.NDArray[np.int8] = np.diff(padded.astype(np.int8), axis=1)
+        # Where black runs start and end. Shape = tuple of two arrays, first array is row indices,
+        # second array is col. indices
+        run_starts: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]] = np.where(diff == 1)
+        run_ends: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]] = np.where(diff == -1)
+        # Length of each black run. Shape = (n_black_runs,)
+        run_length: npt.NDArray[np.intp] = run_ends[1] - run_starts[1]
+        # Max. black run length per row. Shape = (n_rows,)
+        longest_run_per_row: npt.NDArray[np.intp] = np.zeros(n_rows, dtype=np.intp)
+        np.maximum.at(longest_run_per_row, run_starts[0], run_length)
+        # Whether a row is a black row (i.e., has a sufficiently long black run)
+        is_black_row: npt.NDArray[np.bool_] = (longest_run_per_row >= pixmap.width * min_length)
+
+
+        # Sample down to original resolution
         """
-        E.g., the zero-th row's top may be the line of the table header. When we get the pixmap of
-        this area, this table top line will be included. The line itself is usually black, so won't
-        be detected as a grey horizontal line. However, because above this line is white, and
-        possibly due to anti-aliasing, the pixels just above this line may be light grey. This can
-        lead to false positive detection of horizontal lines. So we drop the first and last 20%
-        rows to avoid this problem.
+        We use very aggressive down sampling. E.g., w/ `scaling_factor = 4`, a row in the original
+        PDF becomes four rows in the upsampled pixmap. If any of these four rows is detected as
+        a black row, then we consider the original row as a black row. This is to address grey-ish
+        rows due to anti-aliasing. E.g., a very thin black line may become a grey line in the
+        original pixmap, and thus may not be detected as a black row. But after upsampling, at
+        least one of the four rows should be black enough to be detected as a black row. This
+        allows us to detect very thin black lines in the original pixmap.
+        
+        There may be a small one-off error here. If the #. of rows in the pixmap is not perfectly
+        divisible by `scaling_factor`, then the last few rows may be ignored. But this should
+        little impact: we don't expect any black lines to be at the bottom of `clip` area.
         """
-        pixmap = pixmap[int(pixmap.shape[0] * 0.2):int(pixmap.shape[0] * 0.8), :]
+        is_black_row = np.any(
+            is_black_row[:n_rows - (n_rows % scaling_factor)].reshape(-1, scaling_factor),
+            axis=1
+        )
 
-        # Check if a row has at least `length` continuous grey pixels
-        min_length = int(pixmap.shape[1] * length)
-        for row in pixmap:
-            count = 0
-            for pixel in row:
-                if pixel:
-                    count += 1
-                    if count >= min_length:
-                        return True
-                else:
-                    count = 0
-        return False
-
-    def get_drawings_in_bbox(self, bbox: tuple[float, float, float, float], tol: float = 1) \
-            -> list:
-        """Get all drawings in the given bounding box
-
-        :param bbox: (x0, y0, x1, y1)
-        :param tol: tolerance in pixels. If a drawing is outside the bbox by only `tol` pixels,
-                    it will be included. Default is one pixel
-        :return: A list of drawings
-        """
-        drawings = []
-        for drawing in self.drawings:
-            rect = drawing['rect']
-            if rect.y0 >= bbox[1] - tol and rect.y1 <= bbox[3] + tol \
-                    and rect.x0 >= bbox[0] - tol and rect.x1 <= bbox[2] + tol:
-                drawings.append(drawing)
-        return drawings
-
-    def get_strikeout_text(self) -> list[tuple[pymupdf.Rect, str]]:
-        """Get all strikeout texts and their locations in the page
-
-        See https://stackoverflow.com/a/74582342/12867291.
-
-        :return: A list of tuples, where each tuple is the bbox and text of a strikeout text
-        """
-        # Get all strikeout lines
-        lines = []
-        paths = self.drawings  # Strikeout lines are in fact vector graphics. To be more precise,
-        for path in paths:     # they are short rectangles with very small height
-            for item in path['items']:
-                if item[0] == 're':  # If a graphic is a rect., check its height: absolute height
-                    rect = item[1]   # should < 1px, and have some sizable width relative to height
-                    if (rect.width > 2 * rect.height) and (rect.height < 1):
-                        lines.append(rect)
-
-        # Get all texts on this page
-        # TODO: the O(n^2) here can probably be optimised later
-        words = self.get_text('words')
-        strikeout = []
-        for rect in lines:
-            for w in words:  # `w` is a iterable `(x0, y0, x1, y1, text)`
-                text_rect = pymupdf.Rect(w[:4])     # Location/bbox of the word
-                if text_rect.intersects(rect):      # If the word's location intersects with a
-                    strikeout.append((rect, w[4]))  # strikeout line, it's a strikeout text
-        return strikeout
+        # Find consecutive black rows that are at most `max_thickness`px thickness
+        diff = np.diff(np.concatenate([[0], is_black_row, [0]]).astype(np.int8))
+        # 1: start of a black line; -1: end of a black line
+        line_starts: npt.NDArray[np.intp] = np.where(diff == 1)[0]
+        line_ends: npt.NDArray[np.intp] = np.where(diff == -1)[0]
+        thickness: npt.NDArray[np.intp] = line_ends - line_starts
+        valid_lines: npt.NDArray[np.bool_] = (thickness <= max_thickness)
+        black_lines: list[float] = (line_starts[valid_lines]
+                                    + thickness[valid_lines] / 2
+                                    + clip[1] if clip else 0).tolist()
+        return sorted(black_lines)  # TODO: need sort? Or already sorted?
 
     def parse_table_by_grid(
             self,
@@ -638,63 +650,6 @@ class Page:
 
         df = pd.DataFrame(cells, columns=None, index=None)
         return df, superscripts, crossed_out
-
-    def search_for_black_line(
-            self,
-            clip: Optional[tuple[float, float, float, float]] = None,
-            max_thickness: float = 2,
-            min_length: float = 0.8,
-            scaling_factor: float = 4
-    ) -> list[float]:
-        """Search for a long black horizontal line in the page
-
-        :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
-                     whole page
-        :param max_thickness: The max. thickness of the line in pixels. This helps to distinguish
-                              black box vs black line. Default is 2px
-        :param min_length: The minimum length of the line as a proportion of the `clip` width. The
-                           default is 0.8, i.e., the line should span at least 80% of the width of
-                           the `clip` area
-        :param scaling_factor: Upsample the image by this factor before searching for lines. This
-                               helps to detect thin lines. Default is 4, which means 1px line in
-                               the original image becomes 4px in the upsampled image
-        :return: The y-midpoints of the found lines in a list
-        """
-        # Get the pixmap of the clipped area
-        clip = clip if clip else None
-        pixmap = self.get_pixmap(clip=clip,
-                                 matrix=pymupdf.Matrix(scaling_factor, 0, 0, scaling_factor, 0, 0))
-        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
-
-        # Find rows with sufficient contiguous black pixels
-        is_black_row = np.mean(pixmap < 50, axis=(1, 2)) > min_length  # noqa: PLR2004
-
-        # Sample down to original resolution. If any row is black, then the downsampled row is also
-        # treated as black
-        is_black_row = np.array([np.any(is_black_row[i:i + scaling_factor])
-                                 for i in range(0, len(is_black_row), scaling_factor)])
-
-        # Find consecutive black rows that are at most `max_thickness`px thickness
-        max_thickness *= scaling_factor
-        black_lines = []
-        line_start = None
-        for i, is_black in enumerate(is_black_row):
-            if is_black and line_start is None:
-                line_start = i
-            elif not is_black and line_start is not None:
-                if i - line_start <= max_thickness:
-                    black_lines.append((i + line_start) / 2)  # Midpoint of the line
-                line_start = None
-
-        # Edge case for the line being at the bottom of `clip`. Shouldn't happen but just in case
-        if line_start is not None and len(is_black_row) - line_start <= max_thickness:
-            black_lines.append((line_start + len(is_black_row)) / 2)
-
-        # Convert to original page coordinates
-        if clip:
-            black_lines = [i + clip[1] for i in black_lines]
-        return black_lines
 
     def search_for_white_strip(
             self,

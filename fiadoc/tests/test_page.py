@@ -76,11 +76,11 @@ def page():
     'option, clip, small_area, expected',
     [
         (
-                # Usual case
-                'text',
-                (110, 210, 250, 250),
-                False,
-                [TextBlock(text='All Officials, All Teams')]
+            # Usual case
+            'text',
+            (110, 210, 250, 250),
+            False,
+            [TextBlock(text='All Officials, All Teams')]
         ),
         (
             # Usual case
@@ -111,6 +111,13 @@ def page():
             False,
             [TextBlock(text='The Stewards', bbox=(114.2, 183.4, 182.5, 194.6))]
         ),
+        (
+            # Has strikeout text
+            'dict',
+            (450, 700, 500, 710),
+            False,
+            [TextBlock(text='17:04.076', bbox=(460.5, 699.3, 495.3, 711.5), strikeout=True)]
+        )
     ]
 )
 def test_page_get_text(page, option, clip, small_area, expected):
@@ -125,6 +132,53 @@ def test_page_get_text(page, option, clip, small_area, expected):
             )
         assert res_block.superscript == exp_block.superscript
         assert res_block.strikeout == exp_block.strikeout
+
+
+@pytest.mark.parametrize(
+    'clip, max_thickness, min_length, rgb, expected',
+    [
+        (
+            # Two valid lines and one very short line which should be ignored
+            (50, 150, 200, 260),
+            2,
+            0.8,
+            50,
+            [173, 254]
+        ),
+        (
+            # No black line
+            (300, 290, 400, 300),
+            2,
+            0.8,
+            50,
+            []
+        ),
+        (
+            # A mix of black line and black rectangle should return only line
+            (0, 250, 400, 300),
+            2,
+            0.8,
+            50,
+            [254]
+        ),
+        (
+            # A real example from lap times PDF
+            (450, 650, 510, 750),
+            2,
+            0.5,
+            192,
+            [663, 706]
+        )
+    ]
+)
+def test_page_search_for_black_lines(page, clip, max_thickness, min_length, rgb, expected):
+    black_lines = page.search_for_black_lines(clip=clip,
+                                              max_thickness=max_thickness,
+                                              min_length=min_length,
+                                              rgb=rgb)
+    assert len(black_lines) == len(expected)
+    for line_y_coord, exp_line_y_coord in zip(black_lines, expected):
+        assert line_y_coord == approx(exp_line_y_coord, abs=1)
 
 
 def is_bbox_almost_equal(
