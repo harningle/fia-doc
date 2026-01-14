@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from contextlib import nullcontext
 
+import pandas as pd
 import pymupdf
 import pytest
 from pytest import approx
@@ -8,8 +9,15 @@ from pytest import approx
 from fiadoc.parser import Page, TextBlock
 
 
+@pytest.fixture(scope='module')
+def page():
+    file_path = 'fiadoc/tests/fixtures/page.pdf'
+    doc = pymupdf.open(file_path)
+    return Page(doc[0], file_path)
+
+
 @pytest.mark.parametrize(
-    'text, bbox, superscript, strikeout, expected_repr, expectation',
+    'text, bbox, superscript, strikeout, expected, expectation',
     [
         (
             # Normal case
@@ -17,7 +25,7 @@ from fiadoc.parser import Page, TextBlock
             (1, 2, 3, 4),
             None,
             None,
-            'TextBlock(text="some text", bbox=(1.00, 2.00, 3.00, 4.00))',
+            TextBlock(text='some text', bbox=(1.00, 2.00, 3.00, 4.00)),
             nullcontext()
         ),
         (
@@ -44,12 +52,12 @@ from fiadoc.parser import Page, TextBlock
             None,
             False,
             True,
-            'TextBlock(text="text", strikeout=True)',
+            TextBlock(text='text', strikeout=True),
             nullcontext()
-        ),
+        )
     ]
 )
-def test_textblock(text, bbox, superscript, strikeout, expected_repr, expectation):
+def test_textblock(text, bbox, superscript, strikeout, expected, expectation):
     with expectation:
         block = TextBlock(
             text=text,
@@ -57,19 +65,50 @@ def test_textblock(text, bbox, superscript, strikeout, expected_repr, expectatio
             superscript=superscript,
             strikeout=strikeout
         )
-        assert repr(block) == expected_repr
-        if bbox:
-            assert block.l == block.x0 == bbox[0]
-            assert block.t == block.y0 == bbox[1]
-            assert block.r == block.x1 == bbox[2]
-            assert block.b == block.y1 == bbox[3]
+        assert block == expected
 
 
-@pytest.fixture(scope='module')
-def page():
-    file_path = 'fiadoc/tests/fixtures/page.pdf'
-    doc = pymupdf.open(file_path)
-    return Page(doc[0], file_path)
+@pytest.mark.parametrize(
+    'option, clip, expected',
+    [
+        (
+            # Usual case
+            'text',
+            (110, 210, 250, 250),
+            [TextBlock(text='All Officials, All Teams')]
+        ),
+        (
+            # Has strikeout text
+            'dict',
+            (450, 700, 500, 710),
+            [TextBlock(text='17:04.076', bbox=(460.5, 699.3, 495.3, 711.5), strikeout=True)]
+        ),
+        (
+            # Has superscript
+            'dict',
+            (30, 610, 45, 623),
+            [TextBlock(text='45', bbox=(37.7, 610.6, 49.9, 622.8)),
+             TextBlock(text='1', bbox=(33.8, 610.7, 37.7, 618.5), superscript=True)]
+        ),
+        (
+            # Has nothing
+            'blocks',
+            (200, 680, 300, 700),
+            []
+        ),
+        (
+            # Need OCR, and native `.get_text` shouldn't be able to find anything
+            'blocks',
+            (100, 180, 200, 200),
+            []
+        )
+    ]
+)
+def test_page_native_get_text(page, option, clip, expected):
+    result = page._native_get_text(option=option, clip=clip)
+    assert len(result) == len(expected)
+    for res_block, exp_block in zip(result, expected):
+        assert res_block == exp_block
 
 
 @pytest.mark.parametrize(
@@ -124,14 +163,7 @@ def test_page_get_text(page, option, clip, small_area, expected):
     result = page.get_text(option=option, clip=clip, small_area=small_area)
     assert len(result) == len(expected)
     for res_block, exp_block in zip(result, expected):
-        assert res_block.text == exp_block.text
-        if exp_block.bbox:
-            assert is_bbox_almost_equal(
-                (res_block.x0, res_block.y0, res_block.x1, res_block.y1),
-                (exp_block.x0, exp_block.y0, exp_block.x1, exp_block.y1)
-            )
-        assert res_block.superscript == exp_block.superscript
-        assert res_block.strikeout == exp_block.strikeout
+        assert res_block == exp_block
 
 
 @pytest.mark.parametrize(
@@ -181,9 +213,65 @@ def test_page_search_for_black_lines(page, clip, max_thickness, min_length, rgb,
         assert line_y_coord == approx(exp_line_y_coord, abs=1)
 
 
-def is_bbox_almost_equal(
-        bbox1: tuple[float, float, float, float],
-        bbox2: tuple[float, float, float, float],
-        atol: float = 1
-) -> bool:
-    return all(a == approx(b, abs=atol) for a, b in zip(bbox1, bbox2))
+@pytest.mark.parametrize(
+    'vlines, hlines, tol, header_included, expected',
+    [
+        (
+            # Simple table
+            [420, 442, 455, 500],
+            [652, 663, 675, 688, 699],
+            2,
+            True,
+            pd.DataFrame(
+                data=[[
+                    TextBlock(text='1', bbox=(434.8, 662.8, 439.3, 675.0)),
+                    TextBlock(text=''),
+                    TextBlock(text='16:01:43', bbox=(464.9, 662.8, 495.3, 675.0))
+                ], [
+                    TextBlock(text='2', bbox=(434.8, 675.0, 439.3, 687.1)),
+                    TextBlock(text=''),
+                    TextBlock(text='1:16.698', bbox=(465.0, 675.0, 495.4, 687.1))
+                ], [
+                    TextBlock(text='3', bbox=(434.8, 687.1, 439.3, 699.3)),
+                    TextBlock(text='P', bbox=(443.3, 687.1, 448.0, 699.3)),
+                    TextBlock(text='1:53.862', bbox=(465.0, 687.1, 495.4, 699.3))
+                ]],
+                columns=['NO', '', 'TIME']
+            )
+        ),
+        (
+            # Has strikeout text in table
+            [420, 442, 455, 500],
+            [675, 688, 699, 711],
+            2,
+            False,
+            pd.DataFrame(
+                data=[[
+                    TextBlock(text='2', bbox=(434.8, 675.0, 439.3, 687.1)),
+                    TextBlock(text=''),
+                    TextBlock(text='1:16.698', bbox=(465.0, 675.0, 495.4, 687.1))
+                ], [
+                    TextBlock(text='3', bbox=(434.8, 687.1, 439.3, 699.3)),
+                    TextBlock(text='P', bbox=(443.3, 687.1, 448.0, 699.3)),
+                    TextBlock(text='1:53.862', bbox=(465.0, 687.1, 495.4, 699.3))
+                ], [
+                    TextBlock(text='4', bbox=(434.8, 699.3, 439.3, 711.5)),
+                    TextBlock(text=''),
+                    TextBlock(text='17:04.076', bbox=(460.5, 699.3, 495.3, 711.5), strikeout=True)
+                ]]
+            )
+        )
+    ]
+)
+def test_page_parse_table_by_grid(page, vlines, hlines, tol, header_included, expected):
+    result = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      tol=tol,
+                                      header_included=header_included)
+    pd.testing.assert_frame_equal(result,
+                                  expected,
+                                  check_dtype=False,
+                                  check_index_type=False,
+                                  check_column_type=False,
+                                  check_frame_type=False,
+                                  check_names=False)

@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import warnings
 from dataclasses import dataclass, field
 from functools import cached_property
 from types import SimpleNamespace
@@ -21,13 +22,17 @@ OCR = PaddleOCR(lang='en',
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
                 use_textline_orientation=False)
-# Correct common OCR mistakes
+
+# Common OCR mistakes
 # TODO: very fragile...
 OCR_ERRORS = {
     'KMIH': 'KM/H',
     'L': '1',
     'I': '1'
 }
+
+# Strikeout line location: it shouldn't be too close to the top or bottom of the text bbox
+STRIKEOUT_LINE_MARGIN = 0.2
 
 
 class Page:
@@ -296,7 +301,12 @@ class Page:
 
             # When `option = dict`, also need to check if any strikeout text
             for textblock in textblocks:
-                if self.search_for_black_lines(clip=textblock.bbox, rgb=192):
+                l, t, r, b = textblock.bbox
+                h = b - t
+                if self.search_for_black_lines(
+                        clip=(l, t + STRIKEOUT_LINE_MARGIN * h, r, b - STRIKEOUT_LINE_MARGIN * h),
+                        rgb=192
+                ):
                     textblock.strikeout = True
             return textblocks
 
@@ -557,99 +567,98 @@ class Page:
 
     def parse_table_by_grid(
             self,
-            vlines: list[tuple[float, float]],
-            hlines: list[tuple[float, float]]
-    ) -> tuple[pd.DataFrame, list[tuple[int, int, str]], list[tuple[int, int, bool]]]:
-        """Manually parse the table cell by cell, defined by lines separating the columns and rows
+            vlines: list[float],
+            hlines: list[float],
+            tol: float = 2,
+            header_included: bool = True
+    ) -> pd.DataFrame:
+        """Parse a table cell by cell, defined by lines separating the cols. and rows
 
         PyMuPDF does have a built-in table parser, but it's bad for many reasons:
 
         1. it does not always respect the `clip` parameter: sometimes it gets table header/rows
-           outside the clip area
+           outside the `clip` area
         2. we can't force it to ignore the table header. E.g., for some short table (e.g. 2 rows),
            it may get the first row as the header, and the second row as the data. However, we
            sometimes want to treat all rows as data, not header. There is no way to force this
         3. sometimes it will get an empty column, if the horizontal gap between two columns are too
            big. This is true even if we manually specify `vertical_lines`
 
-        For these reasons, whenever we know the exact positions of rows and columns, we parse the
-        table manually use this function. This function returns three things:
+        For these reasons, we always parse tables w/ this method. It returns the table in a usual
+        `pd.DataFrame`, and each element/cell is a TextBlock
 
-        1. the usual parsed df.
-        2. a list of tuples to identify is a cell (i, j) is crossed out, in the format of
-           (i, j, True or False)
-        3. a list of tuples for the superscript for a cell (i, j), in the format of
-           (i, j, superscript text)
-
-        :param vlines: List of left and right x-coords. of the cols
-        :param hlines: List of top and bottom y-coords. of the rows
-        :return: A usual df., a list of superscript cells, a list of crossed out cells
+        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
+                       boundaries need to be included
+        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
+                       boundaries need to be included
+        :param tol: tolerance for text and cell positioning. In principle, all texts should fall
+                    inside the cell's bounding box. Default is 2 pixels, i.e. if text is within 2px
+                    of the cell's boundary, it is considered to be inside the cell. If we find any
+                    text more than 2px always from the cell's bbox, will raise an error. See #33
+        :param header_included: whether the first row is header/col. names. Default is False, i.e.
+                                treat everything as table content, and no table header/col. names
+        :return: A `pd.DataFrame`, with each cell being a TextBlock
         """
-        cells = []
-        superscripts = []
-        crossed_out = []
-        for i, row_sep in enumerate(hlines):
+        page_no_str = f'p.{self.number} in {self.file}'  # For error/warning messages
+
+        cells: list[list[Optional[TextBlock]]] = []
+        for i in range(len(hlines) - 1):
             row = []
-            for j, col_sep in enumerate(vlines):
-                t = row_sep[0]
-                b = row_sep[1]
-                l = col_sep[0]
-                r = col_sep[1]
+            for j in range(len(vlines) - 1):
+                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
+                cell_bbox_str = f'({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f})'  # For error/warnings
 
-                # Get text in the cell. Since we need to check the superscript, we need `'dict'`
-                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
-                cell = self.get_text('dict', clip=(l, t, r, b))
-                spans = []
-                for block in cell['blocks']:
-                    for line in block['lines']:
-                        for span in line['spans']:
-                            if span['text'].strip():
-                                bbox = span['bbox']
-                                # Need to check if the found text is indeed in the cell's bbox.
-                                # PyMuPDF is notoriously bad for not respecting `clip` parameter.
-                                # We give two pixels tolerance
-                                if bbox[0] >= l - 2 and bbox[2] <= r + 2 \
-                                        and bbox[1] >= t - 2 and bbox[3] <= b + 2:
-                                    spans.append(span)
-
-                # If we don't find any text in the cell, it's empty. This is OK, e.g. the quali.
-                # lap time table's pit column is always empty for non-pit laps
-                if not spans:
-                    row.append('')
+                # Get text inside the cell defined by (l, t, r, b)
+                textblocks = self.get_text('dict', clip=(l, t, r, b))
+                if not textblocks:
+                    # OK to have an empty cell, e.g. the pit col. in quali. lap times PDF should be
+                    # empty for non-stop laps
+                    row.append(TextBlock(text=''))
                     continue
 
-                # Check if any superscript
-                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-
-                # font-characteristics for font flags
-                match len(spans):
-                    case 1:
-                        row.append(spans[0]['text'].strip())
-                    case 2:
-                        for span in spans:
-                            match span['flags']:
-                                case 0:
-                                    row.append(span['text'].strip())
-                                case 1:
-                                    superscripts.append((i, j, span['text'].strip()))
-                                case _:
-                                    raise ValueError(
-                                        f'Unknown font flags for cell at ({l, t, r, b})'
-                                    )
-                    case _:
-                        raise ValueError(f'Unknown span for cell at ({l, t, r, b})')
+                # Need to check if the found text is indeed in the cell's bbox. PyMuPDF is
+                # notoriously bad for NOT respecting the `clip` parameter
+                for k in range(len(textblocks) - 1, -1, -1):  # TODO: bad practice
+                    bbox = textblocks[k].bbox
+                    # Drop text outside the cell bbox
+                    if (bbox[0] < l - tol) or (bbox[1] < t - tol) or (bbox[2] > r + tol) \
+                            or (bbox[3] > b + tol):
+                        warnings.warn(f'Text found outside the cell bbox on {page_no_str}. Cell '
+                                      f'bbox = {cell_bbox_str}. Text found = {textblocks[k]}. '
+                                      f'Ignoring it')
+                        textblocks.pop(k)
 
-                # Check if the cell is crossed out
-                for rect, text in self.crossed_out_text:
-                    if rect.intersects((l, t, r, b)):
-                        assert text == row[-1], \
-                            f'Found a crossed out text at the location of ({l, t, r, b}) with ' \
-                            f'text "{row[-1]}", but the crossed out text is "{text}" and '\
-                            f"doesn't match with the cell's text"
-                        crossed_out.append((i, j, True))
+                # If we had something before, but after filtering out the out-of-bbox texts, now
+                # nothing is left, this is an error
+                if not textblocks:
+                    raise ParsingError(f'Found text outside the cell bbox on {page_no_str}, and '
+                                       f'no valid text left after removing them. Row #. = {i}, '
+                                       f'col. #. = {j}. Cell bbox = {cell_bbox_str}')
+
+                # Should only have one textblock in one cell
+                elif len(textblocks) > 1:
+                    raise ParsingError(f'Found multiple texts in one cell on {page_no_str}. Row '
+                                       f'#. = {i}, col. #. = {j}. Cell bbox = {cell_bbox_str}. '
+                                       f'Texts found = {textblocks}')
+                row.append(textblocks[0])
             cells.append(row)
 
-        df = pd.DataFrame(cells, columns=None, index=None)
-        return df, superscripts, crossed_out
+        cols: Optional[list[TextBlock]] = None
+        if header_included:
+            cols = cells.pop(0)
+            for i, col_name in enumerate(cols):
+                if col_name is None:
+                    # Can be empty, e.g. pit col. in quali. lap times PDF has no col name.
+                    cols[i] = TextBlock(text='')
+                else:
+                    if col_name.superscript or col_name.strikeout:
+                        raise ParsingError(
+                            f'Found superscript or strikeout text in table header on '
+                            f'{page_no_str}: {col_name}. Table bbox = ({vlines[0]:.1f}, '
+                            f'{hlines[0]:.1f}, {vlines[-1]:.1f}, {hlines[-1]:.1f})'
+                        )
+            return pd.DataFrame(cells, columns=[i.text for i in cols], index=None)
+        return pd.DataFrame(cells, columns=None, index=None)
 
     def search_for_white_strip(
             self,
@@ -838,6 +847,8 @@ class TextBlock:
         if not isinstance(self.text, str):
             raise ValueError(f'Invalid `text`: {self.text}. Expected a string')
 
+        if self.bbox is None:  # In case sometimes we pass in `bbox=None`
+            self.bbox = []
         if self.bbox:
             if len(self.bbox) != 4:
                 raise ValueError(f'Invalid `bbox`: {self.bbox}. Expected a tuple of four floats '
@@ -870,6 +881,26 @@ class TextBlock:
             ret += f', strikeout=True'
         ret += ')'
         return ret
+
+    def __eq__(self, other):
+        if not isinstance(other, TextBlock):
+            return False
+
+        if self.text != other.text:
+            return False
+        if self.superscript != other.superscript:
+            return False
+        if self.strikeout != other.strikeout:
+            return False
+
+        # Compare bbox with tolerance of at most 1px difference
+        if self.bbox and other.bbox:  # Both have bbox
+            for v1, v2 in zip(self.bbox, other.bbox):
+                if abs(v1 - v2) > 1:
+                    return False
+        elif self.bbox != other.bbox:  # One has bbox and the other doesn't
+            return False
+        return True
 
 
 class ParsingError(Exception):
