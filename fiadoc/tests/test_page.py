@@ -214,13 +214,14 @@ def test_page_search_for_black_lines(page, clip, max_thickness, min_length, rgb,
 
 
 @pytest.mark.parametrize(
-    'vlines, hlines, tol, header_included, expected',
+    'vlines, hlines, tol, allow_multiple_texts_per_cell, header_included, expected',
     [
         (
             # Simple table
             [420, 442, 455, 500],
             [652, 663, 675, 688, 699],
             2,
+            None,
             True,
             pd.DataFrame(
                 data=[[
@@ -244,6 +245,7 @@ def test_page_search_for_black_lines(page, clip, max_thickness, min_length, rgb,
             [420, 442, 455, 500],
             [675, 688, 699, 711],
             2,
+            None,
             False,
             pd.DataFrame(
                 data=[[
@@ -260,13 +262,37 @@ def test_page_search_for_black_lines(page, clip, max_thickness, min_length, rgb,
                     TextBlock(text='17:04.076', bbox=(460.5, 699.3, 495.3, 711.5), strikeout=True)
                 ]]
             )
+        ),
+        (
+            # Allow multiple texts in the zero-th col.
+            [20, 55, 150],
+            [610, 623, 636, 650],
+            2,
+            [0],
+            False,
+            pd.DataFrame(
+                data=[[
+                    [TextBlock(text='45', bbox=(37.7, 610.6, 53.0, 622.8)),
+                     TextBlock(text='1', bbox=(33.8, 610.7, 37.7, 618.5), superscript=True)],
+                    TextBlock(text='Victor Martins', bbox=(63.8, 610.6, 134.1, 622.8)),
+                ], [
+                    [TextBlock(text='50', bbox=(37.7, 623.2, 49.9, 635.5)),
+                     TextBlock(text='2', bbox=(33.8, 623.4, 37.7, 631.2), superscript=True)],
+                    TextBlock(text='Ryo Hirakawa', bbox=(63.8, 623.2, 135.3, 635.5))
+                ], [
+                    [TextBlock(text='0', bbox=(37.7, 635.6, 43.8, 647.8))],
+                    TextBlock(text='')
+                ]]
+            )
         )
     ]
 )
-def test_page_parse_table_by_grid(page, vlines, hlines, tol, header_included, expected):
+def test_page_parse_table_by_grid(page, vlines, hlines, tol, allow_multiple_texts_per_cell,
+                                  header_included, expected):
     result = page.parse_table_by_grid(vlines=vlines,
                                       hlines=hlines,
                                       tol=tol,
+                                      allow_multiple_texts_per_cell=allow_multiple_texts_per_cell,
                                       header_included=header_included)
     pd.testing.assert_frame_equal(result,
                                   expected,

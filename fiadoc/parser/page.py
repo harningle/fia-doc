@@ -7,7 +7,7 @@ import warnings
 from dataclasses import dataclass, field
 from functools import cached_property
 from types import SimpleNamespace
-from typing import Literal, Optional
+from typing import Literal, Optional, Sequence
 from string import printable
 
 import matplotlib.pyplot as plt
@@ -305,7 +305,8 @@ class Page:
                 h = b - t
                 if self.search_for_black_lines(
                         clip=(l, t + STRIKEOUT_LINE_MARGIN * h, r, b - STRIKEOUT_LINE_MARGIN * h),
-                        rgb=192
+                        min_length=0.9,  # We are using the text's bbox, so relative to it, the
+                        rgb=192          # strikeout line should span almost the entire width
                 ):
                     textblock.strikeout = True
             return textblocks
@@ -533,7 +534,6 @@ class Page:
         # Whether a row is a black row (i.e., has a sufficiently long black run)
         is_black_row: npt.NDArray[np.bool_] = (longest_run_per_row >= pixmap.width * min_length)
 
-
         # Sample down to original resolution
         """
         We use very aggressive down sampling. E.g., w/ `scaling_factor = 4`, a row in the original
@@ -570,6 +570,7 @@ class Page:
             vlines: list[float],
             hlines: list[float],
             tol: float = 2,
+            allow_multiple_texts_per_cell: Optional[Sequence[int]] = None,
             header_included: bool = True
     ) -> pd.DataFrame:
         """Parse a table cell by cell, defined by lines separating the cols. and rows
@@ -595,9 +596,18 @@ class Page:
                     inside the cell's bounding box. Default is 2 pixels, i.e. if text is within 2px
                     of the cell's boundary, it is considered to be inside the cell. If we find any
                     text more than 2px always from the cell's bbox, will raise an error. See #33
+        :param allow_multiple_texts_per_cell: Which cols. can have multiple texts per cell. By
+                                              default, we only allow one textblock in one cell.
+                                              However, some cases (e.g. reserve drivers in entry
+                                              list PDF) may have two textblocks in the zero-th col.
+                                              (one normal text and one superscript). In this case,
+                                              set this parameter to [0], i.e. allow col. 0 to have
+                                              multiple textblocks per cell. Col. indexes start from
+                                              0
         :param header_included: whether the first row is header/col. names. Default is False, i.e.
                                 treat everything as table content, and no table header/col. names
-        :return: A `pd.DataFrame`, with each cell being a TextBlock
+        :return: A `pd.DataFrame`, with each cell being a TextBlock or a list of TextBlocks,
+                 depending on `allow_multiple_texts_per_cell`
         """
         page_no_str = f'p.{self.number} in {self.file}'  # For error/warning messages
 
@@ -635,18 +645,32 @@ class Page:
                                        f'no valid text left after removing them. Row #. = {i}, '
                                        f'col. #. = {j}. Cell bbox = {cell_bbox_str}')
 
-                # Should only have one textblock in one cell
-                elif len(textblocks) > 1:
+                # Should only have one textblock in a cell, unless `allow_multiple_texts_per_cell`
+                # includes this col.
+                if allow_multiple_texts_per_cell and (j in allow_multiple_texts_per_cell):
+                    row.append(textblocks)
+                    continue
+                # If this col. is not in `allow_multiple_texts_per_cell`, but we found multiple
+                # texts, raise an error
+                if len(textblocks) > 1:
                     raise ParsingError(f'Found multiple texts in one cell on {page_no_str}. Row '
                                        f'#. = {i}, col. #. = {j}. Cell bbox = {cell_bbox_str}. '
                                        f'Texts found = {textblocks}')
+                # Normal case will reach here
                 row.append(textblocks[0])
             cells.append(row)
 
-        cols: Optional[list[TextBlock]] = None
         if header_included:
-            cols = cells.pop(0)
+            cols: list[TextBlock | list[TextBlock]] = cells.pop(0)
             for i, col_name in enumerate(cols):
+                if isinstance(col_name, list):  # In case we allow some cols. to have multiple
+                    if len(col_name) > 1:       # texts, the col. name should always be one text
+                        raise ParsingError(
+                            f'Found multiple texts ina cell in table header on {page_no_str}: '
+                            f'{col_name}. Table bbox = ({vlines[0]:.1f}, {hlines[0]:.1f}, '
+                            f'{vlines[-1]:.1f}, {hlines[-1]:.1f})'
+                        )
+                    col_name = col_name[0]
                 if col_name is None:
                     # Can be empty, e.g. pit col. in quali. lap times PDF has no col name.
                     cols[i] = TextBlock(text='')
