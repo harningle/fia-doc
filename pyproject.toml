@@ -53,6 +53,11 @@ minversion = "6.0"
 testpaths = [
     "fiadoc/tests"
 ]
+addopts = ["--doctest-modules"]
+doctest_optionflags = [
+  "NORMALIZE_WHITESPACE",
+  "NUMBER"
+]
 filterwarnings = [
   "ignore::DeprecationWarning:importlib.*:",  # See pymupdf/PyMuPDF#3931 and swig/swig#2881
   "ignore::DeprecationWarning:sys.*:",

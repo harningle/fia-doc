@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from contextlib import nullcontext
 
+import numpy as np
 import pandas as pd
 import pymupdf
 import pytest
@@ -301,3 +302,64 @@ def test_page_parse_table_by_grid(page, vlines, hlines, tol, allow_multiple_text
                                   check_column_type=False,
                                   check_frame_type=False,
                                   check_names=False)
+
+
+@pytest.mark.parametrize(
+    'clip, height, expected',
+    [
+        (
+            # Usual case
+            (0, 500, 200, 600),
+            4,
+            [548]
+        ),
+        (
+            # Usual case w/ super thin `height`
+            (0, 500, 200, 600),
+            0.1,
+            [509, 522, 537, 548, 584, 598]
+        ),
+        (
+            # Nothing found
+            (0, 500, 200, 550),
+            4,
+            []
+        ),
+        (
+            # A real example from lap times PDF
+            (400, 650, 550, 800),
+            4,
+            [767]
+        )
+    ]
+)
+def test_page_search_for_white_strips(page, clip, height, expected):
+    white_strips = page.search_for_white_strips(clip=clip, height=height)
+    assert np.allclose(white_strips, expected, atol=1)
+
+
+@pytest.mark.parametrize(
+    'clip, min_height, min_width, expected',
+    [
+        (
+            # Usual case
+            (420, 650, 505, 711),
+            0,
+            0.8,
+            [650, 662, 675, 687, 699, 711]
+        ),
+        (
+            # Antonelli has a too tall row
+            (420, 650, 505, 780),
+            0,
+            0.8,
+            [648, 662, 675, 687, 699, 711, 724, 737, 757, 771]
+        )
+    ]
+)
+def test_page_search_for_grey_white_rows(page, clip, min_height, min_width, expected):
+    hlines = page.search_for_grey_white_rows(clip=clip,
+                                             min_height=min_height,
+                                             min_width=min_width)
+    assert np.allclose(hlines, expected, atol=1)
+

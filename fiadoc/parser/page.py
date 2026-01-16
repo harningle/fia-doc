@@ -684,46 +684,46 @@ class Page:
             return pd.DataFrame(cells, columns=[i.text for i in cols], index=None)
         return pd.DataFrame(cells, columns=None, index=None)
 
-    def search_for_white_strip(
+    def search_for_white_strips(
             self,
-            height: float = 4,
-            clip: Optional[tuple[float, float, float, float]] = None
+            clip: Optional[tuple[float, float, float, float]] = None,
+            height: float = 4
     ) -> list[float]:
-        """Search for a wide horizontal white strip in the page, with at least `height` px tall
+        """Search for wide horizontal white strips in the page, with at least `height` px tall
 
-        :param height: The minimum height of the white strip in pixels. Default is 6 px, which is
-                       roughly half of the normal line height of the FIA PDFs
         :param clip: (x0, y0, x1, y1). If provided, only search in this area. Otherwise, search the
                      whole page
+        :param height: The minimum height of the white strip in pixels. Default is 4 px, which is
+                       roughly half of the normal line height of the FIA PDFs
         :return: The top y-coord. of the found white strips in a list, sorted from top to bottom
         """
         # TODO: this 4px height is very fragile. Better if get the exact vertical gap in pixels
         #       between two car No. and use (some proportion of) this gap as `height`
 
         # Get the pixmap of the clipped area
-        clip = clip if clip else self.bound()
-        pixmap = self.get_pixmap(clip=clip)
-        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
+        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip)
+        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
+                                                           dtype=np.uint8)
+                                             .reshape((pixmap.height, pixmap.width, 3)))
 
-        # Find all white rows
-        is_white_row = np.all(pixmap == 255, axis=(1, 2))  # noqa: PLR2004
-        white_strips = []
-        strip_start = None
+        # Find all white rows, i.e. strictly all pixels in the row are white (RGB = 255)
+        is_white: npt.NDArray[np.bool_] = np.all(pixmap_arr == 255, axis=(1, 2))  # noqa: PLR2004
 
-        # Find consecutive white rows that are at least `height` px tall
-        for i, is_white in enumerate(is_white_row):
-            if is_white and strip_start is None:
-                strip_start = i
-            elif not is_white and strip_start is not None:
-                if i - strip_start >= height:
-                    white_strips.append(strip_start + t)
-                strip_start = None
+        # Pad with a black row on top and bottom to simplify. diff calculation later
+        padded: npt.NDArray[np.bool_] = np.concatenate([[False], is_white, [False]])
 
-        # Edge case for the strip being at the bottom
-        if strip_start is not None and len(is_white_row) - strip_start >= height:
-            white_strips.append(strip_start + t)
-        return white_strips
+        # Find consecutive white rows
+        # Row colour = B B W W W W W W  B W W  B B B W  B
+        # diff       =   0 1 0 0 0 0 0 -1 1 0 -1 0 0 1 -1
+        # 1: start of a white strip; -1: end of a white strip
+        diff: npt.NDArray[np.int8] = np.diff(padded.astype(np.int8))
+        starts: npt.NDArray[np.intp] = np.where(diff == 1)[0]
+        ends: npt.NDArray[np.intp] = np.where(diff == -1)[0]
+
+        # Filter out white strips that are less than `height` px tall
+        strip_heights: npt.NDArray[np.intp] = ends - starts
+        is_valid_strip: npt.NDArray[np.bool_] = (strip_heights > height)
+        return (starts[is_valid_strip] + pixmap.y).tolist()
 
     def search_for_grey_white_rows(
             self,
@@ -751,96 +751,121 @@ class Page:
                  the last row is also included
         """
         # Get the pixmap of the clipped area
-        clip = clip if clip else self.bound()
-        pixmap = self.get_pixmap(clip=clip, dpi=DPI)
-        l, t, r, b = pixmap.x, pixmap.y, pixmap.x + pixmap.w, pixmap.y + pixmap.h
-        pixmap = np.ndarray([b - t, r - l, 3], dtype=np.uint8, buffer=pixmap.samples)
+        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=DPI)
+        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
+                                                           dtype=np.uint8)
+                                             .reshape((pixmap.height, pixmap.width, 3))
+                                             .copy())
 
-        # Convert minimum row height to the new DPI
-        scaling_factor = pixmap.shape[0] / (clip[3] - clip[1])
-        min_height = scaling_factor * min_height
+        # Convert minimum row height requirement to the new DPI. E.g., if we scale the page from
+        # 300 * 300 to 600 * 600, then 10px in the original page should become 20px
+        scaling_factor: float = pixmap_arr.shape[0] / (clip[3] - clip[1])
+        min_height_scaled: float = min_height * scaling_factor
 
         # Find all grey/white rows. Grey is usually RGB = 232
-        is_grey_row = np.mean(pixmap < 240, axis=(1, 2)) > min_width  # noqa: PLR2004
-        grey_rows = []
-        row_start = None
-        for i, is_grey in enumerate(is_grey_row):
-            if is_grey and (row_start is None):
-                row_start = i
-            elif (not is_grey) and (row_start is not None):
-                if i - row_start > min_height:
-                    grey_rows.append((row_start, i))
-                row_start = None
-        if row_start and (len(is_grey_row) - row_start > min_height):  # If the last row is grey
-            grey_rows.append((row_start, len(is_grey_row)))
+        grey = 240  # TODO: probably make this adjustable later
+        is_grey_row: npt.NDArray[np.bool_] = (np.mean(pixmap_arr < grey, axis=(1, 2)) > min_width)
+
+        # Pad with False (non-grey) rows to simplify diff calculation
+        padded: npt.NDArray[np.bool_] = np.concatenate([[False], is_grey_row, [False]])
+
+        # Find consecutive grey rows: 1 = start of a grey row; -1 = end of a grey row
+        diff: npt.NDArray[np.int8] = np.diff(padded.astype(np.int8))
+        starts: npt.NDArray[np.intp] = np.where(diff == 1)[0]
+        ends: npt.NDArray[np.intp] = np.where(diff == -1)[0]
+
+        # Filter out grey rows shorter than `min_height`
+        row_heights: npt.NDArray[np.intp] = ends - starts
+        valid_rows: npt.NDArray[np.bool_] = (row_heights > min_height_scaled)
+        # [(row start y-coord., row end y-coord.), ...]
+        grey_rows: list[tuple[float, float]] = list(zip(starts[valid_rows].tolist(),
+                                                        ends[valid_rows].tolist()))
 
         # All rows should have roughly the same height
-        row_heights = ([grey_rows[i][1] - grey_rows[i][0] for i in range(len(grey_rows))]
-                       + [grey_rows[i][0] - grey_rows[i - 1][1] for i in range(1, len(grey_rows))])
-        row_height = np.mean(row_heights) if row_heights else 0
-        if not np.all(np.isclose(row_heights, row_height, rtol=0.1)):
-            outliers = [i for i in grey_rows if not np.isclose(i[1] - i[0], row_height, rtol=0.2)]
-            for row in outliers:
-                text = self.get_text('text', clip=(l, clip[1] + row[0] / scaling_factor,
-                                                   r, clip[1] + row[1] / scaling_factor))
-                if 'antonelli' in text.lower():  # See e4df38f. Basically sometimes FIA wraps
-                    continue                     # Antonelli's name into two lines, making the row
-                else:                            # taller
-                    raise ParsingError(f'Found rows with different heights on p.{self.number} in '
-                                       f'{self.file}. Expected all rows to have similar heights: '
-                                       f'{row_heights}')
-        """
-        We use 20% as "roughly the same". It's actually a very tight tolerance. First, when we get
-        pixmap of the page, it's a matrix. So we will have coords./indices like (1, 5), not
-        (1.1, 4.9). This creates some rounding error. After scaling (DPI = 600), this error is
-        further amplified. Second, the `clip` may not always be perfect. The true table area may be
-        (0, 10, 100, 500), and `clip` may be (0, 12, 100.6, 499). This may affect the row height of
-        the first and/or the last row. Therefore, 20% is a reasonable tolerance.
-        """
-        # Convert the grey rows to the original page coordinates
-        grey_rows = [(clip[1] + i[0] / scaling_factor, clip[1] + i[1] / scaling_factor)
-                     for i in grey_rows]
-        row_height /= scaling_factor
+        avg_row_height: float = 0
+        if grey_rows:  # OK to have zero grey row, e.g. only one white row in the table
+            row_heights = np.array([grey_rows[i][1] - grey_rows[i][0]
+                                    for i in range(len(grey_rows))])
+            avg_row_height = np.mean(row_heights)
+            """
+            We use 20% as "roughly the same". It's actually a very tight tolerance. First, when we
+            get pixmap of the page, it's a matrix. So we will have coords./indices like (1, 5), not
+            (1.1, 4.9). This creates some rounding error. After scaling (DPI = 600), this error is
+            further amplified. Second, the `clip` may not always be perfect. The true table area
+            may be (0, 10, 100, 500), and `clip` may be (0, 12, 100.6, 499). This may affect the
+            row height of the first and/or the last row. Therefore, 20% is a reasonable tolerance
+            """
+
+            if not np.all(np.isclose(row_heights, avg_row_height, rtol=0.2)):
+                outliers: list[tuple[float, float]] = [
+                    i for i in grey_rows if not np.isclose(i[1] - i[0], avg_row_height, rtol=0.2)
+                ]
+                for row in outliers:
+                    text = self.get_text('text', clip=(clip[0], clip[1] + row[0] / scaling_factor,
+                                                       clip[2], clip[1] + row[1] / scaling_factor))
+                    # See e4df38f. Sometimes FIA wraps Antonelli's name into two lines, making the
+                    # row exceptionally taller
+                    if any('antonelli' in i.text.lower() for i in text):
+                        continue
+                    else:
+                        raise ParsingError(
+                            f'Found rows with different heights inside ({clip[0]:.1f}, '
+                            f'{clip[1]:.1f}, {clip[2]:.1f}, {clip[3]:.1f}) on p.{self.number} in '
+                            f'{self.file}. Expected all rows to have similar heights'
+                        )
+
+            # Convert the grey rows to the original page coordinates
+            grey_rows = [(clip[1] + i[0] / scaling_factor, clip[1] + i[1] / scaling_factor)
+                         for i in grey_rows]
+            avg_row_height /= scaling_factor
 
         # White rows are in between two consecutive grey rows
-        white_rows = [(grey_rows[i][1], grey_rows[i + 1][0]) for i in range(len(grey_rows) - 1)]
+        white_rows: list[tuple[float, float]] = [(grey_rows[i][1], grey_rows[i + 1][0])
+                                                 for i in range(len(grey_rows) - 1)]
 
-        # Check if the first row is white. (If it's grey, already captured above)
-        # First check if have enough spacing above the first grey row
+        # Check if the first row is white. (If it's grey, then should already be captured above)
+        # First check if have enough spacing (80% of a row height) above the first grey row
         t_first_grey_row = grey_rows[0][0] if grey_rows else clip[3]  # May have zero grey row
-        if t_first_grey_row > clip[1] + row_height * 0.7:
+        if t_first_grey_row > clip[1] + avg_row_height * 0.8:
             # Then check if any text in the area above the first grey row
             text = self.get_text('text', clip=(clip[0], clip[1], clip[2], t_first_grey_row))
-            if text.strip():
-                # If yes, then it's a white row
-                if row_height:
+            if any(i.text for i in text):
+                # If yes, then it's a white row. Set its row height to avg. row height
+                if avg_row_height:
+                    white_rows.insert(0, (t_first_grey_row - avg_row_height, t_first_grey_row))
+                else:
                     """
-                    E.g., we only have one row in the table, and it's white. Because there is no
-                    grey row, `row_height` will be default to zero above. In this case, we just use
+                    Sometimes we only have one white row in the table. Because there is no grey
+                    row, `avg_row_height` will be default to zero above. In this case, we just use
                     the top the `clip` as the top of the (and the only) white row.
                     """
-                    white_rows.insert(0, (t_first_grey_row - row_height, t_first_grey_row))
-                else:
                     white_rows.insert(0, (clip[1], t_first_grey_row))
 
         # Check if the last row is white, in the same way
         b_last_grey_row = grey_rows[-1][1] if grey_rows else clip[1]
-        if b_last_grey_row < clip[3] - row_height * 0.7:
+        if b_last_grey_row < clip[3] - avg_row_height * 0.8:
             text = self.get_text('text', clip=(clip[0], b_last_grey_row, clip[2], clip[3]))
-            if text.strip():
-                if row_height:
-                    white_rows.append((b_last_grey_row, b_last_grey_row + row_height))
+            if any(i.text for i in text):
+                if avg_row_height:
+                    white_rows.append((b_last_grey_row, b_last_grey_row + avg_row_height))
                 else:
                     white_rows.append((b_last_grey_row, clip[3]))
 
-        # Get the rows' y-coords.
-        temp = sorted([coord for row in grey_rows + white_rows for coord in row])
-        if not temp:
+        # Get all rows' start and end y-coords.
+        all_rows: list[float] = sorted([coord for row in grey_rows + white_rows for coord in row])
+        if not all_rows:
             return []
-        hlines = [temp[0]]
-        for i in range(1, len(temp)):
-            if not np.isclose(temp[i], temp[i - 1], rtol=0.01):
-                hlines.append(temp[i])
+
+        # Return the y-coords. where a grey row ends and a white row starts
+        """
+        E.g., grey rows may be [(10, 29.8), (50, 70)], white rows may be [(30, 50), (70, 90)]. Then
+        `all_rows` = [10, 29.8, 30, 50, 50, 70, 70, 90]. We only want to return [10, 29.8 (or 30),
+        50, 70, 90]
+        """
+        hlines: list[float] = [all_rows[0]]
+        for i in range(1, len(all_rows)):
+            if not np.isclose(all_rows[i], all_rows[i - 1], rtol=0.01):
+                hlines.append(all_rows[i])
         return hlines
 
 
