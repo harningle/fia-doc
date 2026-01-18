@@ -33,141 +33,69 @@ LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less th
 class BaseParser:
     """Base class for all parsers
 
-    Provides some common functionality, such as locating the title, parsing tables by grid lines,
-    etc. Not meant to be instantiated directly, but rather to be inherited by others.
+    Provides some common functionality, such as locating the title, getting col. positions, etc.
+    Not meant to be instantiated directly, but rather to be inherited by others.
     """
-    @staticmethod
-    def _parse_table_by_grid(
-            page: Page,
-            vlines: list[float],
-            hlines: list[float],
-            tol: float = 2,
-            header_included: bool = True
-    ) -> pd.DataFrame:
-        """Parse the table cell by cell, defined by lines separating the columns and rows
-
-        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
-                       boundaries need to be included
-        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
-                       boundaries need to be included
-        :param tol: tolerance for text and cell positioning. In principle, all texts should fall
-                    inside the cell's bounding box. Default is 2 pixels, i.e. if text is within 2px
-                    of the cell's boundary, it is considered to be inside the cell. See #33
-        :param header_included: whether the first row is header/col. names. Default is True
-        """
-        cells = []
-        for i in range(len(hlines) - 1):
-            row = []
-            for j in range(len(vlines) - 1):
-                text = ''
-                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
-
-                # Get text inside the cell, defined by the vertical and horizontal lines
-                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html
-                """
-                For each cell defined by the `vlines` and `hlines`, we get text inside it. However,
-                texts that are partially inside the cell will also be captured by pymupdf. So we
-                need to check whether the found text is totally or partially inside the cell's
-                bounding box, and do not want to false include other texts. However, we do want to
-                allow for a bit of tolerance, as `hlines` or `vlines` are not always perfectly
-                positioned. The tolerance is set to 2 pixels in general. But for PDFs that have
-                smaller page margin, i.e. text font size or line height are bigger in these PDFs,
-                we need to increase the tolerance. See #33.
-                """
-                cell = page.get_text('blocks', clip=(l, t, r, b), small_area=True)
-                if cell:
-                    # Usually, one cell is one line of text. The only exception is Andrea Kimi
-                    # Antonelli. His name is too long and thus (maybe) wrapped into two lines (#42)
-                    if len(cell) > 1:
-                        if (len(cell) == 2  # noqa: PLR2004
-                                and ('antonelli' in cell[0][4].lower()
-                                     or 'antonelli' in cell[1][4].lower())):
-                            text = cell[0][4].strip() + ' ' + cell[1][4].strip()
-                        else:
-                            raise ValueError(
-                                f'Expected one text block in row {i}, col. {j} on p.{page.number} '
-                                f'in {page.file}. Found {len(cell)}: {cell}'
-                            )
-                    elif len(cell) == 1:
-                        cell = cell[0]
-                        if cell[4].strip():
-                            bbox = cell[0:4]
-                            if bbox[0] < l - tol or bbox[2] > r + tol \
-                                    or bbox[1] < t - tol or bbox[3] > b + tol:
-                                raise ValueError(
-                                    f"Found text outside the cell's area in row {i}, col. {j} on "
-                                    f"p.{page.number} in {page.file}: {cell}"
-                                )
-                            text = cell[4].strip()
-                    else:
-                        raise ValueError(
-                            f'Expected one text block in row {i}, col. {j} on p.{page.number} in '
-                            f'{page.file}. Found {len(cell)}: {cell}'
-                        )
-                row.append(text)
-            cells.append(row)
-
-        if header_included:
-            return pd.DataFrame(cells[1:], columns=cells[0])
-        else:
-            return pd.DataFrame(cells)
-
     @staticmethod
     def _detect_cols(
             page: Page,
-            clip: tuple[float, float, float, float],
+            clip: BBox,
             col_min_gap: float = 1.1,
             min_black_line_length: float = 0.9
     ) -> list[TextBlock]:
         """
-        Search for table header/cols. in the `clip` area. Returns a list of (l, t, r, b, col. name)
+        Search for table header/cols. in the `clip` area
 
         The high-level idea is:
 
-        1. convert the `clip` area into an image
+        1. convert the `clip` area into an image/pixel map
         2. for each character, mask it into black rectangle using `scipy.ndimage.label`. This is
-           possible because all black pixels are text, all texts are in black, and everything else
-           is white
+           possible because all black pixels are text (sufficient and necessary). We will address
+           the black table lines below
         3. merge multiple black rectangles into a single one if they are sufficiently close to
-           each other
-        4. run OCR on each black rectangle to get the text inside it. And the four corners of the
-           rectangle are the bounding box of the text
+           each other, i.e. group letters into words
+        4. get the text inside each block
 
         :param col_min_gap: Minimum gap between two cols., relative to the width of the median
                             thinnest char. Default is 1.1, i.e. 10% tolerance. If two chars. are
                             horizontally closer than this gap, they are considered to be in the
-                            same word. We many have extremely thin char., like a dot. So we can't
-                            really base this on such extreme value. From thin to fat, we may have
+                            same word. We many have extremely thin char., like "i". So we can't
+                            really base this on the thinnest char. From thin to fat, we may have
                             ".", "I", "a", "W". Usually the width of "a" is a good reference. So we
                             use the width of the median thinnest char. here
-        :param min_black_line_length: Minimum length of a black line, relative to the width of
-                                      the `clip` area. Default is 0.9, i.e. 90% of the width of
-                                      the `clip` area. Any black horizontal line longer than this
-                                      is ignored
+        :param min_black_line_length: Minimum length of a black line, relative to the corresponding
+                                      edge length of the `clip` area. Default is 0.9. That is, any
+                                      black vertical lines longer than 90% of the height of `clip`,
+                                      and any black horizontal lines longer than 90% of the width
+                                      of `clip`, are ignored
+        :return: List of TextBlock representing the detected cols.
         """
         # Get the pixmap of `clip` area
-        pixmap = page.get_pixmap(clip=clip, dpi=DPI)
-        arr = np.ndarray([pixmap.h, pixmap.w, 3], dtype=np.uint8, buffer=pixmap.samples)
-        del pixmap
+        # TODO: create a get pixmap method in Page
+        pixmap: pymupdf.Pixmap = page.get_pixmap(clip=clip, dpi=DPI)
+        arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8)
+                                      .reshape((pixmap.height, pixmap.width, 3)))
 
-        # Drop rows and cols. with almost all black pixels (those are lines not text). After this
-        # step, all black pixels should be texts only
+        # Replace rows and cols. w/ almost all black pixels with white pixels (those are lines not
+        # text). After this step, all black pixels should be texts only
         """
-        As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
-        (184 or 232), use RGB = 128 as a cutoff for "black"
+        There are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
+        (~184 or ~232), so use RGB = 128 as a cutoff for "black"
         """
-        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]  # noqa: PLR2004
-        arr = arr[:, np.mean(arr < 128, axis=(0, 2)) < min_black_line_length]  # noqa: PLR2004
+        arr[np.mean(arr < 128, axis=(1, 2)) >= min_black_line_length] = 255  # noqa: PLR2004
+        arr[:, np.mean(arr < 128, axis=(0, 2)) >= min_black_line_length] = 255  # noqa: PLR2004
 
         # Mask text with rectangles, i.e. label connected components
         labelled, n_features = label(arr < 128)  # noqa: PLR2004
         if n_features == 0:
             return []
-        slices = sorted(find_objects(labelled), key=lambda x: x[1].start)
+        slices: list[tuple[slice, slice, slice]] = sorted(find_objects(labelled),
+                                                          key=lambda x: x[1].start)
 
-        # Visualise the detected slices
+        # For debug: visualise the detected slices
+        # temp = arr.copy()
         # for s in slices:
-        #     arr[s[0], s[1]] = [0, 0, 0]
+        #     temp[s[0], s[1]] = [0, 0, 0]
 
         # Merge the rectangles/slices that are close to each other
         """
@@ -178,112 +106,54 @@ class BaseParser:
         narrow, then "NAT" may be broken into "N", "A", and "T". Generally speaking, using the
         median thinnest char.'s width (w/ ~10% buffer) satisfies both conditions.
         """
-        med_slice_width = np.median([s[1].stop - s[1].start for s in slices]) * col_min_gap
-        merged_slices = []
-        for s in slices:
-            if not merged_slices:
-                merged_slices.append(s)
-            elif s[1].start - merged_slices[-1][1].stop < med_slice_width:
+        med_char_width: float = np.median([s[1].stop - s[1].start for s in slices]) * col_min_gap
+        merged_slices: list[tuple[slice, slice, slice]] = [slices[0]]
+        for s in slices[1:]:
+            # If the current char. is sufficiently close to the last word, then it belongs to the
+            # last word
+            if s[1].start - merged_slices[-1][1].stop < med_char_width:
+                last = merged_slices[-1]
                 merged_slices[-1] = (
-                    slice(min(merged_slices[-1][0].start, s[0].start),
-                          max(merged_slices[-1][0].stop, s[0].stop)),
-                    slice(min(merged_slices[-1][1].start, s[1].start),
-                          max(merged_slices[-1][1].stop, s[1].stop)),
-                    merged_slices[-1][2]
+                    slice(min(last[0].start, s[0].start), max(last[0].stop, s[0].stop)),
+                    slice(min(last[1].start, s[1].start), max(last[1].stop, s[1].stop)),
+                    last[2]
                 )
             else:
+                # If far from the last word, then the current char. is the start of a new word
                 merged_slices.append(s)
-        del slices
 
-        # OCR the merged slices
-        cols = []
+        # For debug: visualise the detected words/merged slices
+        # temp = arr.copy()
+        # for s in merged_slices:
+        #     temp[s[0], s[1]] = [0, 0, 0]
+
+        # Get the text of these words
+        cols: list[TextBlock] = []
         for s in merged_slices:
-            l, t, r, b = page._transform_bbox(
-                original_bbox=clip,
-                new_bbox=(0, 0, arr.shape[1], arr.shape[0]),
-                bbox=(s[1].start, s[0].start, s[1].stop, s[0].stop)
-            )
-            text = page.get_text('text', clip=(l - 1, t - 1, r + 1, b + 1)).strip()
-            if text:
+            l, t, r, b = page._transform_bbox(bbox=(s[1].start, s[0].start, s[1].stop, s[0].stop),
+                                              from_page_bound=(0, 0, arr.shape[1], arr.shape[0]),
+                                              to_page_bound=clip)
+            l -= 1  # Give 1px buffer
+            t -= 1
+            r += 1
+            b += 1
+            texts = page.get_text('text', clip=(l, t, r, b), small_area=True)
+            if len(texts) != 1:
+                raise ParsingError(f'Expected one text block for col. name. Found {texts} inside '
+                                   f'({clip[0]:.2f}, {clip[1]:.2f}, {clip[2]:.2f}, {clip[3]:.2f}) '
+                                   f'on p.{page.number} in {page.file}')
+            text = texts[0]
+            if text.text:
                 # The "/" in "KM/H" is often mis-OCRed. Manually correct it here
-                if re.match(r'KM\SH', text):
-                    text = 'KM/H'
-                cols.append(TextBlock(text=text, bbox=(l, t, r, b)))
+                if re.match(r'KM\SH', text.text):
+                    text.text = 'KM/H'
+                text.bbox = (l, t, r, b)
+                cols.append(text)
             else:
-                raise ParsingError(f'Unable to OCR text in the table header inside '
+                raise ParsingError(f'Unable to get text in the table header inside '
                                    f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
                                    f'{page.file}')
         return cols
-
-    @staticmethod
-    def _detect_rows(
-            page: Page,
-            clip: tuple[float, float, float, float],
-            min_black_line_length: float = 0.9
-    ) -> list[TextBlock]:
-        """
-        Search for table rows in the `clip` area. Returns a list of TextBlock of the row names
-
-        See `_detect_cols()` for detals
-
-        :param min_black_line_length: Minimum length of a black vertical line, relative to the
-                                      height of the `clip` area. Default is 0.9, i.e. 90% of the
-                                      height of the `clip` area. Any black vertical line longer
-                                      than this is ignored
-        """
-        # Get the pixmap of `clip` area
-        pixmap = page.get_pixmap(clip=clip, dpi=DPI)
-        arr = np.ndarray([pixmap.h, pixmap.w, 3], dtype=np.uint8, buffer=pixmap.samples)
-        del pixmap
-
-        # Drop cols. with almost all black pixels (those are lines not text). After this step, all
-        # black pixels should be texts only
-        """
-        As there are usually only three colours in the PDF: black (RGB ~= 21), white (0), and grey
-        (184 or 232), use RGB = 128 as a cutoff for "black"
-        """
-        arr = arr[np.mean(arr < 128, axis=(1, 2)) < min_black_line_length]  # noqa: PLR2004
-
-        # Mask text with rectangles, i.e. label connected components
-        labelled, n_features = label(arr < 128)  # noqa: PLR2004
-        if n_features == 0:
-            return []
-        slices = sorted(find_objects(labelled), key=lambda x: x[0].start)
-
-        # Merge the rectangles/slices that are close to each other
-        min_slice_height = min([s[0].stop - s[0].start for s in slices])
-        merged_slices = []
-        for s in slices:
-            if not merged_slices:
-                merged_slices.append(s)
-            elif s[0].start - merged_slices[-1][0].stop < min_slice_height:
-                merged_slices[-1] = (
-                    slice(min(merged_slices[-1][0].start, s[0].start),
-                          max(merged_slices[-1][0].stop, s[0].stop)),
-                    slice(min(merged_slices[-1][1].start, s[1].start),
-                          max(merged_slices[-1][1].stop, s[1].stop)),
-                    merged_slices[-1][2]
-                )
-            else:
-                merged_slices.append(s)
-        del slices
-
-        # Get text/OCR the merged slices
-        rows = []
-        for s in merged_slices:
-            l, t, r, b = page._transform_bbox(
-                original_bbox=clip,
-                new_bbox=(0, 0, arr.shape[1], arr.shape[0]),
-                bbox=(s[1].start, s[0].start, s[1].stop, s[0].stop)
-            )
-            text = page.get_text('text', clip=(l - 1, t - 1, r + 1, b + 1)).strip()
-            if text:
-                rows.append(TextBlock(text=text, bbox=(l, t, r, b)))
-            else:
-                raise ParsingError(f'Unable to get the text inside the row '
-                                   f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
-                                   f'{page.file}')
-        return rows
 
 
 class EntryListParser:
