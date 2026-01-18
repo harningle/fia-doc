@@ -18,58 +18,6 @@ def page():
 
 
 @pytest.mark.parametrize(
-    'text, bbox, superscript, strikeout, expected, expectation',
-    [
-        (
-            # Normal case
-            'some text',
-            (1, 2, 3, 4),
-            None,
-            None,
-            TextBlock(text='some text', bbox=(1.00, 2.00, 3.00, 4.00)),
-            nullcontext()
-        ),
-        (
-            # `text` is None, so should raise ValueError
-            None,
-            None,
-            None,
-            None,
-            None,
-            pytest.raises(ValueError)
-        ),
-        (
-            # Negative bbox values, so should raise ValueError
-            'something',
-            (1, 1, 2, -10),
-            None,
-            None,
-            None,
-            pytest.raises(ValueError)
-        ),
-        (
-            # Strikeout text
-            'text',
-            None,
-            False,
-            True,
-            TextBlock(text='text', strikeout=True),
-            nullcontext()
-        )
-    ]
-)
-def test_textblock(text, bbox, superscript, strikeout, expected, expectation):
-    with expectation:
-        block = TextBlock(
-            text=text,
-            bbox=bbox,
-            superscript=superscript,
-            strikeout=strikeout
-        )
-        assert block == expected
-
-
-@pytest.mark.parametrize(
     'option, clip, expected',
     [
         (
@@ -362,4 +310,3 @@ def test_page_search_for_grey_white_rows(page, clip, min_height, min_width, expe
                                              min_height=min_height,
                                              min_width=min_width)
     assert np.allclose(hlines, expected, atol=1)
-

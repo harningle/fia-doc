@@ -7,28 +7,19 @@ from functools import cached_property, partial
 from typing import Literal, Optional, get_args
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import pymupdf
 from pydantic import ValidationError
 from scipy.ndimage import find_objects, label
 
-from ._constants import QUALI_DRIVERS
-from .models.classification import SessionEntryImport, SessionEntryObject
-from .models.driver import RoundEntryImport, RoundEntryObject
-from .models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
-from .models.lap import LapImport, LapObject
-from .models.pit_stop import PitStopData, PitStopObject
-from .utils import (
-    DPI,
-    Page,
-    ParsingError,
-    TextBlock,
-    duration_to_millisecond,
-    quali_lap_times_to_json,
-    time_to_timedelta,
-)
-
-pd.set_option('future.no_silent_downcasting', True)
+from .._constants import DPI, QUALI_DRIVERS
+from ..models.classification import SessionEntryImport, SessionEntryObject
+from ..models.driver import RoundEntryImport, RoundEntryObject
+from ..models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
+from ..models.lap import LapImport, LapObject
+from ..models.pit_stop import PitStopData, PitStopObject
+from .page import BBox, Page, ParsingError, TextBlock
 
 PracticeSessionT = Literal['fp', 'fp1', 'fp2', 'fp3']
 RaceSessionT = Literal['race', 'sprint']

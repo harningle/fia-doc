@@ -17,7 +17,8 @@ import pandas as pd
 import pymupdf
 from paddleocr import PaddleOCR
 
-DPI = 600  # Works the best for OCR
+from .._constants import DPI
+
 OCR = PaddleOCR(lang='en',
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
@@ -869,18 +870,27 @@ class Page:
         return hlines
 
 
+BBox = tuple[float, float, float, float]
+
+
 @dataclass
 class TextBlock:
     """A text block, with its text, (if any) bounding box, superscripts, and strikeout texts
 
     :param text: Text
     :param bbox: The bounding box of the text block in the format (l, t, r, b). If not provided,
-                 defaults to (-1, -1, -1, -1)
-    :param superscript: A list of superscript texts as strings
-    :param strikeout: A list of strikeout texts as strings
+                 defaults to `None`
+    :param superscript: Whether the text block is a superscript text. Default is `False`
+    :param strikeout: Whether the text block is a strikeout text. Default is `False`
     """
-    text: str
-    bbox: Optional[tuple[float, float, float, float]] = field(default_factory=list)
+    superscript: bool = False
+    strikeout: bool = False
+
+    # Internal storage
+    _text: str = field(init=False)
+    _bbox: Optional[BBox] = field(init=False, default=None)
+
+    # Derived attributes
     l: Optional[float] = field(init=False, default=None)
     t: Optional[float] = field(init=False, default=None)
     r: Optional[float] = field(init=False, default=None)
@@ -889,36 +899,68 @@ class TextBlock:
     y0: Optional[float] = field(init=False, default=None)
     x1: Optional[float] = field(init=False, default=None)
     y1: Optional[float] = field(init=False, default=None)
-    superscript: Optional[bool] = field(default=False)
-    strikeout: Optional[bool] = field(default=False)
 
-    def __post_init__(self):
-        if not isinstance(self.text, str):
-            raise ValueError(f'Invalid `text`: {self.text}. Expected a string')
+    def __init__(
+            self,
+            text: str,
+            bbox: Optional[BBox] = None,
+            superscript: bool = False,
+            strikeout: bool = False
+    ):
+        if not isinstance(superscript, bool):
+            raise TypeError(f'Invalid `superscript`: {self.superscript}. Expected either True or '
+                            f'False')
+        if not isinstance(strikeout, bool):
+            raise TypeError(f'Invalid `strikeout`: {self.strikeout}. Expected either True or '
+                            f'False')
+        self.text = text  # Checked in setter
+        self.bbox = bbox  # Checked in setter
+        self.superscript = superscript
+        self.strikeout = strikeout
 
-        if self.bbox is None:  # In case sometimes we pass in `bbox=None`
-            self.bbox = []
-        if self.bbox:
-            if len(self.bbox) != 4:
-                raise ValueError(f'Invalid `bbox`: {self.bbox}. Expected a tuple of four floats '
-                                 f'representing (l, t, r, b)')
-            for i in self.bbox:
-                if i < 0:
-                    raise ValueError(f'Invalid `bbox`: {self.bbox}. All values in bbox must be '
-                                     f'non-negative')
-            self.l, self.t, self.r, self.b = self.bbox
-            self.x0, self.y0, self.x1, self.y1 = self.bbox
+    @property
+    def text(self) -> str:
+        return self._text
 
-        if self.superscript is None:
-            self.superscript = False
-        if not isinstance(self.superscript, bool):
-            raise ValueError(f'Invalid `superscript`: {self.superscript}. Expected either True or '
-                             f'False')
-        if self.strikeout is None:
-            self.strikeout = False
-        if not isinstance(self.strikeout, bool):
-            raise ValueError(f'Invalid `strikeout`: {self.strikeout}. Expected either True or '
-                             f'False')
+    @text.setter
+    def text(self, value: str):
+        if not isinstance(value, str):
+            raise TypeError(f'Invalid `text`: {value}. Expected a string')
+        self._text = value
+
+    @property
+    def bbox(self) -> Optional[BBox]:
+        return self._bbox
+
+    @bbox.setter
+    def bbox(self, value: Optional[BBox]):
+        if value is None:
+            self._clear_bbox()
+            return
+
+        if isinstance(value, list):
+            value = tuple(value)
+        if not isinstance(value, tuple):
+            raise TypeError(f'Invalid `bbox`: {value}. Expected a tuple of four floats '
+                            f'representing (l, t, r, b)')
+        if len(value) != 4:
+            raise ValueError(f'Invalid `bbox`: {value}. Expected a tuple of four floats '
+                             f'representing (l, t, r, b)')
+        
+        for i in value:
+            if not isinstance(i, (int, float)):
+                raise TypeError(f'Invalid `bbox`: {value}. All values in bbox must be numbers')
+            if i < 0:
+                raise ValueError(f'Invalid `bbox`: {value}. All values in bbox must be '
+                                 f'non-negative')
+        self._bbox = value
+        self.l, self.t, self.r, self.b = value
+        self.x0, self.y0, self.x1, self.y1 = value
+
+    def _clear_bbox(self) -> None:
+        self._bbox = None
+        self.l = self.t = self.r = self.b = None
+        self.x0 = self.y0 = self.x1 = self.y1 = None
 
     def __repr__(self) -> str:
         ret = f'TextBlock(text="{self.text}"'
