@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
-import pickle
 import re
 import warnings
 from functools import cached_property, partial
-from typing import Literal, Optional, get_args
+from typing import Any, Literal, Optional, get_args
 
 import numpy as np
 import numpy.typing as npt
@@ -56,13 +55,19 @@ class BaseParser:
            each other, i.e. group letters into words
         4. get the text inside each block
 
-        :param col_min_gap: Minimum gap between two cols., relative to the width of the median
-                            thinnest char. Default is 1.1, i.e. 10% tolerance. If two chars. are
-                            horizontally closer than this gap, they are considered to be in the
-                            same word. We many have extremely thin char., like "i". So we can't
-                            really base this on the thinnest char. From thin to fat, we may have
-                            ".", "I", "a", "W". Usually the width of "a" is a good reference. So we
-                            use the width of the median thinnest char. here
+        :param col_min_gap: Minimum vertical gap between two cols., relative to width of the median
+                            thinnest char. Default is 1.1, i.e. 110% of the width of the median
+                            thinnest char. E.g., we have "D", "r", "i", "v", "e", "r", some space,
+                            "N", "a", "t", some space, "T", "e", "a", "m". We'd like to group them
+                            into "Driver", "Nat", and "Team", etc. So for chars. vertically closer
+                            than "some space", they should be grouped together. This `col_min_gap`
+                            is basically how big is "some space", relative to the median thinnest
+                            char. The reason to use median is because of extremely thin chars.,
+                            like "." in "No.". Using the width of "." may break "Nat" into "N",
+                            "a", and "t". From thin to fat, we often have ".", "I", "a", "W".
+                            Usually the width of "a" is a good reference: chars. within a distance
+                            of width of "a" are in considered to be in a same word, while chars.
+                            farther from this width will be considered to be in two different words
         :param min_black_line_length: Minimum length of a black line, relative to the corresponding
                                       edge length of the `clip` area. Default is 0.9. That is, any
                                       black vertical lines longer than 90% of the height of `clip`,
@@ -155,8 +160,42 @@ class BaseParser:
                                    f'{page.file}')
         return cols
 
+    @staticmethod
+    def _normalise_textblock(tbs: TextBlock | list[TextBlock] | Any) -> Optional[str | int] | Any:
+        """Convert a single or a list of TextBlock into a string
 
-class EntryListParser:
+        If it's not a list of TextBlocks, return it directly. Otherwise:
+
+        1. It's a single textblock, or in the list there is only one textblock, no matter it's
+           normal or superscript or whatever, return its text directly
+        2. If multiple textblocks are there, and only one is normal text, i.e. no strikethrough or
+           superscript, return that normal one's text
+        3. if multiple normal textblocks, raise an error
+
+        No text is allowed, and will return `None`. If the final returned text is pure digits, will
+        convert it to `int`
+        """
+        if isinstance(tbs, TextBlock):
+            return int(tbs.text) if tbs.text.isdigit() else tbs.text
+
+        if (not isinstance(tbs, list)) or any(not isinstance(tb, TextBlock) for tb in tbs):
+            return tbs
+
+        if not tbs:
+            return None
+        if len(tbs) == 1:
+            return int(tbs[0].text) if tbs[0].text.isdigit() else tbs[0].text
+
+        normal_texts = [tb.text for tb in tbs if (not tb.strikeout) and (not tb.superscript)]
+        if not normal_texts:
+            return None
+        if len(normal_texts) == 1:
+            return int(normal_texts[0]) if normal_texts[0].isdigit() else normal_texts[0]
+
+        raise ParsingError(f'Expected only one normal textblock. Found multiple: {tbs}')
+
+
+class EntryListParser(BaseParser):
     def __init__(
             self,
             file: str | os.PathLike,
@@ -168,303 +207,226 @@ class EntryListParser:
         self.round_no = round_no
         self.df = self._parse()
 
-    def _parse_table_by_grid(
-            self,
-            page: pymupdf.Page,
-            vlines: list[float],
-            hlines: list[float],
-            line_height: float,
-            tol: float = 2
-    ) -> pd.DataFrame:
-        """Parse the table cell by cell, defined by lines separating the columns and rows
-
-        This overrides the method from `BaseParser` to handle the superscripts. The superscript
-        indicates which reserve driver is driving whose car. E.g., Antonelli (reserve) is driving
-        Hamilton's (normal) car, then driver No. 44 and driver No. 12 have the same superscript.
-
-        :param page: the page to parse
-        :param vlines: x-coords. of vertical lines separating the cols. Table left and right
-                       boundaries need to be included
-        :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
-                       boundaries need to be included
-        :param line_height: height of a usual row, i.e. the height of a car No. text. Will use this
-                            to detect the end of the main driver table and the start of the reserve
-                            driver table
-        :param tol: tolerance for bbox. of text. Default is 2 pixels. See #33
-        """
-        cells = []
-        for i in range(len(hlines) - 1):
-            row = []
-            superscripts = []
-            for j in range(len(vlines) - 1):
-
-                # Check if there is an unusually big gap between two consecutive horizontal lines.
-                # If so, then we are now at the gap between the main table and the reserve driver
-                # table, so skip the current row (, which is the gap)
-                if hlines[i + 1] - hlines[i] > line_height * 1.5:
-                    break
-
-                # Get text(s) in the cell
-                l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
-                cell = page.get_text('dict', clip=(l, t, r, b))
-                spans = []
-                for block in cell['blocks']:
-                    for line in block['lines']:
-                        for span in line['spans']:
-                            if span['text'].strip():
-                                bbox = span['bbox']
-                                # Need to check if the found text is indeed in the cell's bbox.
-                                # PyMuPDF is notoriously bad for not respecting `clip` parameter.
-                                # We give `tol` pixels tolerance. See #33
-                                if bbox[0] >= l - tol and bbox[2] <= r + tol \
-                                        and bbox[1] >= t - tol and bbox[3] <= b + tol:
-                                    spans.append(span)
-
-                # Check if any superscript
-                # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-font-characteristics  # noqa: E501
-                # for font flags
-                superscript = None
-                if len(spans) == 1:    # Only one text, which is the usual text, and no superscript
-                    row.append(spans[0]['text'].strip())
-                elif len(spans) == 2:  # Two texts. Should be one usual text and one superscript  # noqa: E501, PLR2004
-                    n_superscripts = 0
-                    n_regular_text = 0
-                    for span in spans:
-                        if span['flags'] == 0:
-                            regular_text = span['text'].strip()
-                            n_regular_text += 1
-                        elif span['flags'] == 1:
-                            superscript = span['text'].strip()
-                            n_superscripts += 1
-                        else:
-                            raise ValueError(
-                                f'Unable to infer whether the text is a regular text or a '
-                                f'superscript in cell in row {i}, col. {j} on p.{page.number} in '
-                                f'{self.file}: {cell}'
-                            )
-                    # If we found two regular texts above, then have to decide which is the
-                    # superscript using font size (#48). In principle superscript font size should
-                    # be sufficiently smaller than the regular text. We use 20% diff. as a cutoff
-                    if n_superscripts == 2 or n_regular_text == 2:  # noqa: PLR2004
-                        temp = (spans[0]['size'] + spans[1]['size']) / 2
-                        if (spans[0]['size'] - spans[1]['size']) / temp > 0.2:  # noqa: PLR2004
-                            superscript = spans[1]['text'].strip()
-                            regular_text = spans[0]['text'].strip()
-                        elif (spans[1]['size'] - spans[0]['size']) / temp > 0.2:  # noqa: PLR2004
-                            superscript = spans[0]['text'].strip()
-                            regular_text = spans[1]['text'].strip()
-                        else:
-                            raise ValueError(f'Cannot determine which text is superscript in '
-                                             f'row {i}, col {j} on p.{page.number} in '
-                                             f'{self.file}: {cell}')
-                    row.append(regular_text)
-                    superscripts.append(superscript)
-                else:
-                    raise ValueError(f'Found more than two text blocks in the cell in row {i}, '
-                                     f'col. {j} on p.{page.number} in {self.file}. Expected only '
-                                     f'one or two texts. Found: {cell}')
-
-            # Only the zero-th cell in each row (the car No. col.) can have a superscript, so after
-            # processing all cells in the row, should get at most one single superscript per row
-            if len(superscripts) > 1:
-                raise ValueError(f'Found multiple superscripts in row {i} on p.{page.number} in '
-                                 f'{self.file}. Expected one or no superscript per row. Found: '
-                                 f'{superscripts}')
-            if row:  # Empty iff. we are at the gap between the main and reserve driver table
-                row.append(superscripts[0] if superscripts else None)  # Add superscript to the row
-                cells.append(row)
-
-        # Convert to df.
-        df = pd.DataFrame(cells)
-        if df.shape[1] == 5:    # noqa: PLR2004
-            df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
-        elif df.shape[1] == 6:  # noqa: PLR2004
-            df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor', 'reserve']
-        else:
-            raise ValueError(f'Expected either 5 or 6 cols. in {self.file}. Found: '
-                             f'{df.columns.tolist()}')
-        df.car_no = df.car_no.astype(int)
-        assert df.car_no.is_unique, f'Car No. is not unique in {self.file}: {df.car_no.tolist()}'
-
-        # Clean up the reserve driver relationship
-        if 'reserve' not in df.columns:
-            df['reserve'] = False
-            return df
-        df['reserve_for'] = None
-        for i in df.reserve.dropna().unique():  # For each superscript
-            temp = df[df.reserve == i]          # Find the driver(s) with this superscript
-            # Should have two drivers: one main and one reserve for the main
-            if len(temp) == 2:  # noqa: PLR2004
-                assert temp.car_no.nunique() == 2, (  # noqa: PLR2004
-                    f'Expected two different drivers for superscript {i} in {self.file}. Found '
-                    f'{temp.car_no.nunique()}'
-                )
-                df.loc[df[df.reserve == i].index[1], 'reserve_for'] = temp.car_no.iloc[0]
-            # Handle the case where there is only one single driver with this superscript. This
-            # means a driver is incorrectly indicated as having a reserve driver, e.g. copy-paste
-            # error in the raw PDF in 2024 Chinese (#23)
-            # TODO: this may create problems. E.g., the parser misses a superscript and then misses
-            #       a reserve driver
-            elif len(temp) == 1:
-                df.loc[df.reserve == i, 'reserve'] = None
-                warnings.warn(
-                    f'Driver {temp.driver.iloc[0]} is indicated as being or having a reserve '
-                    f'driver but no associated driver was found in {self.file}'
-                )
-            else:
-                raise ValueError(
-                    f'Expected exactly two drivers with superscript {i} in {self.file}. Found '
-                    f'{temp.driver.tolist()}'
-                )
-        df.reserve = df['reserve_for'].notna()
-        return df
-
     def _parse(self) -> pd.DataFrame:
         """
         :return: Df. with cols. of ["car_no", "driver", "nat", "team", "constructor"]
         """
-        # Go to the page with "No.", "Driver", "Nat", "Team", and "Constructor"
+        # Go to the page with "No.", "Driver", "Nat", "Team", and "Constructor". These col. names
+        # should appear in the top half of the page
         doc = pymupdf.open(self.file)
         found = False
+        page: Page
         for page in doc:
-            text = page.get_text('text')
-            if 'No.' in text and 'Driver' in text and 'Nat' in text and 'Team' in text and \
-                    'Constructor' in text:
+            page = Page(page, file=self.file)
+            tb = page.get_text('text', clip=(0, 0, page.w, page.h * 0.5))
+            if all(i in tb[0].text for i in ['No.', 'Driver', 'Nat', 'Team', 'Constructor']):
                 found = True
                 break
         if not found:
+            doc.close()
             raise ValueError(f'Could not find any page containing entry list table in {self.file}')
 
-        # The top y-coord. of the table is below "Driver"
+        # The table starts under the bottommost horizontal black line
+        if black_lines := page.search_for_black_lines(clip=(0, 0, page.w, page.h * 0.5),
+                                                      min_length=0.5):
+            t_table_header = black_lines[-1] + 1  # Add 1px buffer
+        else:
+            doc.close()
+            raise ParsingError(f'Cannot find the black line above the table header in {self.file}')
+
+        # Table header is below the black line and above a white strip
+        if white_strips := page.search_for_white_strips(clip=(0, t_table_header, page.w, page.h),
+                                                        height=0.5):  # Very short white strip
+            if len(white_strips) < 2:
+                doc.close()
+                raise ParsingError(f'Expected at least two white strips below the bottommost '
+                                   f'black line in {self.file}. Found: {white_strips}')
+            b_table_header = white_strips[1] + 1  # 1px buffer
+        else:
+            doc.close()
+            raise ParsingError(f'find no white strip below the table header in {self.file}')
+
+        # Col. positions
+        cols = self._detect_cols(page,
+                                 clip=(0, t_table_header, page.w, b_table_header),
+                                 col_min_gap=1.5,
+                                 min_black_line_length=0.5)
+        if [i.text.lower() for i in cols] != ['no.', 'driver', 'nat', 'team', 'constructor']:
+            raise ParsingError(f'Expected cols. "No.", "Driver", "Nat", "Team", and "Constructor" '
+                               f'in {self.file}. Got: {cols}')
+        vlines = [cols[0].bbox[0] - 1,
+                  cols[1].bbox[0] - 1,
+                  cols[2].bbox[0] - 1,
+                  (cols[2].bbox[2] + cols[3].bbox[0]) / 2,
+                  cols[4].bbox[0] - 1,
+                  page.w]  # Vertical lines separating the cols.
+        col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])  # Table header row height
+
+        # Table ends above a sufficiently tall white strip
+        if white_strips := page.search_for_white_strips(clip=(0, b_table_header, page.w, page.h),
+                                                        height=col_row_height):
+            b_table = white_strips[0] + 1
+        else:
+            doc.close()
+            raise ParsingError(f'Cannot find the white strip below the table in {self.file}')
+
+        # Row positions, identified by very short white strips between two consecutive rows
+        white_strips = page.search_for_white_strips(clip=(0, b_table_header, page.w, b_table),
+                                                    height=0.1)
+        if not white_strips:
+            raise ParsingError(f'Cannot find any white strip separating rows in the table in '
+                               f'{self.file}')
         """
-        1. locate the positions of "Driver"'s. One page may have multiple "Driver"'s, e.g. 2024
-           Mexican. We only pick the topmost one
-        2. make sure the found "Driver" is indeed the table header. That is, in the same height,
-           we should find "No.", "Nat", "Team", and "Constructor" as well
+        We want to know the vertical gap between two rows, so we can pass it to `tol` in 
+        `.parse_table_by_grid()`. The white strips found above are their top positions. So between
+        two consecutive white strips, there is a row plus a vertical gap to the next row.
+        Therefore, vertical gap is approx. the dist. between two consecutive white strips minus the
+        row height, which is already found above as `col_row_height`.
         """
-        driver = page.search_for('Driver')
-        driver.sort(key=lambda x: x.y0)
-        driver = driver[0]
-        for col in ['No.', 'Nat', 'Team', 'Constructor']:
-            temp = page.search_for(col, clip=(0, driver.y0, page.bound()[2], driver.y1))
-            assert len(temp) == 1, f'Cannot locate "Driver" in {self.file}'
+        row_gap = np.mean(np.diff(white_strips)) - col_row_height
+        # Exclude, if any, the topmost and bottommost white strips, if they are the white spaces
+        # above and below the table
+        hlines = [i + row_gap / 2 for i in white_strips[1:-1]]
+        # If the top white strip is sufficiently far from the table header, then it is the white
+        # space between row 0 and 1. Otherwise, it's the separator between the table header and row
+        # 0, which does not need to be included
+        if abs(white_strips[0] - b_table_header) > col_row_height / 2:
+            hlines.insert(0, white_strips[0] - row_gap / 2)
+        # Similarly for the bottom white strip
+        if abs(b_table - white_strips[-1]) > col_row_height / 2:
+            hlines.append(white_strips[-1] + row_gap / 2)
+        hlines.insert(0, b_table_header)
+        hlines.append(b_table + row_gap / 2) # Now `hlines` are horizontal lines separating rows
 
-        # Table headers
-        headers = {}
-        for col in ['No.', 'Driver', 'Nat', 'Team', 'Constructor']:
-            temp = page.search_for(col, clip=(0, driver.y0, page.bound()[2], driver.y1))
-            assert len(temp) == 1, f'Expected one "{col}", got {len(temp)} in {self.file}'
-            headers[col.lower().strip('.')] = temp[0]
+        # Parse the table using the grid above
+        df = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      allow_multiple_texts_per_cell=[0],  # Allow superscripts
+                                      header_included=False,
+                                      tol=row_gap)
+        df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
 
-        # The leftmost x-coord. of the table is the leftof "No."
-        l = headers['no'].x0
+        def identify_reserve(tbs: list[TextBlock]) -> Optional[int]:
+            if len(tbs) == 1:
+                return None
+            if len(tbs) >= 3 or len(tbs) == 0:
+                raise ParsingError(f'Find none or more than two text blocks in "No." col. in '
+                                   f'{self.file}: {tbs}')
+            # Two text blocks. One is the car No. and the other, which is a superscript, indicates
+            # reserve driver
+            normal_driver: Optional[str] = None
+            reserve_driver: Optional[str] = None
+            for tb in tbs:
+                if tb.superscript:
+                    reserve_driver = tb.text
+                else:
+                    normal_driver = tb.text
+            if (not normal_driver) or (not reserve_driver):
+                raise ParsingError(f'Cannot identify normal or reserve driver in "No." col. in '
+                                   f'{self.file}: {tbs}')
+            return int(reserve_driver)
 
-        # Right is simply the page's right boundary
-        r = page.bound()[2]
+        df['has_reserve'] = df.car_no.apply(identify_reserve)
 
-        # Bottom of the table
-        """
-        It's slightly more difficult to determine the bottom of the table, as there is no line
-        delineating the bottom of the table. Below the table, we have stewards' names, so we can't
-        use the bottom of the page as the bottom of the table either. So instead, we search for
-        digits below "No.". The last car No.'s position is the the bottom of the table.
-
-        When we say "the table", there can actually be two tables: the usual table for drivers, and
-        the reserve driver table. Regardless of the existence of the reserve driver table, the
-        above method always identifies the bottom correctly. `self._parse_table_by_grid()` will
-        handle the reserve driver table properly by looking at the superscripts.
-        """
-        car_nos = page.get_text(
-            'words',
-            clip=(headers['no'].x0, headers['no'].y1, headers['no'].x1, page.bound()[3])
-        )
-        car_nos = [i for i in car_nos if i[4].isdigit()]
-        for i in car_nos:
-            assert np.isclose(i[0], l, atol=1), \
-                f'Car No. {i[4]} is not vertically aligned with "No." in {self.file}'
-            assert i[2] < driver.x0, \
-                f'Car No. {i[4]} is not to the left of "Driver" in {self.file}'
-
-        # Lines separating the columns
-        aux_vlines = [
-            l,
-            headers['driver'].x0,
-            headers['nat'].x0,
-            headers['team'].x0,
-            headers['constructor'].x0,
-            r
+        # Check if we have a second table for reserve drivers, by searching for numbers in the No.
+        # col. below the table
+        reserve_driver_nos = [
+            i for i in page.get_text('words',
+                                     clip=(vlines[0], b_table + 1, vlines[1], page.h))
+            if i.text.isdigit()
         ]
 
-        # Line gap and height
+        # Check consistency between the reserve drivers indicated in the main table and the reserve
+        # drivers we find above (#23)
         """
-        Line gap defined as the gap between the bottom of a car No. and the top of the next car No.
-        If we have ten drivers, then there are nine line gaps. We take the second largest of these
-        gaps as a usual line gap. There is an usually big gap between the main table and the
-        reserve driver table, which is the largest gap and we want to skip it, so use the second
-        largest.
+        We have two cases:
+        
+        1. both tables have reserve drivers
+        2. the main table has some reserve drivers, but we find no reserve drivers here
+        3. the main table has no reserve drivers, but we do find some here
+        
+        1. is what should happen. 2. either means the FIA doc. is wrong (see #23), or our parser
+        mis-identify something. Raise a warning here. 3. means the main table missed some reserve
+        drivers. This is an error for sure.
         """
-        line_gap = sorted([abs(car_nos[i + 1][1] - car_nos[i][3])
-                           for i in range(len(car_nos) - 1)])[-2]
-        """
-        We use 1/3 of the line height as a sanity check, here and throughout this repo. 1/3
-        basically means, if `line_gap` is 10px, then anything taller than 3.3px is fine. This seems
-        crazy but actually works quite well. Here are the two reasons (not only matters there but
-        everywhere in the parser):
+        has_reserves_in_main_table = df.has_reserve.notna().any()
+        reserves_found = (len(reserve_driver_nos) > 0)
+        if has_reserves_in_main_table == reserves_found:  # All good
+            pass
+        elif has_reserves_in_main_table and (not reserves_found):
+            warnings.warn(f'Found reserve drivers in the main table, but no reserve driver table '
+                          f'in {self.file}. Either the FIA doc. is wrong (see #23), or our parser '
+                          f'mis-identified something')
+        else:
+            doc.close()
+            raise ParsingError(f'Reserve drivers found in the main table does not agree with'
+                               f'those below the main table in {self.file}')
 
-        1. false negative: will a text area be mistakenly excluded because it's short? Unlikely,
-           because if the area has any text, that text definitely needs to occupy 1/3 of a normal
-           line height. Think about the height of "o", "p", and "l": "o" is shorter than "l" but
-           still needs to occupy a significant portion of the line height
-        2. false negative: will a non-text area be mistakenly included? No, because text is always
-           in black, and sometimes has grey background. We always have such colour checks when
-           dealing with empty areas, so they won't be mistakenly included. Actually the opposite.
-           This is the reason why we use a very conservative 1/3 here, because some empty areas are
-           too short, so need to be very conservative when detecting these non-text empty areas.
-           E.g., the empty area between the main table and fastest lap in 2024 Spanish vs the same
-           empty area in 2025 Austrian
-        """
-        line_height = np.mean([i[3] - i[1] for i in car_nos])
-        assert line_gap < line_height / 3, (
-            f'Line gap {line_gap} is too big relative to line height {line_height} in {self.file}'
-        )
-
-        # Lines separating the rows
-        """
-        These row separators are usually the midpoints of a car No. and the next car No. However,
-        if we are at the last row of the main table, or the first row of the reserve driver table,
-        such midpoints are not row separators, but rather the midpoint of bottom of the main table
-        and the top of the reserve driver table. So we need to handle these cases separately, using
-        `line_gap` above.
-        """
-        # Zero-th row separator is between "No." and the top of the first car No.
-        aux_hlines = [(headers['no'].y1 + car_nos[0][1]) / 2]
-        # The rest are midpoints or determined by the line height and gap as specified above
-        for i, _ in enumerate(car_nos[:-1]):
-            curr_line_gap = car_nos[i + 1][1] - car_nos[i][3]
-            # If the current row and the next row are sufficiently close, then they belong to the
-            # same table, so use the midpoint
-            if curr_line_gap < line_gap * 2:  # Zero-th row is always fine as above
-                aux_hlines.append((car_nos[i][3] + car_nos[i + 1][1]) / 2)
-            # If they are vertically too far from each other, then the current row is the last row
-            # of the main table, so use the bottom of the current row + line gap. Also
-            # need to append the top of the next row, which is the first row of the reserve driver
-            # table
+        # Parse the reserve driver table, if any
+        if reserves_found:
+            # Get the top and bottom of the reserve driver table
+            """
+            We can't rely on the bboxes of `reserve_driver_nos` to identify the rows, or the table
+            position, because PyMuPDF returns very weird bbox if a text has superscript. Therefore,
+            we still locate the table using white strips.
+            
+            The table top will be the last white strip between the main table bottom and the
+            bottommost reserve driver No. We use the bottommost to make sure, even if the bbox from
+            PyMuPDF is wrong, we are conservative enough to include at least the zero-th row.
+            
+            Table bottom is identified similarly: the first tall white strip below the bottommost
+            reserve driver No.
+            """
+            if white_strips := page.search_for_white_strips(
+                    clip=(0, b_table, page.w, max(i.bbox[3] for i in reserve_driver_nos)),
+                    height=col_row_height
+            ):
+                t_reserve_table = white_strips[-1] + 1
             else:
-                aux_hlines.append(car_nos[i][3] + line_gap)
-                aux_hlines.append(car_nos[i + 1][1] - line_gap)
-        # The last row's bottom is the bottom of the last row + line gap
-        aux_hlines.append(car_nos[-1][3] + line_gap)
+                doc.close()
+                raise ParsingError(f'Cannot find the white strip above the reserve driver table '
+                                   f'in {self.file}')
+            if white_strips := page.search_for_white_strips(
+                    clip=(0, max(i.bbox[3] for i in reserve_driver_nos), page.w, page.h),
+                    height=col_row_height
+            ):
+                b_reserve_table = white_strips[0] + 1
+            else:
+                doc.close()
+                raise ParsingError(f'Cannot find the white strip below the reserve driver table '
+                                   f'in {self.file}')
 
-        # Get the table
-        tol = 2 if l > 40 else 3  # noqa: PLR2004
-        df = self._parse_table_by_grid(page, aux_vlines, aux_hlines, line_height, tol)
+            # Identify rows
+            white_strips = page.search_for_white_strips(
+                clip=(0, t_reserve_table, page.w, b_reserve_table),
+                height=0.1
+            )
+            hlines_reserve = [i + col_row_height * 0.1 for i in white_strips[1:-1]]
+            if abs(white_strips[0] - t_reserve_table) > col_row_height / 2:
+                hlines_reserve.insert(0, white_strips[0])
+            if abs(b_reserve_table - white_strips[-1]) > col_row_height / 2:
+                hlines_reserve.append(white_strips[-1])
+            hlines_reserve.insert(0, t_reserve_table)
+            hlines_reserve.append(b_reserve_table)
+
+            # Parse the reserve driver table
+            reserves_df = page.parse_table_by_grid(vlines=vlines,
+                                                   hlines=hlines_reserve,
+                                                   allow_multiple_texts_per_cell=[0],
+                                                   header_included=False,
+                                                   tol=col_row_height * 0.3)
+            reserves_df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
+            reserves_df['reserve_for'] = reserves_df.car_no.apply(identify_reserve)
+            df = pd.concat([df, reserves_df], ignore_index=True)
+
+        df = df.map(self._normalise_textblock)
 
         def to_json() -> list[dict]:
             drivers = []
             for x in df.itertuples():
                 try:
                     drivers.append(RoundEntryImport(
-                            object_type="RoundEntry",
+                            object_type='RoundEntry',
                             foreign_keys=RoundEntry(
                                 year=self.year,
                                 round=self.round_no,
@@ -478,15 +440,10 @@ class EntryListParser:
                             ]
                         ).model_dump(exclude_unset=True))
                 except ValidationError as e:
-                    warnings.warn(f'Error when parsing driver {x.driver} in {self.file}: {e}')
+                    warnings.warn(f'Error when parsing driver {x} in {self.file}: {e}')
             return drivers
 
-        def to_pkl(filename: str | os.PathLike) -> None:
-            with open(filename, 'wb') as f:
-                pickle.dump(df.to_json(), f)
-
         df.to_json = to_json
-        df.to_pkl = to_pkl
         return df
 
 

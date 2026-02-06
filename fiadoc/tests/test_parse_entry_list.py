@@ -33,7 +33,7 @@ race_list = [
         2024,
         4,
         '2024_4_entry_list.json',
-        pytest.warns(UserWarning, match='Error when parsing driver Ayumu')
+        pytest.warns(UserWarning, match='Error when parsing driver')
     ),
     (
         # RIC incorrectly indicated as having a reserve driver here
@@ -42,7 +42,8 @@ race_list = [
         2024,
         5,
         '2024_5_entry_list.json',
-        pytest.warns(UserWarning, match='Ricciardo is indicated as')
+        pytest.warns(UserWarning,
+                     match='Found reserve drivers in the main table, but no reserve driver table')
     ),
     (
         # Weird PDF page margin (#33)
@@ -58,7 +59,7 @@ race_list = [
         2025,
         3,
         '2025_3_entry_list.json',
-        pytest.warns(UserWarning, match='Error when parsing driver Ryo Hirakawa')
+        pytest.warns(UserWarning, match='Error when parsing driver')
     ),
     (
         # Car No. superscripts shown as regular text
@@ -66,7 +67,7 @@ race_list = [
         2025,
         4,
         '2025_4_entry_list.json',
-        pytest.warns(UserWarning, match='Error when parsing driver Ryo Hirakawa')
+        pytest.warns(UserWarning, match='Error when parsing driver')
     ),
     (
         # Two and only two reserve drivers (#55)
