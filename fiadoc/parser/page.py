@@ -702,7 +702,7 @@ class Page:
         #       between two car No. and use (some proportion of) this gap as `height`
 
         # Get the pixmap of the clipped area
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip)
+        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=DPI)
         pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
                                                            dtype=np.uint8)
                                              .reshape((pixmap.height, pixmap.width, 3)))
@@ -721,10 +721,15 @@ class Page:
         starts: npt.NDArray[np.intp] = np.where(diff == 1)[0]
         ends: npt.NDArray[np.intp] = np.where(diff == -1)[0]
 
-        # Filter out white strips that are less than `height` px tall
+        # Filter out white strips that are less than `height`px tall, after DPI scaling
         strip_heights: npt.NDArray[np.intp] = ends - starts
-        is_valid_strip: npt.NDArray[np.bool_] = (strip_heights > height)
-        return (starts[is_valid_strip] + pixmap.y).tolist()
+        scaling_factor: float = pixmap.height / (clip[3] - clip[1]) if clip else 1
+        is_valid_strip: npt.NDArray[np.bool_] = (strip_heights > height * scaling_factor)
+
+        # Return the top y-coords. of the valid white strips, scaled back to the original page
+        white_strips: list[float] = (starts[is_valid_strip] / scaling_factor
+                                     + (clip[1] if clip else 0)).tolist()
+        return white_strips
 
     def search_for_grey_white_rows(
             self,
