@@ -44,7 +44,7 @@ def duration_to_millisecond(s: str | None) -> dict[str, str | int] | None:
     >>> duration_to_millisecond('12.345')
     {'_type': 'timedelta', 'milliseconds': 12345}
     """
-    if s is None:
+    if not s:
         return None
 
     match s.count(':'):

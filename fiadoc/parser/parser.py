@@ -18,6 +18,7 @@ from ..models.driver import RoundEntryImport, RoundEntryObject
 from ..models.foreign_key import PitStopForeignKeys, RoundEntry, SessionEntryForeignKeys
 from ..models.lap import LapImport, LapObject
 from ..models.pit_stop import PitStopData, PitStopObject
+from ..utils import duration_to_millisecond
 from .page import BBox, Page, ParsingError, TextBlock
 
 PracticeSessionT = Literal['fp', 'fp1', 'fp2', 'fp3']
@@ -467,9 +468,10 @@ class PracticeParser(BaseParser):
         self._check_session()
 
     def _check_session(self) -> None:
+        # TODO: do we need this? Isn't pydantic doing this already?
         if self.session not in get_args(PracticeSessionT):
-            raise ValueError(f'Invalid session: {self.session}. '
-                             f'Valid sessions are: {get_args(PracticeSessionT)}')
+            raise ValueError(f'Invalid session: {self.session}. Valid sessions are: '
+                             f'{get_args(PracticeSessionT)}')
         return
 
     @cached_property
@@ -485,7 +487,7 @@ class PracticeParser(BaseParser):
         if self.lap_times_file:
             return self._parse_lap_times()
         else:
-            warnings.warn('Lap times PDF is missing. Can get fastest laps only from the '
+            warnings.warn('Lap times PDF is missing. Can get fastest laps ONLY from the '
                           'classification PDF')
             return self._apply_fallback_fastest_laps()
 
@@ -497,108 +499,79 @@ class PracticeParser(BaseParser):
         """
         # Find the page with "Practice Session Classification", on which the table is located
         doc = pymupdf.open(self.classification_file)
-        classification = []
-        for i in range(len(doc)):
-            page = Page(doc[i], file=self.classification_file)
-            classification = page.search_for('Practice Session Classification')
-            if classification:
+        page: Page
+        classification: Optional[list[TextBlock]] = None
+        for page in doc:
+            page = Page(page, file=self.classification_file)
+            if classification := page.search_for('Practice Session Classification'):
+                if len(classification) > 1:
+                    doc.close()
+                    raise ParsingError(f'Found more than one "Practice Session Classification" on '
+                                       f'p.{page.number} in {self.classification_file}')
                 break
         if not classification:
             doc.close()
-            raise ValueError(f'"Practice Session Classification" not found on any page in '
-                             f'{self.classification_file}')
+            raise ParsingError(f'"Practice Session Classification" not found on any page in '
+                               f'{self.classification_file}')
+        page_no_str = f'p.{page.number} in {page.file}'  # For error/warning messages
 
         # Position of "Practice Session Classification", below which is the table
-        b_classification = classification[0].y1
+        b_classification = classification[0].b
 
         # Find the first black horizontal line below "Practice Session Classification"
-        if black_line := page.search_for_black_line(clip=(0, b_classification, page.w, page.h)):
-            t_table_body = sorted(black_line)[0]  # Topmost black line below "Final Classification"
+        if black_lines := page.search_for_black_lines(clip=(0, b_classification, page.w, page.h)):
+            t_table_body = black_lines[0]  # Topmost black line below "Final Classification"
         else:
+            doc.close()
             raise ParsingError(f'Cannot find the black line separating table header and table '
-                               f'body below "Practice Session Classification" on p.{page.number} '
-                               f'in {self.classification_file}')
+                               f'body below "Practice Session Classification" on {page_no_str}')
 
-        # Get text/line height
-        temp = page.get_text('blocks', clip=(0, b_classification, page.w, t_table_body))
-        if not temp:
-            raise ParsingError(f'Cound not find any text in the table header on p.{page.number} '
-                               f'in {self.classification_file}')
-        line_height = np.mean([i[3] - i[1] for i in temp])
-
-        # The first white strip below the table header, which is the bottom of the table
-        white_strip = page.search_for_white_strip(clip=(0, t_table_body, page.w, page.h),
-                                                  height=line_height / 3)
-        if white_strip:
-            b_table = sorted(white_strip)[0]
-        else:
-            raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
-                               f'{self.classification_file}')
-
-        # Get table col. names and their positions
+        # Get cols.
         cols = self._detect_cols(page,
                                  clip=(0, b_classification + 1, page.w, t_table_body - 1),
                                  col_min_gap=1)
         if not cols:
-            raise ParsingError(f'Could not detect cols. in the table header on p.{page.number} in '
-                               f'{self.classification_file}')
-        cols = {i.text: i for i in cols}
-        if set(cols.keys()) != {'NO', 'DRIVER', 'NAT', 'ENTRANT', 'TIME', 'LAPS', 'GAP', 'INT',
-                                'KM/H', 'TIME OF DAY'}:
-            raise ParsingError(f'Got unexpected or miss some table cols. on p.{page.number} in '
-                               f'{self.classification_file}: {cols}')
+            raise ParsingError(f'Could not locate cols. in the table header on {page_no_str}')
+        if [i.text.upper() for i in cols] != ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'TIME', 'LAPS',
+                                              'GAP', 'INT', 'KM/H', 'TIME OF DAY']:
+            doc.close()
+            raise ParsingError(
+                f'Got unexpected or miss some cols. on {page_no_str}. Expected "NO", "DRIVER", '
+                f'"NAT", "ENTRANT", "TIME", "LAPS", "GAP", "INT", "KM/H", and "TIME OF DAY". Got: '
+                f'{[i.text for i in cols]}'
+            )
+        vlines = [0,
+                  cols[0].bbox[0] - 1,
+                  (cols[0].bbox[2] + cols[1].bbox[0]) / 2,
+                  cols[2].bbox[0] - 1,
+                  (cols[2].bbox[2] + cols[3].bbox[0]) / 2,
+                  1.5 * cols[4].l - 0.5 * cols[4].r,  # Left of "TIME" - half-width of "TIME"
+                  cols[5].bbox[0],
+                  cols[5].bbox[2],
+                  (cols[6].bbox[2] + cols[7].bbox[0]) / 2,
+                  (cols[7].bbox[2] + cols[8].bbox[0]) / 2,
+                  cols[9].bbox[0],
+                  cols[9].bbox[2]]
+        col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])
 
-        # Vertical lines separating the columns
-        vlines = [
-            0,
-            cols['NO'].l,
-            (cols['NO'].r + cols['DRIVER'].l) / 2,
-            cols['NAT'].l - 1,
-            (cols['NAT'].r + cols['ENTRANT'].l) / 2,
-            1.5 * cols['TIME'].l - 0.5 * cols['TIME'].r,  # Left of "TIME" - half-width of "TIME"
-            cols['LAPS'].l,
-            cols['LAPS'].r,
-            (cols['GAP'].r + cols['INT'].l) / 2,
-            (cols['INT'].r + cols['KM/H'].l) / 2,
-            cols['TIME OF DAY'].l,
-            cols['TIME OF DAY'].r
-        ]
+        # The first white strip below the table header, which is the bottom of the table
+        if white_strips := page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
+                                                        height=col_row_height):
+            b_table = sorted(white_strips)[0]
+        else:
+            doc.close()
+            raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
+                               f'{self.classification_file}')
 
         # Horizontal lines separating the rows
         hlines = page.search_for_grey_white_rows(clip=(0, t_table_body + 1, page.w, b_table + 1),
-                                                 min_height=line_height / 3)
+                                                 min_height=col_row_height / 2)
 
         # Parse the table using the grid above
-        df = self._parse_table_by_grid(
-            page=page,
-            vlines=vlines,
-            hlines=hlines,
-            header_included=False
-        )
-        assert df.shape[1] == 11, (  # noqa: PLR2004
-            f'Expected 11 cols. on p.{page.number} in {self.classification_file}. Got '
-            f'{df.columns.tolist()}'
-        )
-        df.columns = ['position'] + list(cols.keys())
-        df = df.replace('', None)  # Empty strings --> None, so `duration_to_millisecond` can skip
-                                   # e.g. empty "TIME" cells without error
-        # Set col. names
-        del df['NAT']
-        df = df.rename(columns={
-            'position': 'finishing_position',
-            'NO': 'car_no',
-            'DRIVER': 'driver',
-            'ENTRANT': 'team',
-            'TIME': 'fastest_lap_time',
-            'LAPS': 'laps_completed',
-            'GAP': 'gap',
-            'INT': 'int',
-            'KM/H': 'avg_speed',
-            'TIME OF DAY': 'fastest_lap_calender_time'
-        })
-        df.finishing_position = df.finishing_position.astype(int)
-        df.car_no = df.car_no.astype(int)
-        df.laps_completed = df.laps_completed.astype(int)
+        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False)
+        df = df.map(self._normalise_textblock)
+        df.columns = ['finishing_position', 'car_no', 'driver', 'nat', 'team', 'fastest_lap_time',
+                      'laps_completed', 'gap', 'int', 'avg_speed', 'fastest_lap_calender_time']
         df.fastest_lap_time = df.fastest_lap_time.apply(duration_to_millisecond)
 
         """
@@ -608,13 +581,16 @@ class PracticeParser(BaseParser):
         missing for everyone, because we can't infer that from the PDF.
 
         And all drivers in the table will be classified, because as long as they make a lap that
-        counts, they are classified and in the PDF.
+        counts, they are classified and in the PDF. DNS or other not classified drivers won't be in
+        the PDF in the first place.
+        
+        TODO: should we add back not classified drivers manually?
         """
 
         def to_json() -> list[dict]:
             return df.apply(
                 lambda x: SessionEntryImport(
-                    object_type="SessionEntry",
+                    object_type='SessionEntry',
                     foreign_keys=SessionEntryForeignKeys(
                         year=self.year,
                         round=self.round_no,
