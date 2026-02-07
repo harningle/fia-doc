@@ -506,32 +506,44 @@ class Page:
                                                            dtype=np.uint8)
                                              .reshape((pixmap.height, pixmap.width, 3))
                                              .copy())
-
-        # Find rows with sufficiently many contiguous black pixels
         n_rows, n_cols, _ = pixmap_arr.shape
+
         # Whether a pixel is black (RGB < `rgb`). Shape = (n_rows, n_cols)
         is_black_pixel: npt.NDArray[np.bool_] = np.all(pixmap_arr < rgb, axis=2)
+
+        # Fill single-pixel white gap between black pixels: black white black --> black black black
+        # This accounts for rendering issues where one black line may appear as two black lines w/
+        # a white gap in between, e.g. 2024 Qatar FP1 classification
+        is_black_pixel[:, 1:-1] |= (is_black_pixel[:, :-2]
+                                    & ~is_black_pixel[:, 1:-1]
+                                    & is_black_pixel[:, 2:])
+
         # Add white border to left and right to simplify diff calculation later
         # Shape = (n_rows, n_cols + 2)
         padded: npt.NDArray[np.bool_] = np.pad(is_black_pixel,
                                                ((0, 0), (1, 1)),
                                                mode='constant',
                                                constant_values=False)
+
         # Whether a pixel has a white or black pixel to the left of it
         # Shape = (n_rows, n_cols + 1)
         # 1  = left pixel is white, this pixel is black --> start of a black run
         # -1 = left pixel is black, this pixel is white --> end of a black run
         # 0  = same colour as left pixel                --> inside a run or all white pixels
         diff: npt.NDArray[np.int8] = np.diff(padded.astype(np.int8), axis=1)
-        # Where black runs start and end. Shape = tuple of two arrays, first array is row indices,
-        # second array is col. indices
+
+        # Where black runs start and end. Shape = tuple of two arrays: first is row indices, and
+        # second is col. indices
         run_starts: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]] = np.where(diff == 1)
         run_ends: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]] = np.where(diff == -1)
+
         # Length of each black run. Shape = (n_black_runs,)
         run_length: npt.NDArray[np.intp] = run_ends[1] - run_starts[1]
+
         # Max. black run length per row. Shape = (n_rows,)
         longest_run_per_row: npt.NDArray[np.intp] = np.zeros(n_rows, dtype=np.intp)
         np.maximum.at(longest_run_per_row, run_starts[0], run_length)
+
         # Whether a row is a black row (i.e., has a sufficiently long black run)
         is_black_row: npt.NDArray[np.bool_] = (longest_run_per_row >= pixmap.width * min_length)
 

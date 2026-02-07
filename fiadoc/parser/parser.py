@@ -174,6 +174,8 @@ class BaseParser:
 
         No text is allowed, and will return `None`. If the final returned text is pure digits, will
         convert it to `int`
+
+        TODO: should we put this method here? Or in some other class?
         """
         if isinstance(tbs, TextBlock):
             return int(tbs.text) if tbs.text.isdigit() else tbs.text
@@ -408,6 +410,7 @@ class EntryListParser(BaseParser):
                 hlines_reserve.append(white_strips[-1])
             hlines_reserve.insert(0, t_reserve_table)
             hlines_reserve.append(b_reserve_table)
+            # TODO: add row gap to hlines_reserve, like what we do for the main table?
 
             # Parse the reserve driver table
             reserves_df = page.parse_table_by_grid(vlines=vlines,
