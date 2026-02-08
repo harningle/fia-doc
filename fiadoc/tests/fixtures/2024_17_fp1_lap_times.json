@@ -1767,7 +1767,7 @@
                     "milliseconds": 170099
                 },
                 "is_entry_fastest_lap": false,
-                "is_deleted": true
+                "is_deleted": false
             }
         ]
     },
