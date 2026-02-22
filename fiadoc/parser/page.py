@@ -29,7 +29,11 @@ OCR = PaddleOCR(lang='en',
 OCR_ERRORS = {
     'KMIH': 'KM/H',
     'L': '1',
-    'I': '1'
+    'I': '1',
+    '↑': '1',
+    '→': '1',
+    '←': '1',
+    '↓': '1'
 }
 
 # Strikeout line location: it shouldn't be too close to the top or bottom of the text bbox
@@ -68,9 +72,9 @@ class Page:
         ocred_page = [TextBlock(
             text=OCR_ERRORS.get(i[1], i[1]),
             bbox=self._transform_bbox(
-                original_bbox=self._pymupdf_page.bound(),
-                new_bbox=(0, 0, pixmap.width, pixmap.height),
-                bbox=tuple(i[0])
+                bbox=tuple(i[0]),
+                from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                to_page_bound=self._pymupdf_page.bound()
             )
         ) for i in ocred_page]
         # TODO: the confidence score should somehow be used in the future
