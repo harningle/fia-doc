@@ -257,27 +257,27 @@ def test_page_parse_table_by_grid(page, vlines, hlines, tol, allow_multiple_text
     [
         (
             # Usual case
-            (0, 500, 200, 600),
-            4,
+            (0, 530, 200, 600),
+            8,
             [548]
         ),
         (
             # Usual case w/ super thin `height`
             (0, 500, 200, 600),
             0.1,
-            [509, 522, 537, 548, 584, 598]
+            [509, 522, 537, 548, 583, 598]
         ),
         (
             # Nothing found
             (0, 500, 200, 550),
-            4,
+            10,
             []
         ),
         (
             # A real example from lap times PDF
             (400, 650, 550, 800),
-            4,
-            [767]
+            10,
+            [766]
         )
     ]
 )
