@@ -4,11 +4,12 @@ import logging
 import os
 import re
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cached_property
-from types import SimpleNamespace
-from typing import Literal, Optional, Sequence
 from string import printable
+from types import SimpleNamespace
+from typing import Literal, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -419,13 +420,13 @@ class Page:
         `pixmap.samples_mv`. The difference is that `pixmap.samples` returns a bytes object, i.e. a
         copy of the original pixmap, while `pixmap.samples_mv` is a memory view/pointer to the
         original pixmap. So the latter is significantly faster.
-        
+
         However, we still must create a deep `.copy()`. Because PaddleOCR may process the input
         image inplace, and we are working with a memory view, so during the OCR, the original
         pixmap may be changed, leading to unexpected errors. I sometimes/very often get segfault
         errors without the `.copy()`, but can't reproduce it consistently. For safety, always do a
         copy here.
-        
+
         A quick benchmark shows that using `pixmap.samples_mv` + `.copy()` is 5x faster than using
         `pixmap.samples`. This is why we reach the above code.
         """
@@ -570,7 +571,7 @@ class Page:
         original pixmap, and thus may not be detected as a black row. But after upsampling, at
         least one of the four rows should be black enough to be detected as a black row. This
         allows us to detect very thin black lines in the original pixmap.
-        
+
         There may be a small one-off error here. If the #. of rows in the pixmap is not perfectly
         divisible by `scaling_factor`, then the last few rows may be ignored. But this should
         little impact: we don't expect any black lines to be at the bottom of `clip` area.
@@ -697,17 +698,16 @@ class Page:
                             f'{col_name}. Table bbox = ({vlines[0]:.1f}, {hlines[0]:.1f}, '
                             f'{vlines[-1]:.1f}, {hlines[-1]:.1f})'
                         )
-                    col_name = col_name[0]
+                    col_name = col_name[0]  # noqa: PLW2901
                 if col_name is None:
                     # Can be empty, e.g. pit col. in quali. lap times PDF has no col name.
                     cols[i] = TextBlock(text='')
-                else:
-                    if col_name.superscript or col_name.strikeout:
-                        raise ParsingError(
-                            f'Found superscript or strikeout text in table header on '
-                            f'{page_no_str}: {col_name}. Table bbox = ({vlines[0]:.1f}, '
-                            f'{hlines[0]:.1f}, {vlines[-1]:.1f}, {hlines[-1]:.1f})'
-                        )
+                elif col_name.superscript or col_name.strikeout:
+                    raise ParsingError(
+                        f'Found superscript or strikeout text in table header on {page_no_str}: '
+                        f'{col_name}. Table bbox = ({vlines[0]:.1f}, {hlines[0]:.1f}, '
+                        f'{vlines[-1]:.1f}, {hlines[-1]:.1f})'
+                    )
             return pd.DataFrame(cells, columns=[i.text for i in cols], index=None)
         return pd.DataFrame(cells, columns=None, index=None)
 
@@ -974,10 +974,10 @@ class TextBlock:
         if not isinstance(value, tuple):
             raise TypeError(f'Invalid `bbox`: {value}. Expected a tuple of four floats '
                             f'representing (l, t, r, b)')
-        if len(value) != 4:
+        if len(value) != 4:  # noqa:PLR2004
             raise ValueError(f'Invalid `bbox`: {value}. Expected a tuple of four floats '
                              f'representing (l, t, r, b)')
-        
+
         for i in value:
             if not isinstance(i, (int, float)):
                 raise TypeError(f'Invalid `bbox`: {value}. All values in bbox must be numbers')
@@ -998,9 +998,9 @@ class TextBlock:
         if self.bbox:
             ret += f', bbox=({self.l:.2f}, {self.t:.2f}, {self.r:.2f}, {self.b:.2f})'
         if self.superscript:
-            ret += f', superscript=True'
+            ret += ', superscript=True'
         if self.strikeout:
-            ret += f', strikeout=True'
+            ret += ', strikeout=True'
         ret += ')'
         return ret
 

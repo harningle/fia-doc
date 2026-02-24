@@ -1,24 +1,9 @@
 import os
 import re
-import tempfile
-from dataclasses import dataclass, field
-from functools import cached_property
-from pathlib import Path
-from string import printable
-from types import SimpleNamespace
-from typing import Literal, Optional
 
 import matplotlib.pyplot as plt
-import numpy as np
-import numpy.typing as npt
 import pandas as pd
-import pymupdf
 import requests
-
-# from PIL import Image
-from .models.foreign_key import SessionEntryForeignKeys
-from .models.lap import LapImport, LapObject
-
 
 rc = {'figure.figsize': (8, 6),
       'axes.facecolor': 'white',  # Remove background colour

@@ -235,7 +235,7 @@ class EntryListParser(BaseParser):
         found = False
         page: Page
         for page in doc:
-            page = Page(page, file=self.file)
+            page = Page(page, file=self.file)  # noqa: PLW2901
             tb = page.get_text('text', clip=(0, 0, page.w, page.h * 0.5))
             if all(i in tb[0].text for i in ['No.', 'Driver', 'Nat', 'Team', 'Constructor']):
                 found = True
@@ -255,7 +255,7 @@ class EntryListParser(BaseParser):
         # Table header is below the black line and above a white strip
         if white_strips := page.search_for_white_strips(clip=(0, t_table_header, page.w, page.h),
                                                         height=0.5):  # Very short white strip
-            if len(white_strips) < 2:
+            if len(white_strips) < 2:  # noqa: PLR2004
                 doc.close()
                 raise ParsingError(f'Expected at least two white strips below the bottommost '
                                    f'black line in {self.file}. Found: {white_strips}')
@@ -295,7 +295,7 @@ class EntryListParser(BaseParser):
             raise ParsingError(f'Cannot find any white strip separating rows in the table in '
                                f'{self.file}')
         """
-        We want to know the vertical gap between two rows, so we can pass it to `tol` in 
+        We want to know the vertical gap between two rows, so we can pass it to `tol` in
         `.parse_table_by_grid()`. The white strips found above are their top positions. So between
         two consecutive white strips, there is a row plus a vertical gap to the next row.
         Therefore, vertical gap is approx. the dist. between two consecutive white strips minus the
@@ -327,7 +327,7 @@ class EntryListParser(BaseParser):
         def identify_reserve(tbs: list[TextBlock]) -> Optional[int]:
             if len(tbs) == 1:
                 return None
-            if len(tbs) >= 3 or len(tbs) == 0:
+            if len(tbs) >= 3 or len(tbs) == 0:  # noqa: PLR2004
                 raise ParsingError(f'Find none or more than two text blocks in "No." col. in '
                                    f'{self.file}: {tbs}')
             # Two text blocks. One is the car No. and the other, which is a superscript, indicates
@@ -358,11 +358,11 @@ class EntryListParser(BaseParser):
         # drivers we find above (#23)
         """
         We have two cases:
-        
+
         1. both tables have reserve drivers
         2. the main table has some reserve drivers, but we find no reserve drivers here
         3. the main table has no reserve drivers, but we do find some here
-        
+
         1. is what should happen. 2. either means the FIA doc. is wrong (see #23), or our parser
         mis-identify something. Raise a warning here. 3. means the main table missed some reserve
         drivers. This is an error for sure.
@@ -387,11 +387,11 @@ class EntryListParser(BaseParser):
             We can't rely on the bboxes of `reserve_driver_nos` to identify the rows, or the table
             position, because PyMuPDF returns very weird bbox if a text has superscript. Therefore,
             we still locate the table using white strips.
-            
+
             The table top will be the last white strip between the main table bottom and the
             bottommost reserve driver No. We use the bottommost to make sure, even if the bbox from
             PyMuPDF is wrong, we are conservative enough to include at least the zero-th row.
-            
+
             Table bottom is identified similarly: the first tall white strip below the bottommost
             reserve driver No.
             """
@@ -517,7 +517,7 @@ class PracticeParser(BaseParser):
         page: Page
         classification: Optional[list[TextBlock]] = None
         for page in doc:
-            page = Page(page, file=self.classification_file)
+            page = Page(page, file=self.classification_file)  # noqa: PLW2901
             if classification := page.search_for('Practice Session Classification'):
                 if len(classification) > 1:
                     doc.close()
@@ -598,7 +598,7 @@ class PracticeParser(BaseParser):
         And all drivers in the table will be classified, because as long as they make a lap that
         counts, they are classified and in the PDF. DNS or other not classified drivers won't be in
         the PDF in the first place.
-        
+
         TODO: should we add back not classified drivers manually?
         """
 
@@ -709,7 +709,7 @@ class PracticeParser(BaseParser):
                 doc.close()
                 raise ParsingError(f'Expect at least two vertical white strips separating drivers '
                                    f'on {page_no_str}. Found: {driver_separators}')
-            elif len(driver_separators) > 4:
+            elif len(driver_separators) > 4:  # noqa: PLR2004
                 doc.close()
                 raise ParsingError(f'Expect at most four white strips separating drivers on '
                                    f'{page_no_str}. Found: {driver_separators}')
@@ -721,7 +721,7 @@ class PracticeParser(BaseParser):
                 # black line
                 white_strips = page.search_for_white_strips(clip=(0, 0, page.w, black_line),
                                                             height=lap_times_height / 3)
-                if len(white_strips) < 2:
+                if len(white_strips) < 2:  # noqa: PLR2004
                     doc.close()
                     raise ParsingError(f'Find one or no white strip above the black line at '
                                        f'{black_line} on {page_no_str}: {white_strips}. Expected '
@@ -752,8 +752,8 @@ class PracticeParser(BaseParser):
 
                 # Parse each of the three side by side drivers' tables
                 for l_driver, r_driver in zip(driver_separators[:-1], driver_separators[1:]):
-                    l_driver += 1
-                    r_driver += 1
+                    l_driver += 1  # noqa: PLW2901
+                    r_driver += 1  # noqa: PLW2901
 
                     # Get the driver name and car No.
                     driver = page.get_text(clip=(l_driver, t_driver, r_driver, t_table_header))
@@ -816,13 +816,15 @@ class PracticeParser(BaseParser):
                             col_min_gap=3,
                             min_black_line_length=0.5
                         )
-                        if (len(cols) != 2) or (cols[0].text != 'NO') or (cols[1].text != 'TIME'):
+                        if ((len(cols) != 2)  # noqa: PLR2004
+                                or (cols[0].text != 'NO')
+                                or (cols[1].text != 'TIME')):
                             raise ParsingError(
                                 f'Expected "NO" and "TIME" cols. in ({l_table:.2f}, '
                                 f'{t_table_header:.2f}, {r_table:.2f}, {b_table_header:.2f}) on '
                                 f'{page_no_str}. Got: {cols}'
                             )
-                        l_table = cols[0].l - 1  # More accurate table left boundary
+                        l_table = cols[0].l - 1  # More accurate left boundary  # noqa: PLW2901
 
                         # Vertical lines separating the two cols.
                         vlines = [l_table, cols[0].r, (cols[0].r + cols[1].l) / 2, r_table]
@@ -1026,7 +1028,7 @@ class RaceParser(BaseParser):
         page: Page
         classification: Optional[list[TextBlock]] = None
         for page in doc:
-            page = Page(page, file=self.classification_file)
+            page = Page(page, file=self.classification_file)  # noqa: PLW2901
             if '.pdf' in page.get_text():  # Fix #59
                 continue
             classification = page.search_for('Final Classification')
@@ -1291,8 +1293,8 @@ class RaceParser(BaseParser):
 
             # Iterate over each table
             for l_table, r_table in zip(table_separators[:-1], table_separators[1:]):
-                l_table += 1  # Some buffer so we have a bit blank margins between the table
-                r_table += 1
+                l_table += 1  # Some buffer so have a bit margins between tables  # noqa: PLW2901
+                r_table += 1  # noqa: PLW2901
                 table_clip_str = f'({l_table:.1f}, {b_table_header:.1f}, {r_table:.1f}, ' \
                                  f'{b_tables:.1f})'
 
@@ -1607,7 +1609,7 @@ class RaceParser(BaseParser):
                 doc.close()
                 raise ParsingError(f'Expect at least two vertical white strips separating drivers '
                                    f'on {page_no_str}. Found: {driver_separators}')
-            elif len(driver_separators) > 4:
+            elif len(driver_separators) > 4:  # noqa: PLR2004
                 doc.close()
                 raise ParsingError(f'Expect at most four white strips separating drivers on '
                                    f'{page_no_str}. Found: {driver_separators}')
@@ -1619,7 +1621,7 @@ class RaceParser(BaseParser):
                 # black line
                 white_strips = page.search_for_white_strips(clip=(0, 0, page.w, black_line),
                                                             height=lap_analysis_height / 3)
-                if len(white_strips) < 2:
+                if len(white_strips) < 2:  # noqa: PLR2004
                     doc.close()
                     raise ParsingError(f'Found one or no white strip above the black line at '
                                        f'{black_line} on {page_no_str}: {white_strips}. Expected '
@@ -1650,8 +1652,8 @@ class RaceParser(BaseParser):
 
                 # Parse each of the three side by side drivers' tables
                 for l_driver, r_driver in zip(driver_separators[:-1], driver_separators[1:]):
-                    l_driver += 1
-                    r_driver += 1
+                    l_driver += 1  # noqa: PLW2901
+                    r_driver += 1  # noqa: PLW2901
 
                     # Get the driver name and car No.
                     driver = page.get_text(clip=(l_driver, t_driver, r_driver, t_table_header))
@@ -1707,13 +1709,15 @@ class RaceParser(BaseParser):
                             col_min_gap=3,
                             min_black_line_length=0.5
                         )
-                        if (len(cols) != 2) or (cols[0].text != 'LAP') or (cols[1].text != 'TIME'):
+                        if ((len(cols) != 2)  # noqa: PLR2004
+                                or (cols[0].text != 'LAP')
+                                or (cols[1].text != 'TIME')):
                             raise ParsingError(
                                 f'Expected "LAP" and "TIME" cols. in ({l_table:.1f}, '
                                 f'{t_table_header:.1f}, {r_table:.1f}, {b_table_header:.1f}) on '
                                 f'{page_no_str}. Got: {cols}'
                             )
-                        l_table = cols[0].l - 1  # More accurate table left boundary
+                        l_table = cols[0].l - 1  # More accurate left boundary  # noqa: PLW2901
 
                         # Vertical lines separating the two cols.
                         vlines = [l_table, cols[0].r, (cols[0].r + cols[1].l) / 2, r_table]
@@ -1891,7 +1895,7 @@ class QualifyingParser(BaseParser):
         classification = []
         page: Page
         for i in range(len(doc)):
-            page = Page(doc[i], file=self.classification_file)
+            page = Page(doc[i], file=self.classification_file)  # noqa: PLW2901
             if '.pdf' in page.get_text():  # Fix #59
                 continue
             classification = page.search_for('Final Classification')
@@ -2379,7 +2383,7 @@ class QualifyingParser(BaseParser):
                 doc.close()
                 raise ParsingError(f'Expect at least two vertical white strips separating drivers '
                                    f'on {page_no_str}. Found: {driver_separators}')
-            elif len(driver_separators) > 4:
+            elif len(driver_separators) > 4:  # noqa: PLR2004
                 doc.close()
                 raise ParsingError(f'Expect at most four white strips separating drivers on '
                                    f'{page_no_str}. Found: {driver_separators}')
@@ -2391,7 +2395,7 @@ class QualifyingParser(BaseParser):
                 # black line
                 white_strips = page.search_for_white_strips(clip=(0, 0, page.w, black_line),
                                                             height=lap_times_height / 3)
-                if len(white_strips) < 2:
+                if len(white_strips) < 2:  # noqa: PLR2004
                     doc.close()
                     raise ParsingError(f'Found one or no white strip above the black line at '
                                        f'{black_line} on {page_no_str}: {white_strips}. Expected '
@@ -2422,8 +2426,8 @@ class QualifyingParser(BaseParser):
 
                 # Parse each of the three side by side drivers' tables
                 for l_driver, r_driver in zip(driver_separators[:-1], driver_separators[1:]):
-                    l_driver += 1
-                    r_driver += 1
+                    l_driver += 1  # noqa: PLW2901
+                    r_driver += 1  # noqa: PLW2901
 
                     # Get the driver name and car No.
                     driver = page.get_text(clip=(l_driver, t_driver, r_driver, t_table_header))
@@ -2479,14 +2483,15 @@ class QualifyingParser(BaseParser):
                             col_min_gap=3,
                             min_black_line_length=0.5
                         )
-                        if (len(cols) != 2) or (cols[0].text != 'NO') or (
-                                cols[1].text != 'TIME'):
+                        if ((len(cols) != 2)  # noqa: PLR2004
+                                or (cols[0].text != 'NO')
+                                or (cols[1].text != 'TIME')):
                             raise ParsingError(
                                 f'Expected "NO" and "TIME" cols. in ({l_table:.1f}, '
                                 f'{t_table_header:.1f}, {r_table:.1f}, {b_table_header:.1f}) on '
                                 f'{page_no_str}. Got: {cols}'
                             )
-                        l_table = cols[0].l - 1  # More accurate table left boundary
+                        l_table = cols[0].l - 1  # More accurate left boundary  # noqa: PLW2901
 
                         # Vertical lines separating the two cols.
                         vlines = [l_table, cols[0].r, (cols[0].r + cols[1].l) / 2, r_table]
