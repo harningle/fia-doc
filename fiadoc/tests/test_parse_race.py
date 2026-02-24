@@ -6,7 +6,7 @@ from contextlib import nullcontext
 import pytest
 
 from fiadoc.parser import RaceParser
-from fiadoc.utils import download_pdf
+from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
@@ -135,24 +135,12 @@ def prepare_race_data(request, tmp_path) -> tuple[list[dict], list[dict], list[d
     else:
         expected_lap_times = None
 
-    # Sort data
-    classification_data.sort(key=lambda x: x['foreign_keys']['car_number'])
-    expected_classification.sort(key=lambda x: x['foreign_keys']['car_number'])
-    if lap_times_data:
-        lap_times_data.sort(key=lambda x: x['foreign_keys']['car_number'])
-        for i in lap_times_data:
-            i['objects'].sort(key=lambda x: x['number'])
-    if expected_lap_times:
-        expected_lap_times.sort(key=lambda x: x['foreign_keys']['car_number'])
-        for i in expected_lap_times:
-            i['objects'].sort(key=lambda x: x['number'])
-
     # TODO: currently manually tested against fastf1 lap times. The test data should be generated
     #       automatically later. Also need to manually add if the lap time is deleted and if the
     #       lap is fastest manually. Also need to add the laps where PDFs have data but fastf1
     #       doesn't
-    return classification_data, lap_times_data, expected_classification, expected_lap_times
-
+    return (sort_json(classification_data),     sort_json(lap_times_data),
+            sort_json(expected_classification), sort_json(expected_lap_times))
 
 def test_parse_race(prepare_race_data):
     classification_data, lap_times_data, expected_classification, expected_lap_times \
@@ -172,6 +160,7 @@ def test_parse_race(prepare_race_data):
                     and j['foreign_keys']['session'] == session:
                 expected_laps = j['objects']
                 for lap in laps:
+                    # TODO: What was I doing here...?
                     # Here we allow the lap to be missing in fastf1 data
                     for expected_lap in expected_laps:
                         if lap['number'] == expected_lap['number']:

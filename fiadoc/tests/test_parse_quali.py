@@ -7,7 +7,7 @@ from typing import Optional
 import pytest
 
 from fiadoc.parser import QualifyingParser
-from fiadoc.utils import download_pdf
+from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
@@ -183,29 +183,12 @@ def prepare_quali_data(request, tmp_path) \
     with open('fiadoc/tests/fixtures/' + expected_lap_times, encoding='utf-8') as f:
         expected_lap_times = json.load(f)
 
-    # Sort data
-    classification_data.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    expected_classification.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    lap_times_data.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    for i in lap_times_data:
-        i['objects'].sort(key=lambda x: x['number'])
-    expected_lap_times.sort(
-        key=lambda x: (x['foreign_keys']['session'], x['foreign_keys']['car_number'])
-    )
-    for i in expected_lap_times:
-        i['objects'].sort(key=lambda x: x['number'])
-
     # TODO: currently manually tested against fastf1 lap times. The test data should be generated
     #       automatically later. Also need to manually add if the lap time is deleted and if the
     #       lap is fastest manually. Also need to add the laps where PDFs have data but fastf1
     #       doesn't
-    return classification_data, lap_times_data, expected_classification, expected_lap_times
+    return (sort_json(classification_data),     sort_json(lap_times_data),
+            sort_json(expected_classification), sort_json(expected_lap_times))
 
 
 def test_parse_quali(prepare_quali_data):

@@ -1,5 +1,6 @@
 import os
 import re
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -29,7 +30,7 @@ def duration_to_millisecond(s: str | None) -> dict[str, str | int] | None:
     >>> duration_to_millisecond('12.345')
     {'_type': 'timedelta', 'milliseconds': 12345}
     """
-    if not s:
+    if s is None:
         return None
 
     match s.count(':'):
@@ -102,3 +103,16 @@ def download_pdf(url: str, out_path: str | os.PathLike) -> None:
     with open(out_path, 'wb') as f:
         f.write(resp.content)
     return
+
+
+def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort a list of dicts by their keys and values, for comparison used in tests"""
+    def _sort_recursively(i: Any) -> Any:
+        """Helper function to sort lists/dicts recursively"""
+        if isinstance(i, dict):
+            return {k: _sort_recursively(v) for k, v in sorted(i.items())}
+        elif isinstance(i, list):
+            return sorted([_sort_recursively(k) for k in i], key=lambda x: str(x))
+        else:
+            return i
+    return _sort_recursively(j)
