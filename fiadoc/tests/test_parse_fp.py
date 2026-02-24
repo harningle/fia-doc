@@ -15,7 +15,7 @@ race_list = [
         11,
         'fp1',
         '2025_11_fp1_classification.json',
-        None,
+        '2025_11_fp1_lap_times.json',
         nullcontext()
     ),
     (
@@ -26,7 +26,7 @@ race_list = [
         17,
         'fp1',
         '2024_17_fp1_classification.json',
-        None,
+        '2024_17_fp1_lap_times.json',
         nullcontext()
     ),
     (
@@ -38,6 +38,17 @@ race_list = [
         'fp3',
         '2025_15_fp3_classification.json',
         '2025_15_fp3_lap_times_fallback.json',
+        pytest.warns(UserWarning, match='Lap times PDF is missing')
+    ),
+    (
+        # Weird one-driver-a-row layout lap times PDF...
+        '2025_01_aus_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
+        '2025_01_aus_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
+        2025,
+        1,
+        'fp1',
+        '2025_1_fp1_classification.json',
+        '2025_1_fp1_lap_times.json',
         nullcontext()
     )
 ]
@@ -60,8 +71,7 @@ def prepare_fp_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dic
 
     with context:
         classification_data = parser.classification_df.to_json()
-        lap_times_data = None
-        # lap_times_data = parser.lap_times_df.to_json()
+        lap_times_data = parser.lap_times_df.to_json()
     with open('fiadoc/tests/fixtures/' + expected_classification, encoding='utf-8') as f:
         expected_classification = json.load(f)
     if expected_lap_times:
@@ -78,4 +88,4 @@ def test_parse_fp(prepare_fp_data):
     classification_data, lap_times_data, expected_classification, expected_lap_times \
         = prepare_fp_data
     assert classification_data == expected_classification
-    # assert lap_times_data == expected_lap_times
+    assert lap_times_data == expected_lap_times

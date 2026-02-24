@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+"""Driver and team and race constants"""
 # Manually map driver and team names to their ID in jolpica database
 TEAMS = {
     2023: {
@@ -55,8 +56,17 @@ QUALI_DRIVERS = {
         1: float('inf'),
         2: 15,
         3: 10
+    },
+    2026: {
+        1: float('inf'),
+        2: 15,
+        3: 10
     }
 }
+
+"""PDF parsing settings"""
+# Best DPI for PDF parsing
+DPI = 600
 
 
 if __name__ == '__name__':

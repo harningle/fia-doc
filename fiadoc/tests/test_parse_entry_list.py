@@ -43,7 +43,8 @@ race_list = [
         2024,
         5,
         '2024_5_entry_list.json',
-        pytest.warns(UserWarning, match='Ricciardo is indicated as')
+        pytest.warns(UserWarning,
+                     match='Found reserve drivers in the main table, but no reserve driver table')
     ),
     (
         # Weird PDF page margin (#33)

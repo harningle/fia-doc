@@ -10,8 +10,10 @@ readme = "README.md"
 
 requires-python = ">=3.12,<3.13"  # jolpica-schemas requires 3.12+
 dependencies = [
+  "beautifulsoup4>=4.0,<5.0",
   "filelock>=3.19.0,<4.0.0",
   "matplotlib>=3.4.0,<4.0.0",
+  "lxml>=6.0,<7.0",
   "opencv-python>=4.10.0,<5.0.0",
   "paddleocr==3.2.0",
   "paddlepaddle==3.2.0",
@@ -52,6 +54,11 @@ minversion = "6.0"
 testpaths = [
     "fiadoc/tests"
 ]
+addopts = ["--doctest-modules"]
+doctest_optionflags = [
+  "NORMALIZE_WHITESPACE",
+  "NUMBER"
+]
 filterwarnings = [
   "ignore::DeprecationWarning:importlib.*:",  # See pymupdf/PyMuPDF#3931 and swig/swig#2881
   "ignore::DeprecationWarning:sys.*:",
@@ -81,14 +88,15 @@ select = [
 ]
 ignore = [
   "PD013",    # I still like `df.stack` more than `df.melt`
-  "PD901",    # Fine if `df` as a var. name
   "E741",     # Don't care about ambiguous var. name. We have comments
+  "PLC0207",  # Don't care about string split times
   "PLR1711",  # I prefer explicit `return` even if returns nothing
   "PLR0911",  # I know too many `return`'s are not good, but...
   "PLR0912",  # TODO: skip too many branches or statements or func. args. for now. Need to refactor
   "PLR0915",
   "PLR0913",
-  "PLR1714",  # Write out all comparisons for readability
+  "PLR1714",  # Write out all comparisons for readability"PLW1641",  # No need hash for objects
+  "PLW1641",  # No need hash for object
   "UP009",    # UTF-8 encoding
   "UP007",    # I prefer `Optional[xxx]` over xxx | None
   "UP045",    # I prefer `Optional[xxx]` over xxx | None
