@@ -29,7 +29,7 @@ OCR = PaddleOCR(lang='en',
 # TODO: very fragile...
 OCR_ERRORS = {
     'KMIH': 'KM/H',
-    'L': '1',
+    'L': '1',  # If OCR gets only a single "L", it's almost surely number 1 rather than letter "L"
     'I': '1',
     '↑': '1',
     '→': '1',
@@ -942,10 +942,10 @@ class TextBlock:
             strikeout: bool = False
     ):
         if not isinstance(superscript, bool):
-            raise TypeError(f'Invalid `superscript`: {self.superscript}. Expected either True or '
+            raise TypeError(f'Invalid `superscript`: {superscript}. Expected either True or '
                             f'False')
         if not isinstance(strikeout, bool):
-            raise TypeError(f'Invalid `strikeout`: {self.strikeout}. Expected either True or '
+            raise TypeError(f'Invalid `strikeout`: {strikeout}. Expected either True or '
                             f'False')
         self.text = text  # Checked in setter
         self.bbox = bbox  # Checked in setter
