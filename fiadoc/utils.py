@@ -112,7 +112,7 @@ def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if isinstance(i, dict):
             return {k: _sort_recursively(v) for k, v in sorted(i.items())}
         elif isinstance(i, list):
-            return sorted([_sort_recursively(k) for k in i], key=lambda x: str(x))
+            return sorted([_sort_recursively(k) for k in i], key=str)
         else:
             return i
     return _sort_recursively(j)

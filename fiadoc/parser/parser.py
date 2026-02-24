@@ -26,7 +26,7 @@ from ..models.foreign_key import (
     PitStopForeignKeys,
     RoundEntryForeignKeys,
     SessionEntryForeignKeys,
-    TeamDriverForeignKeys
+    TeamDriverForeignKeys,
 )
 from ..models.lap import LapImport, LapObject
 from ..models.pit_stop import PitStopData, PitStopObject
