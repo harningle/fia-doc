@@ -201,7 +201,7 @@ class BaseParser:
         # 2.
         normal_texts = [tb.text
                         for tb in tbs
-                        if (not tb.strikeout) and (not tb.superscript) and tb.text]
+                        if (not tb.superscript) and tb.text]
         if not normal_texts:
             return None
         if len(normal_texts) == 1:
