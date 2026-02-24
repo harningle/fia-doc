@@ -40,6 +40,9 @@ OCR_ERRORS = {
 # Strikeout line location: it shouldn't be too close to the top or bottom of the text bbox
 STRIKEOUT_LINE_MARGIN = 0.2
 
+# Allow apostrophe
+printable += '‘’'  # For names like "O’ward", where we want to keep "’"
+
 
 class Page:
     def __init__(self, page: pymupdf.Page, file: str | os.PathLike):
