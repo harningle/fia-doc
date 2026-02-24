@@ -266,6 +266,16 @@ class Page:
                     textblocks = [TextBlock(text=spans[0]['text'], bbox=spans[0]['bbox'])]
                 # Two texts found. Should be one usual text and one superscript
                 case 2:
+                    # Edge case: Antonelli's name may be wrapped into two lines, so we have two
+                    # textblocks here, both of which are normal text
+                    if any(n in span['text'].lower()
+                           for span in spans
+                           for n in ['andrea kimi', 'antonelli']):
+                        return [TextBlock(text=' '.join(span['text'].strip() for span in spans),
+                                          bbox=(min(span['bbox'][0] for span in spans),
+                                                min(span['bbox'][1] for span in spans),
+                                                max(span['bbox'][2] for span in spans),
+                                                max(span['bbox'][3] for span in spans)))]
                     n_superscripts: int = 0
                     n_regular_texts: int = 0
                     for span in spans:  # See https://pymupdf.readthedocs.io/en/latest/recipes-text.html#how-to-analyze-font-characteristics  # noqa: E501
