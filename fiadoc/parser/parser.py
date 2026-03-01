@@ -1083,7 +1083,7 @@ class RaceParser(BaseParser):
         classification: Optional[list[TextBlock]] = None
         for page in doc:
             page = Page(page, file=self.classification_file)  # noqa: PLW2901
-            if '.pdf' in page.get_text():  # Fix #59
+            if '.pdf' in page.get_text(clip=(0, 0, page.w, page.h / 2))[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification')
             if classification:
@@ -1950,7 +1950,7 @@ class QualifyingParser(BaseParser):
         page: Page
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)  # noqa: PLW2901
-            if '.pdf' in page.get_text():  # Fix #59
+            if '.pdf' in page.get_text(clip=(0, 0, page.w, page.h / 2))[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification')
             if classification:
