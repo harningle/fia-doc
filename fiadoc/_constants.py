@@ -69,5 +69,5 @@ QUALI_DRIVERS = {
 DPI = 600
 
 
-if __name__ == '__name__':
+if __name__ == '__main__':
     pass
