@@ -23,7 +23,7 @@ from .._constants import DPI
 OCR = PaddleOCR(lang='en',
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
-                use_textline_orientation=False)
+                use_textline_orientation=False)  # TODO: lazy init.
 
 # Common OCR mistakes
 # TODO: very fragile...
@@ -67,7 +67,7 @@ class Page:
         # pixmap.pil_save(self.tempdir / f'{random_filename}.png')
         pixmap_arr = np.ndarray(
             [pixmap.height, pixmap.width, 3], dtype=np.uint8, buffer=pixmap.samples
-        )
+        )  # TODO: from buffer?
         ocred_page = OCR.predict(pixmap_arr)[0]
         ocred_page = zip(ocred_page['rec_boxes'], ocred_page['rec_texts'])
 
@@ -697,7 +697,7 @@ class Page:
                 if isinstance(col_name, list):  # In case we allow some cols. to have multiple
                     if len(col_name) > 1:       # texts, the col. name should always be one text
                         raise ParsingError(
-                            f'Found multiple texts ina cell in table header on {page_no_str}: '
+                            f'Found multiple texts in a cell in table header on {page_no_str}: '
                             f'{col_name}. Table bbox = ({vlines[0]:.1f}, {hlines[0]:.1f}, '
                             f'{vlines[-1]:.1f}, {hlines[-1]:.1f})'
                         )
