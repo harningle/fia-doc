@@ -6,9 +6,7 @@ import re
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from functools import cached_property
 from string import printable
-from types import SimpleNamespace
 from typing import Literal, Optional
 
 import matplotlib.pyplot as plt
@@ -54,115 +52,6 @@ class Page:
     def __getattr__(self, name: str):
         return getattr(self._pymupdf_page, name)  # If a method/attr. is not found, use PyMuPDF's
 
-    @cached_property
-    def ocred_page(self) -> SimpleNamespace:
-        """OCR the entire page and return the texts with their bounding boxes
-
-        :return: An object w/ `.get_text` and `.search_for` methods, as if it is a `pymupdf.Page`
-        TODO: move to OCR module later
-        """
-        # OCR
-        pixmap = self._pymupdf_page.get_pixmap(dpi=DPI)
-        # random_filename = uuid.uuid4().hex
-        # pixmap.pil_save(self.tempdir / f'{random_filename}.png')
-        pixmap_arr = np.ndarray(
-            [pixmap.height, pixmap.width, 3], dtype=np.uint8, buffer=pixmap.samples
-        )  # TODO: from buffer?
-        ocred_page = OCR.predict(pixmap_arr)[0]
-        ocred_page = zip(ocred_page['rec_boxes'], ocred_page['rec_texts'])
-
-        # Because of the DPI, the bounding boxes of texts after OCR may not be in the same
-        # coordinate system as the original PDF page. Convert them back
-        ocred_page = [TextBlock(
-            text=OCR_ERRORS.get(i[1], i[1]),
-            bbox=self._transform_bbox(
-                bbox=tuple(i[0]),
-                from_page_bound=(0, 0, pixmap.width, pixmap.height),
-                to_page_bound=self._pymupdf_page.bound()
-            )
-        ) for i in ocred_page]
-        # TODO: the confidence score should somehow be used in the future
-
-        # Define some methods like `search_for` and `get_text`
-        def search_for(
-                text: str,
-                clip: Optional[tuple[float, float, float, float]] = None,
-                tol: float = 2
-        ) -> list[pymupdf.Rect]:
-            """Search for text in OCR results and return the bounding boxes as `pymupdf.Rect`
-
-            The search is case-insensitive, same as PyMuPDF.
-            """
-            results = [i.bbox for i in ocred_page if text.lower() in i.text.lower()]
-            if clip is None:
-                clip = self._pymupdf_page.bound()
-            results = [pymupdf.Rect(i) for i in results
-                       if i[0] > clip[0] - tol and i[1] > clip[1] - tol
-                       and i[2] < clip[2] + tol and i[3] < clip[3] + tol]
-            return results
-
-        '''
-        def get_text(
-                option: str,
-                clip: Optional[tuple[float, float, float, float]] = None,
-                tol: float = 2
-        ) -> str | list | dict:
-            """`pymupdf.Page.get_text` equivalent for the OCR results
-
-            TODO: this won't work for "partial get". That is, if "Lewis Hamilton" occupies the bbox
-                  (10, 10, 50, 50), and we only want the text in (20, 10, 50, 50), we should get
-                  "Hamilton". But the current implementation will return nothing, as the current
-                  bbox is for the entire text and we don't know the coords. of part of the text.
-
-            :param option: The `option` parameter in `pymupdf.Page.get_text`. Only support "text",
-                           "words", "blocks", or "dict"
-            :param clip: (x0, y0, x1, y1). If provided, only return text in this area
-            :param tol: Tolerance in pixels. Only if a text is inside the clip area with `tol` px
-                        margin, it will be included in the results. Default is 2 px
-            :return: The text in the specified format, depending on `option`
-            """
-            if clip is None:
-                clip = (-1, -1, self._pymupdf_page.bound()[2] + 1,
-                        self._pymupdf_page.bound()[3] + 1)
-
-            results = []
-            for result in ocred_page:
-                bbox = tuple(result[:4])
-                if bbox[0] > clip[0] - tol and bbox[1] > clip[1] - tol \
-                        and bbox[2] < clip[2] + tol and bbox[3] < clip[3] + tol:
-                    if option == 'text':
-                        results.append(result[4])
-                    elif option == 'words':
-                        results.append((bbox[0], bbox[1], bbox[2], bbox[3], result[4]))
-                    elif option == 'blocks':
-                        results.append((bbox[0], bbox[1], bbox[2], bbox[3], result[4], -1, -1))
-                    elif option == 'dict':
-                        results.append({
-                            'blocks': [{
-                                'bbox': clip,
-                                'lines': [{
-                                    'bbox': clip,
-                                    'spans': [{
-                                        'bbox': clip,
-                                        'text': result[4]
-                                    }]
-                                }]
-                            }]
-                        })
-                    else:
-                        raise ValueError(f'`option` must be one of "text", "words", "blocks", or '
-                                         f'"dict" if using OCR. Got "{option}"')
-            if not results:
-                return '' if option == 'text' else []
-            return results
-        '''
-
-        return SimpleNamespace(
-            search_for=search_for,
-            # get_text=get_text,
-            to_list=lambda: ocred_page
-        )
-
     def show_page(self, clip: Optional[tuple[float, float, float, float]] = None) -> None:
         """May not work well depending on screen resolution and/or DPI. For debug process only
 
@@ -176,17 +65,49 @@ class Page:
         plt.show()
         return
 
-    def search_for(self, text: str, **kwargs) -> list['TextBlock']:
+    def search_for(
+            self,
+            text: str,
+            clip: Optional['BBox'] = None,
+            tol: Optional[float] = 2,
+            dpi: Optional[int] = DPI,
+            **kwargs
+    ) -> list['BBox']:
         """`pymupdf.Page.search_for`, with OCR"""
-        results: list[pymupdf.Rect]
-
         # Usual search
         if results := self._pymupdf_page.search_for(text, **kwargs):
             return [TextBlock(text=text, bbox=(tuple(i))) for i in results]
 
-        # If nothing found, OCR the page and search again
-        # TODO
-        return self.ocred_page.search_for(text, **kwargs)
+        # If usual search finds nothing, use OCR. Here we must specify the `clip` area to search
+        # It can be the whole page, but it's MUCH better to be a smaller area to have faster OCR
+        # as well as better quality
+        if clip is None:
+            raise ValueError('Without OCR we found nothing. And `clip` must be provided when '
+                             'searching with OCR, to avoid very slow OCR and bad quality')
+        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=dpi, annots=False)
+        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
+                                                           dtype=np.uint8)
+                                             .reshape((pixmap.height, pixmap.width, 3))
+                                             .copy())
+        ocr_results = OCR.predict(pixmap_arr)[0]
+        ocr_results = zip(ocr_results['rec_boxes'], ocr_results['rec_texts'])
+
+        # Because of the DPI, the bounding boxes of texts after OCR may not be in the same
+        # coordinate system as the original PDF page. Convert them back
+        ocr_results = [TextBlock(
+            text=OCR_ERRORS.get(i[1], i[1]),
+            bbox=self._transform_bbox(
+                bbox=tuple(i[0]),
+                from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                to_page_bound=clip
+            )
+        ) for i in ocr_results]
+
+        found = [i.bbox for i in ocr_results if text.lower() in i.text.lower()]
+        found = [pymupdf.Rect(i) for i in found
+                 if i[0] > clip[0] - tol and i[1] > clip[1] - tol
+                 and i[2] < clip[2] + tol and i[3] < clip[3] + tol]
+        return found
 
     @staticmethod
     def _transform_bbox(
@@ -358,6 +279,7 @@ class Page:
             clip: Optional[tuple[float, float, float, float]] = None,
             small_area: bool = False,
             expected: Optional[re.Pattern] = None,
+            dpi: Optional[int] = DPI,
             **kwargs
     ) -> list['TextBlock']:
         r"""This is `pymupdf.Page.get_text` w/ OCR functionality
@@ -379,6 +301,9 @@ class Page:
         :param expected: If provided, only texts that match this regex will be returned. Default is
                          return everything w/o filtering. E.g., when we extract texts in the lap
                          time col., we want `expected` to be `re.compile(r'\d+:\d+\.\d+')`.
+        :param dpi: The DPI for OCR. Higher DPI can improve OCR quality, but also significantly
+                    slow down the OCR process. Will be ignored if we find text without OCR. Default
+                    is 600, which is very slow but has great quality
         :param kwargs: Other keyword arguments to pass to `pymupdf.Page.get_text`
         :return: A list of `TextBlock`s
         """
@@ -397,10 +322,8 @@ class Page:
         # positioning, e.g. "George Russell" may be OCR-ed as "George" and "Russell". And it's very
         # slow
         if clip is None:
-            if results := self.ocred_page.get_text(option, clip):
-                return results
-            else:
-                return []
+            raise ValueError('Native `.get_text()` found nothing. Proceed with OCR, but `clip` is '
+                             'not provided')
 
         # If we have `clip`, only OCR the clipped area
         # First check if any black pixels
@@ -413,7 +336,7 @@ class Page:
         2. OCR quality can be really bad. It may say a short light grey line is "-", which breaks
            most of our parsing. So we try our best to avoid OCR-ing such areas
         """
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=DPI, annots=False)
+        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=dpi, annots=False)
         pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
                                                            dtype=np.uint8)
                                              .reshape((pixmap.height, pixmap.width, 3))

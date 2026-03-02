@@ -20,13 +20,13 @@ from ..models.driver import (
     RoundEntryImport,
     RoundEntryObject,
     TeamDriverImport,
-    TeamDriverObject
+    TeamDriverObject,
 )
 from ..models.foreign_key import (
     PitStopForeignKeys,
     RoundEntryForeignKeys,
     SessionEntryForeignKeys,
-    TeamDriverForeignKeys
+    TeamDriverForeignKeys,
 )
 from ..models.lap import LapImport, LapObject
 from ..models.pit_stop import PitStopData, PitStopObject
@@ -250,7 +250,8 @@ class EntryListParser(BaseParser):
         page: Page
         for page in doc:
             page = Page(page, file=self.file)  # noqa: PLW2901
-            tb = page.get_text('text', clip=(0, 0, page.w, page.h * 0.5))
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h * 0.5)
+            tb = page.get_text('text', clip=top_half)
             if all(i in tb[0].text for i in ['No.', 'Driver', 'Nat', 'Team', 'Constructor']):
                 found = True
                 break
@@ -569,10 +570,13 @@ class PracticeParser(BaseParser):
         # Find the page with "Practice Session Classification", on which the table is located
         doc = pymupdf.open(self.classification_file)
         page: Page
-        classification: Optional[list[TextBlock]] = None
+        classification: Optional[list[BBox]] = None
         for page in doc:
             page = Page(page, file=self.classification_file)  # noqa: PLW2901
-            if classification := page.search_for('Practice Session Classification'):
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            if classification := page.search_for('Practice Session Classification',
+                                                 clip=top_half,
+                                                 dpi=100):
                 if len(classification) > 1:
                     doc.close()
                     raise ParsingError(f'Found more than one "Practice Session Classification" on '
@@ -585,7 +589,7 @@ class PracticeParser(BaseParser):
         page_no_str = f'p.{page.number} in {page.file}'  # For error/warning messages
 
         # Position of "Practice Session Classification", below which is the table
-        b_classification = classification[0].b
+        b_classification = classification[0].y1
 
         # Find the first black horizontal line below "Practice Session Classification"
         if black_lines := page.search_for_black_lines(clip=(0, b_classification, page.w, page.h)):
@@ -693,7 +697,8 @@ class PracticeParser(BaseParser):
             # Find "Lap Times"
             page = Page(page, file=self.lap_times_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            lap_times = page.search_for('Lap Times')
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            lap_times = page.search_for('Lap Times', clip=top_half, dpi=100)
             if len(lap_times) != 1:
                 doc.close()
                 raise ParsingError(f'Find none or multiple "Lap Times" on {page_no_str}')
@@ -747,7 +752,7 @@ class PracticeParser(BaseParser):
                     b_page_content = bottom_black_line - 1
                     if page_no_text := page.search_for(
                             f'Page {page.number + 1} of',
-                            clip=(0, black_lines[-1], page.w, b_page_content)
+                            clip=(0, black_lines[-1], page.w, b_page_content),
                     ):
                         b_page_content = min(b_page_content, page_no_text[0].y0 - 1)
                 clip = (page.h - b_page_content, 0, page.h - black_lines[0] - 1, page.w)
@@ -1080,15 +1085,16 @@ class RaceParser(BaseParser):
         # Find the page with "Final Classification", on which the table is located
         doc = pymupdf.open(self.classification_file)
         page: Page
-        classification: Optional[list[TextBlock]] = None
+        classification: Optional[list[BBox]] = None
         for page in doc:
             page = Page(page, file=self.classification_file)  # noqa: PLW2901
-            if '.pdf' in page.get_text(clip=(0, 0, page.w, page.h / 2))[0].text:  # Fix #59
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            if '.pdf' in page.get_text(clip=top_half, dpi=300)[0].text:  # Fix #59
                 continue
-            classification = page.search_for('Final Classification')
+            classification = page.search_for('Final Classification', clip=top_half, dpi=100)
             if classification:
                 break
-            classification = page.search_for('Provisional Classification')
+            classification = page.search_for('Provisional Classification', clip=top_half, dpi=100)
             if classification:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
@@ -1169,7 +1175,9 @@ class RaceParser(BaseParser):
         """
 
         # Check if there is a "NOT CLASSIFIED" table below the main table
-        not_classified = page.search_for('NOT CLASSIFIED', clip=(0, b_table + 1, page.w, page.h))
+        not_classified = page.search_for('NOT CLASSIFIED',
+                                         clip=(0, b_table + 1, page.w, page.h),
+                                         dpi=300)
 
         # If yes, repeat the above for the "NOT CLASSIFIED" table
         if not_classified:
@@ -1309,7 +1317,8 @@ class RaceParser(BaseParser):
             # a black line below the table header
             page = Page(page, file=self.history_chart_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            history_chart = page.search_for('History Chart', clip=(0, 0, page.w, page.h / 3))
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            history_chart = page.search_for('History Chart', clip=top_half, dpi=100)
             if len(history_chart) != 1:
                 doc.close()
                 raise ParsingError(f'Find none or multiple "History Chart" on {page_no_str}')
@@ -1469,7 +1478,8 @@ class RaceParser(BaseParser):
             page_no_str = f'p.{page.number} in {page.file}'
 
             # Table header/col. names are below "Race Lap Chart"
-            if lap_chart := page.search_for('Lap Chart'):
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            if lap_chart := page.search_for('Lap Chart', clip=top_half, dpi=100):
                 t_table_header = lap_chart[0].y1 + 1
             else:
                 doc.close()
@@ -1599,7 +1609,8 @@ class RaceParser(BaseParser):
             # Find "Lap Times"
             page = Page(page, file=self.lap_analysis_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            lap_analysis = page.search_for('Lap Analysis')
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            lap_analysis = page.search_for('Lap Analysis', clip=top_half, dpi=100)
             if len(lap_analysis) != 1:
                 doc.close()
                 raise ParsingError(f'Find none or multiple "Lap Analysis" on {page_no_str}')
@@ -1950,12 +1961,14 @@ class QualifyingParser(BaseParser):
         page: Page
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)  # noqa: PLW2901
-            if '.pdf' in page.get_text(clip=(0, 0, page.w, page.h / 2))[0].text:  # Fix #59
+            # Table/page title should appear in top half of the page
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
+            if '.pdf' in page.get_text(clip=top_half, dpi=300)[0].text:  # Fix #59
                 continue
-            classification = page.search_for('Final Classification')
+            classification = page.search_for('Final Classification', clip=top_half, dpi=100)
             if classification:
                 break
-            classification = page.search_for('Provisional Classification')
+            classification = page.search_for('Provisional Classification', clip=top_half, dpi=100)
             if classification:
                 warnings.warn('Found and using provisional classification, not the final one')
                 break
@@ -2113,7 +2126,9 @@ class QualifyingParser(BaseParser):
         df['is_classified'] = True
 
         # Parse "NOT CLASSIFIED" table, if any
-        if not_classified := page.search_for('NOT CLASSIFIED', clip=(0, b_table, page.w, page.h)):
+        if not_classified := page.search_for('NOT CLASSIFIED',
+                                             clip=(0, b_table, page.w, page.h),
+                                             dpi=300):
             t_table_body = not_classified[0].y1 + 1
             if white_strips:= page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
                                                            height=col_row_height / 3):
@@ -2139,7 +2154,9 @@ class QualifyingParser(BaseParser):
         df = pd.concat([df, not_classified], ignore_index=True)
 
         # Parse "DISQUALIFIED" table, if any
-        if disqualified := page.search_for('DISQUALIFIED', clip=(0, b_table, page.w, page.h)):
+        if disqualified := page.search_for('DISQUALIFIED',
+                                           clip=(0, b_table, page.w, page.h),
+                                           dpi=300):
             """
             There can be multiple "DISQUALIFIED" text. E.g., in the penalty notes, we may have
             "DISQUALIFIED", and we may have "DISQUALIFIED" as the table title. The table title
@@ -2372,7 +2389,8 @@ class QualifyingParser(BaseParser):
             # Find "Lap Times"
             page = Page(page, file=self.lap_times_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {self.lap_times_file}'
-            quali_lap_times = page.search_for('Lap Times')
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            quali_lap_times = page.search_for('Lap Times', clip=top_half, dpi=100)
             if len(quali_lap_times) != 1:
                 doc.close()
                 raise ParsingError(f'Find none or multiple "Lap Times" on {page_no_str}')
@@ -2765,7 +2783,8 @@ class PitStopParser(BaseParser):
             page_no_str = f'p.{page.number} in {self.file}'
 
             # Locate "Pit Stop Summary" title
-            pit_stop_summary = page.search_for('Pit Stop Summary')
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            pit_stop_summary = page.search_for('Pit Stop Summary', clip=top_half, dpi=100)
             if len(pit_stop_summary) != 1:
                 raise ParsingError(f'Find none or multiple "Pit Stop Summary" on {page_no_str}')
             b_title = pit_stop_summary[0].y1
