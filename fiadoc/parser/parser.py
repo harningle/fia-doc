@@ -250,8 +250,8 @@ class EntryListParser(BaseParser):
         page: Page
         for page in doc:
             page = Page(page, file=self.file)  # noqa: PLW2901
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h * 0.5)
-            tb = page.get_text('text', clip=top_half)
+            top_half = (0, page.h * 0.1, page.w, page.h * 0.5)
+            tb = page.get_text('text', clip=top_half, dpi=300)
             if all(i in tb[0].text for i in ['No.', 'Driver', 'Nat', 'Team', 'Constructor']):
                 found = True
                 break
