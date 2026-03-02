@@ -1266,6 +1266,7 @@ class RaceParser(BaseParser):
             .sort_values(by=['fastest_lap_time', 'fastest_lap_no'], ascending=[True, True]) \
             .groupby('car_no', sort=False) \
             .ngroup() + 1
+        df.loc[df.fastest_lap_time.isna(), 'fastest_lap_rank'] = None
 
         # Fill in some default values
         df = df.fillna({'points': 0, 'finishing_status': 0})
@@ -1295,7 +1296,8 @@ class RaceParser(BaseParser):
                             points=x.points,
                             time=x.time,
                             laps_completed=x.laps_completed,
-                            fastest_lap_rank=x.fastest_lap_rank if x.fastest_lap_time else None,
+                            fastest_lap_rank=x.fastest_lap_rank if pd.notna(x.fastest_lap_time)
+                                             else None,
                             grid=x.starting_grid
                             # TODO: replace the rank with missing or -1 in self.classification_df
                         )
