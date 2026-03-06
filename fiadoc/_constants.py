@@ -37,6 +37,19 @@ TEAMS = {
         'Racing Bulls Honda RBPT': 'rb',
         'Williams Mercedes': 'williams',
         'Kick Sauber Ferrari': 'sauber'
+    },
+    2026: {
+        'McLaren Mercedes': 'mclaren',
+        'Mercedes': 'mercedes',
+        'Red Bull Racing Red Bull Ford': 'red_bull',
+        'Ferrari': 'ferrari',
+        'Atlassian Williams Mercedes': 'williams',
+        'Racing Bulls Red Bull Ford': 'rb',
+        'Aston Martin Aramco Honda': 'aston_martin',
+        'Haas Ferrari': 'haas',
+        'Audi': 'audi',
+        'Alpine Mercedes': 'alpine',
+        'Cadillac Ferrari': 'cadillac'
     }
 }
 
@@ -65,6 +78,112 @@ QUALI_DRIVERS = {
 }
 
 """PDF parsing settings"""
+# Regular drivers in each season
+REGULAR_DRIVERS = {
+    2023: {
+        'max verstappen': 'max_verstappen',
+        'sergio perez': 'perez',
+        'charles leclerc': 'leclerc',
+        'carlos sainz': 'sainz',
+        'george russell': 'russell',
+        'lewis hamilton': 'hamilton',
+        'esteban ocon': 'ocon',
+        'pierre gasly': 'gasly',
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'valtteri bottas': 'bottas',
+        'zhou guanyu': 'zhou',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'kevin magnussen': 'kevin_magnussen',
+        'nico hulkenberg': 'hulkenberg',
+        'daniel ricciardo': 'ricciardo',
+        'yuki tsunoda': 'tsunoda',
+        'alexander albon': 'albon',
+        'logan sargeant': 'sargeant',
+        'nyck de vries': 'de_vries',
+        'liam lawson': 'lawson'
+    },
+    2024: {
+        'max verstappen': 'max_verstappen',
+        'sergio perez': 'perez',
+        'george russell': 'russell',
+        'lewis hamilton': 'hamilton',
+        'charles leclerc': 'leclerc',
+        'carlos sainz': 'sainz',
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'esteban ocon': 'ocon',
+        'pierre gasly': 'gasly',
+        'alexander albon': 'albon',
+        'logan sargeant': 'sargeant',
+        'daniel ricciardo': 'ricciardo',
+        'yuki tsunoda': 'tsunoda',
+        'valtteri bottas': 'bottas',
+        'zhou guanyu': 'zhou',
+        'kevin magnussen': 'kevin_magnussen',
+        'nico hulkenberg': 'hulkenberg',
+        'oliver bearman': 'bearman',
+        'franco colapinto': 'colapinto',
+        'jack doohan': 'doohan',
+        'liam lawson': 'lawson',
+        'andrea kimi antonelli': 'antonelli'
+    },
+    2025: {
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'charles leclerc': 'leclerc',
+        'lewis hamilton': 'hamilton',
+        'max verstappen': 'max_verstappen',
+        'liam lawson': 'lawson',
+        'george russell': 'russell',
+        'andrea kimi antonelli': 'antonelli',
+        'kimi antonelli': 'antonelli',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'pierre gasly': 'gasly',
+        'jack doohan': 'doohan',
+        'esteban ocon': 'ocon',
+        'oliver bearman': 'bearman',
+        'isack hadjar': 'hadjar',
+        'yuki tsunoda': 'tsunoda',
+        'alexander albon': 'albon',
+        'carlos sainz': 'sainz',
+        'nico hulkenberg': 'hulkenberg',
+        'gabriel bortoleto': 'bortoleto',
+        'garbiel bortoleto': 'bortoleto',  # typo in entry list in 2025 australian
+        'franco colapinto': 'colapinto'
+    },
+    2026: {
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'george russell': 'russell',
+        'andrea kimi antonelli': 'antonelli',
+        'kimi antonelli': 'antonelli',
+        'max verstappen': 'max_verstappen',
+        'isack hadjar': 'hadjar',
+        'charles leclerc': 'leclerc',
+        'lewis hamilton': 'hamilton',
+        'alexander albon': 'albon',
+        'carlos sainz': 'sainz',
+        'arvid lindblad': 'arvid_lindblad',
+        'liam lawson': 'lawson',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'esteban ocon': 'ocon',
+        'oliver bearman': 'bearman',
+        'nico hulkenberg': 'hulkenberg',
+        'gabriel bortoleto': 'bortoleto',
+        'garbiel bortoleto': 'bortoleto',  # Typo in entry list in 2025 australian
+        'pierre gasly': 'gasly',
+        'franco colapinto': 'colapinto',
+        'sergio perez': 'perez',
+        'valtteri bottas': 'bottas'
+    }
+}
+
 # Best DPI for PDF parsing
 DPI = 600
 
