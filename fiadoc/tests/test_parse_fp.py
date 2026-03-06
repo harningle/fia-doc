@@ -8,7 +8,7 @@ from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
-        # Normal practice
+        # 0: Normal practice
         '2025_11_aut_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
         '2025_11_aut_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
         2025,
@@ -19,7 +19,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # A driver fails to set a valid time, i.e. has a few laps but all deleted/invalid
+        # 1: Ocon fails to set a valid time, i.e. has a few laps but all deleted/invalid
         '2024_17_aze_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
         '2024_17_aze_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
         2024,
@@ -30,7 +30,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Lap times PDF unavailable
+        # 2: Lap times PDF unavailable
         '2025_dutch_grand_prix_-_fp3_classification.pdf',
         None,
         2025,
@@ -41,7 +41,7 @@ race_list = [
         pytest.warns(UserWarning, match='Lap times PDF is missing')
     ),
     (
-        # Weird one-driver-a-row layout lap times PDF...
+        # 3: Weird one-driver-a-row layout lap times PDF...
         '2025_01_aus_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
         '2025_01_aus_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
         2025,
@@ -52,7 +52,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # A driver has no lap at all, i.e. DNS
+        # 4: A driver has no lap at all, i.e. DNS
         '2026_01_aus_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
         '2026_01_aus_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
         2026,
@@ -60,6 +60,19 @@ race_list = [
         'fp1',
         '2026_1_fp1_classification.json',
         '2026_1_fp1_lap_times.json',
+        nullcontext()
+    ),
+    (
+        # 5: Perez has no valid lap, and the lap times PDF doesn't mark pit laps correctly (#77)
+        # This is different from Ocon's case in test case 1, where the lap times PDF does correctly
+        # mark all pit laps
+        '2026_01_aus_f1_p2_timing_secondpracticesessionclassification_v01.pdf',
+        '2026_01_aus_f1_p2_timing_secondpracticesessionlaptimes_v01.pdf',
+        2026,
+        1,
+        'fp2',
+        '2026_1_fp2_classification.json',
+        '2026_1_fp2_lap_times.json',
         nullcontext()
     )
 ]

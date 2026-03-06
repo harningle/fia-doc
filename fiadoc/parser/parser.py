@@ -682,8 +682,9 @@ class PracticeParser(BaseParser):
                             is_classified=True,
                             status=None,
                             laps_completed=x.laps_completed,
-                            fastest_lap_rank=x.finishing_position  # It's FP so finishing position
-                        )                                          # is the fastest lap ranking
+                            fastest_lap_rank=x.finishing_position if pd.notna(x.fastest_lap_time)
+                                             else None  # Finishing position is fastest lap ranking
+                        )                               # as long as has a fastest lap time
                     ]
                 ).model_dump(exclude_none=True, exclude_unset=True),
                 axis=1
@@ -948,9 +949,17 @@ class PracticeParser(BaseParser):
         # TODO: what if a driver has two laps with identical fastest lap time? Label the first one
         #       as the fastest lap and second as not?
         if (temp._merge != 'both').any():
-            raise AssertionError(f'Found some cars only appearing in one but not both of the lap '
-                                 f'times and classification PDFs:\n'
-                                 f'{temp[temp._merge != "both"].to_string(index=False)}')
+            warnings.warn(f'Found some cars only appearing in one but not both of the lap times '
+                          f'and classification PDFs. Can be a parsing error:\n'
+                          f'{temp[temp._merge != "both"].to_string(index=False)}')
+            """
+            TODO: check for other laps vs classification checks
+            We raise a warning rather than an error here because a driver can have valid laps but
+            no fastest lap. E.g., Perez in 2026 Australian FP2: out lap, in lap. Both laps are
+            valid, but both go from or into the pit, so no fastest lap. A better check would be
+            using the colour info. in the lap times PDF, as the fastest lap should be in green.
+            """
+        temp = temp[temp._merge == 'both']
         if (temp.lap_time != temp.fastest_lap_time).any():
             diff = temp[temp.lap_time != temp.fastest_lap_time]
             raise AssertionError(f'Fastest lap time in lap times PDF does not match the one in '
