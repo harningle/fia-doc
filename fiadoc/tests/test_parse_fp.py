@@ -74,6 +74,17 @@ race_list = [
         '2026_1_fp2_classification.json',
         '2026_1_fp2_lap_times.json',
         nullcontext()
+    ),
+    (
+        # 6: different PDF style in decision doc. (#78)
+        'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_p1_classification.pdf',
+        None,
+        2025,
+        7,
+        'fp1',
+        '2025_7_fp1_classification.json',
+        '2025_7_fp1_lap_times_fallback.json',
+        pytest.warns(UserWarning, match='Lap times PDF is missing')
     )
 ]
 
@@ -83,8 +94,11 @@ def prepare_fp_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dic
     # Download and parse race classification and lap times PDFs
     url_classification, url_lap_time, year, round_no, session, expected_classification, \
         expected_lap_times, context = request.param
-    download_pdf('https://www.fia.com/sites/default/files/' + url_classification,
-                     tmp_path / 'classification.pdf')
+    if url_classification.startswith('http'):
+        download_pdf(url_classification, tmp_path / 'classification.pdf')
+    else:
+        download_pdf('https://www.fia.com/sites/default/files/' + url_classification,
+                         tmp_path / 'classification.pdf')
     if url_lap_time:
         download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
                      tmp_path / 'lap_times.pdf')

@@ -580,6 +580,8 @@ class PracticeParser(BaseParser):
         for page in doc:
             page = Page(page, file=self.classification_file)  # noqa: PLW2901
             top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            if '.pdf' in page.get_text(clip=top_half, dpi=300)[0].text:
+                continue
             if classification := page.search_for('Practice Session Classification',
                                                  clip=top_half,
                                                  dpi=100):
@@ -606,18 +608,38 @@ class PracticeParser(BaseParser):
                                f'body below "Practice Session Classification" on {page_no_str}')
 
         # Get cols.
-        cols = self._detect_cols(page,
-                                 clip=(0, b_classification + 1, page.w, t_table_body - 1),
-                                 col_min_gap=1)
-        if not cols:
-            raise ParsingError(f'Could not locate cols. in the table header on {page_no_str}')
-        if [i.text.upper() for i in cols] != ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'TIME', 'LAPS',
-                                              'GAP', 'INT', 'KM/H', 'TIME OF DAY']:
+        """
+        Most cols. names can be easily parsed, except "NAT" and "ENTRANT", which are very close to
+        each other, and sometimes the gap between them is even smaller than the gap between two
+        chars. Therefore, we often get the two cols. as one "NAT ENTRANT". Below we try smaller and
+        smaller `col_min_gap`, until we get all expected cols. correctly. If even with a very small
+        `col_min_gap` we still can't get the cols. right, raise an error.
+        """
+        cols: Optional[list[TextBlock]] = None
+        for col_min_gap in [1, 0.9, 0.8, 0.7, 0.6, 0.5]:
+            try:
+                cols = self._detect_cols(page,
+                                         clip=(0, b_classification + 1, page.w, t_table_body - 1),
+                                         col_min_gap=col_min_gap)
+                if not cols:
+                    raise ParsingError(f'Could not locate cols. in the table header on '
+                                       f'{page_no_str}')
+                if {i.text.lower() for i in cols} != EXPECTED_COLS['fp']['required']:
+                    raise ParsingError(
+                        f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
+                        f'{EXPECTED_COLS['fp']['required']}. Got: {[i.text for i in cols]}'
+                    )
+                break
+            except ParsingError:
+                continue
+            except Exception as e:
+                doc.close()
+                raise e
+        if (not cols) or {i.text.lower() for i in cols} != EXPECTED_COLS['fp']['required']:
             doc.close()
             raise ParsingError(
-                f'Got unexpected or miss some cols. on {page_no_str}. Expected "NO", "DRIVER", '
-                f'"NAT", "ENTRANT", "TIME", "LAPS", "GAP", "INT", "KM/H", and "TIME OF DAY". Got: '
-                f'{[i.text for i in cols]}'
+                f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
+                f'{EXPECTED_COLS['fp']['required']}. Got: {[i.text for i in cols]}'
             )
         vlines = [0,
                   cols[0].bbox[0] - 1,
@@ -647,8 +669,12 @@ class PracticeParser(BaseParser):
                                                  min_height=col_row_height / 2)
 
         # Parse the table using the grid above
-        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False)
-        df = df.map(self._normalise_textblock)
+        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False,
+                                      allow_multiple_texts_per_cell=[2, 4])
+        # Allow multiple text blocks in "DRIVER" col. We don't need this col. at all, so don't care
+        # if it's correctly parsed, as long as the car. No. col. is correct. The same applies to
+        # "ENTRANT" col. as well
+        df = df.map(self._normalise_textblock, merge_multi_tbs=True)
         df.columns = ['finishing_position', 'car_no', 'driver', 'nat', 'team', 'fastest_lap_time',
                       'laps_completed', 'gap', 'int', 'avg_speed', 'fastest_lap_calender_time']
         df.fastest_lap_time = df.fastest_lap_time.apply(duration_to_millisecond)
@@ -839,7 +865,7 @@ class PracticeParser(BaseParser):
                     # table, so should skip two in the second row
                     if (not driver) or (not ''.join(i.text for i in driver)):
                         continue
-                    if match := re.match(r'^(\d+)\s+[A-Za-z ]+$', driver[0].text):
+                    if match := re.match(r"^(\d+)\s+[A-Za-z'‘’ ]+$", driver[0].text):  # O'Ward
                         car_no = int(match.group(1))
                     else:
                         doc.close()
@@ -1758,7 +1784,7 @@ class RaceParser(BaseParser):
                     # table, so should skip two in the second row
                     if (not driver) or (not ''.join(i.text for i in driver)):
                         continue
-                    if match := re.match(r'^(\d+)\s+[A-Za-z ]+$', driver[0].text):
+                    if match := re.match(r"^(\d+)\s+[A-Za-z'‘’ ]+$", driver[0].text):
                         car_no = int(match.group(1))
                     else:
                         doc.close()
@@ -2539,7 +2565,7 @@ class QualifyingParser(BaseParser):
                     # table, so should skip two in the second row
                     if (not driver) or (not ''.join(i.text for i in driver)):
                         continue
-                    if match := re.match(r'^(\d+)\s+[A-Za-z ]+$', driver[0].text):
+                    if match := re.match(r"^(\d+)\s+[A-Za-z'‘’ ]+$", driver[0].text):
                         car_no = int(match.group(1))
                     else:
                         doc.close()

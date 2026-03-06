@@ -192,6 +192,11 @@ EXPECTED_COLS: dict[str, dict[str, set]] = {
     'entry_list': {
         'required': {'no.', 'constructor'},
         'optional': {'tla', 'driver', 'nat', 'team'}
+    },
+    'fp': {
+        'required': {'no', 'driver', 'nat', 'entrant', 'time', 'laps', 'gap', 'int', 'km/h',
+                     'time of day'},
+        'optional': {}
     }
 }
 
