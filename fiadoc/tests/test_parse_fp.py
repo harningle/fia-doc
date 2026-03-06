@@ -19,7 +19,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # A driver fails to set a time
+        # A driver fails to set a valid time, i.e. has a few laps but all deleted/invalid
         '2024_17_aze_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
         '2024_17_aze_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
         2024,
@@ -49,6 +49,17 @@ race_list = [
         'fp1',
         '2025_1_fp1_classification.json',
         '2025_1_fp1_lap_times.json',
+        nullcontext()
+    ),
+    (
+        # A driver has no lap at all, i.e. DNS
+        '2026_01_aus_f1_p1_timing_firstpracticesessionclassification_v01.pdf',
+        '2026_01_aus_f1_p1_timing_firstpracticesessionlaptimes_v01.pdf',
+        2026,
+        1,
+        'fp1',
+        '2026_1_fp1_classification.json',
+        '2026_1_fp1_lap_times.json',
         nullcontext()
     )
 ]

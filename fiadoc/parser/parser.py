@@ -746,18 +746,30 @@ class PracticeParser(BaseParser):
             # Find vertical white spaces separating the three side-by-side drivers. These white
             # strips should be relatively tall. We use half of the "Lap Times" height as the
             # threshold here
-            if len(black_lines) == 1:  # If only one row of drivers on the page, then the bottom of
-                b_page_content = page.h
-                if bottom_black_line:  # the search area is page bottom, excl. footnote
+            if len(black_lines) == 1:    # If only one row of drivers on the page, then the bottom
+                b_page_content = page.h  # of the search area is page bottom, excl. footnote
+                if bottom_black_line:
                     b_page_content = bottom_black_line - 1
                     if page_no_text := page.search_for(
                             f'Page {page.number + 1} of',
                             clip=(0, black_lines[-1], page.w, b_page_content),
                     ):
                         b_page_content = min(b_page_content, page_no_text[0].y0 - 1)
-                clip = (page.h - b_page_content, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - b_page_content, 0, page.h - black_lines[0] + 1, page.w)
             else:
-                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] + 1, page.w)
+            """
+            What does the `+1` do in the `clip` above? `page.h - black_lines[-1] + 1` is the
+            location of black line between the table header and body of the next table. We don't
+            want to include that black line in the search area, so plus 1px buffer to exclude it.
+            Similarly, for `page.h - black_lines[0] + 1`, which is the black line between the table
+            header and body of the table currently being parsed. We want to include the black
+            lines, because we want to use them to locate the tables. That's why we add 1px buffer
+            to include them. Usually the buffer and the black lines don't matter, because the table
+            body alone can identify the location of a table; we don't need the black lines. But in
+            case where a driver has no lap at all, e.g. 2026 Australian FP1 Alonso, the black lines
+            are the only thing to locate a table, so must make sure to include them.
+            """
             page.set_rotation(90)
             driver_separators = page.search_for_white_strips(clip=clip,
                                                              height=lap_times_height * 0.5)
@@ -899,6 +911,9 @@ class PracticeParser(BaseParser):
                         df = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
                                                       header_included=False)
+                        if df.empty:
+                            continue
+                            # TODO: raise a warning here, as we found a driver with zero lap?
                         df.columns = ['lap_no', 'pit', 'lap_time']
                         df['lap_time_deleted'] = df.lap_time.apply(lambda x: x.strikeout is True)
                         df = df.map(self._normalise_textblock)
