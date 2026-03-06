@@ -78,6 +78,14 @@ race_list = [
         9,
         '2025_9_entry_list.json',
         pytest.warns(UserWarning, match='New drivers found in entry list PDF')
+    ),
+    (
+        # Has optional cols. like "TLA" (#76)
+        '2026_australian_grand_prix_-_entry_list_v2.pdf',
+        2026,
+        1,
+        '2026_1_entry_list.json',
+        nullcontext()
     )
 ]
 # Not going to test year 2023 for entry list, as their PDF format is different, and we are not

@@ -11,7 +11,7 @@ import pandas as pd
 import pymupdf
 from scipy.ndimage import find_objects, label
 
-from .._constants import DPI, QUALI_DRIVERS
+from .._constants import DPI, EXPECTED_COLS, QUALI_DRIVERS
 from ..drivers import Drivers
 from ..models.classification import SessionEntryImport, SessionEntryObject
 from ..models.driver import (
@@ -242,6 +242,7 @@ class EntryListParser(BaseParser):
     def _parse(self) -> pd.DataFrame:
         """
         :return: Df. with cols. of ["car_no", "driver", "nat", "team", "constructor"]
+        TODO: update docstring
         """
         # Go to the page with "No.", "Driver", "Nat", "Team", and "Constructor". These col. names
         # should appear in the top half of the page
@@ -284,15 +285,14 @@ class EntryListParser(BaseParser):
                                  clip=(0, t_table_header, page.w, b_table_header),
                                  col_min_gap=1.5,
                                  min_black_line_length=0.5)
-        if [i.text.lower() for i in cols] != ['no.', 'driver', 'nat', 'team', 'constructor']:
-            raise ParsingError(f'Expected cols. "No.", "Driver", "Nat", "Team", and "Constructor" '
-                               f'in {self.file}. Got: {cols}')
-        vlines = [cols[0].bbox[0] - 1,
-                  cols[1].bbox[0] - 1,
-                  cols[2].bbox[0] - 1,
-                  (cols[2].bbox[2] + cols[3].bbox[0]) / 2,
-                  cols[4].bbox[0] - 1,
-                  page.w]  # Vertical lines separating the cols.
+        req_cols = EXPECTED_COLS['entry_list']['required']
+        optional_cols = EXPECTED_COLS['entry_list']['optional']
+        if {i.text.lower() for i in cols} < req_cols:
+            raise ParsingError(f'Missing required cols. {req_cols} in {self.file}. Got: {cols}')
+        if {i.text.lower() for i in cols} > req_cols | optional_cols:
+            warnings.warn(f'Got unexpected cols. in {self.file}. Expected only {req_cols} and '
+                          f'{optional_cols}. Got: {cols}')
+        vlines = [i.bbox[0] - 1 for i in cols] + [page.w]  # Vertical lines separating the cols.
         col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])  # Table header row height
 
         # Table ends above a sufficiently tall white strip
@@ -337,7 +337,8 @@ class EntryListParser(BaseParser):
                                       allow_multiple_texts_per_cell=[0],  # Allow superscripts
                                       header_included=False,
                                       tol=row_gap)
-        df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
+        df.columns = [i.text.lower() for i in cols]
+        df = df.rename(columns={'no.': 'car_no'})
 
         def identify_reserve(tbs: list[TextBlock]) -> Optional[int]:
             if len(tbs) == 1:
@@ -449,7 +450,8 @@ class EntryListParser(BaseParser):
                                                    allow_multiple_texts_per_cell=[0],
                                                    header_included=False,
                                                    tol=col_row_height * 0.3)
-            reserves_df.columns = ['car_no', 'driver', 'nat', 'team', 'constructor']
+            reserves_df.columns = [i.text.lower() for i in cols]
+            reserves_df = reserves_df.rename(columns={'no.': 'car_no'})
             reserves_df['reserve_for'] = reserves_df.car_no.apply(identify_reserve)
             df = pd.concat([df, reserves_df], ignore_index=True)
 
@@ -463,6 +465,10 @@ class EntryListParser(BaseParser):
             drivers: list[dict] = []
             new_driver_objects: list[DriverObject] = []
             new_team_drivers: list[dict] = []
+            if 'nat' not in df.columns:  # In case NAT is missing and we have a new driver, we can
+                df['nat'] = None         # still create a DriverObject with country code = None
+                warnings.warn('Col. "Nat" is missing in the entry list PDF. Will set country code '
+                              'to None for any new driver')
             for x in df.itertuples():
                 # Check if the driver exists in Jolpica. If not, create a DriverObject and
                 # TeamDriverObject (mark him as a junior driver) for him
@@ -476,7 +482,7 @@ class EntryListParser(BaseParser):
                                     reference=driver_id,
                                     forename=DRIVERS.get_first_name(x.driver),
                                     surname=DRIVERS.get_last_name(x.driver),
-                                    country_code=x.nat
+                                    country_code=x.nat if isinstance(x.nat, str) else None
                                 )
                             )
                             new_team_drivers.append(
