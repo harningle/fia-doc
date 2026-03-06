@@ -1452,7 +1452,7 @@ class RaceParser(BaseParser):
                                        f'{cols[1:]}')
                 line_height = np.mean([i.b - i.t for i in cols])
                 vlines = [cols[0].l,
-                          (cols[0].r + cols[1].l) / 2,
+                          0.8 * cols[0].r + cols[1].l / 5,  # 20% point between "LAP" and "GAP"
                           cols[1].l / 4 + cols[1].r / 4 + cols[2].l / 2,  # Midpoint between "GAP"
                           r_table]                                        # and "TIME", minus 1/4
                                                                           # width of "GAP"
