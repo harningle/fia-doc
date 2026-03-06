@@ -10,7 +10,7 @@ from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
-        # 0: normal race w/o unclassified drivers
+        # 0: Normal race w/o unclassified drivers
         '2024_10_esp_f1_r0_timing_raceprovisionalclassification_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racelapanalysis_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racehistorychart_v01_1.pdf',
@@ -23,7 +23,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # 1: normal race w/ some unclassified drivers
+        # 1: Normal race w/ some unclassified drivers
         'doc_50_-_2024_monaco_grand_prix_-_provisional_race_classification.pdf',
         '2024_08_mon_f1_r0_timing_racelapanalysis_v01.pdf',
         '2024_08_mon_f1_r0_timing_racehistorychart_v01.pdf',
@@ -37,7 +37,7 @@ race_list = [
     ),
     (
         # 2: DNF but classified, e.g., crashed in final lap, but finished 90%+ of the race
-        # (jolpica/jolpica-f1#223, jolpica/jolpica-f1#246)
+        #    (jolpica/jolpica-f1#223, jolpica/jolpica-f1#246)
         'https://www.fia.com/system/files/decision-document/2025_canadian_grand_prix_-_final_race_classification.pdf',
         '2025_10_can_f1_r0_timing_racelapanalysis_v01.pdf',
         '2025_10_can_f1_r0_timing_racehistorychart_v01.pdf',
@@ -50,7 +50,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # 3: only classification PDF available, w/o some lap times PDF
+        # 3: Only classification PDF available, w/o some lap times PDF
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_race_classification.pdf',
         '2025_07_ita_f1_r0_timing_racelapanalysis_v01_0.pdf',
         None,
@@ -64,7 +64,7 @@ race_list = [
                       match='Lap chart, history chart, or lap time PDFs is missing')
     ),
     (
-        # 4: entire PDF is an image (#36)
+        # 4: Entire PDF is an image (#36)
         'https://www.fia.com/system/files/decision-document/2025_austrian_grand_prix_-_final_race_classification.pdf',
         '2025_11_aut_f1_r0_timing_racelapanalysis_v01.pdf',
         '2025_11_aut_f1_r0_timing_racehistorychart_v01.pdf',
@@ -77,7 +77,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # 5: a car starts a few laps later (#60)
+        # 5: A car starts a few laps later (#60)
         'https://www.fia.com/system/files/decision-document/2025_belgian_grand_prix_-_final_sprint_classification.pdf',
         '2025_13_bel_f1_s0_timing_sprintlapanalysis_v01.pdf',
         '2025_13_bel_f1_s0_timing_sprinthistorychart_v01.pdf',
@@ -87,6 +87,19 @@ race_list = [
         'sprint',
         '2025_13_sprint_classification.json',
         '2025_13_sprint_lap_times.json',
+        nullcontext()
+    ),
+    (
+        # 6: DSQ drivers in a separate table, rather than in the normal table (#61)
+        'https://www.fia.com/system/files/decision-document/2025_las_vegas_grand_prix_-_final_race_classification.pdf',
+        '2025_22_usa_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2025_22_usa_f1_r0_timing_racehistorychart_v01.pdf',
+        '2025_22_usa_f1_r0_timing_racelapchart_v01.pdf',
+        2025,
+        22,
+        'race',
+        '2025_22_race_classification.json',
+        '2025_22_race_lap_times.json',
         nullcontext()
     )
 ]

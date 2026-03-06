@@ -13,7 +13,7 @@ from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
-        # Normal entry list
+        # 0: Normal entry list
         '2024%20S%C3%A3o%20Paulo%20Grand%20Prix%20-%20Revised%20Entry%20List.pdf',
         2024,
         21,
@@ -21,7 +21,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Have multiple reserve drivers who are not in the 20 usual drivers (#49)
+        # 1: Has multiple reserve drivers who are not in the 20 usual drivers (#49)
         '2024%20Mexico%20City%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         20,
@@ -29,7 +29,7 @@ race_list = [
         pytest.warns(UserWarning, match='New drivers found in entry list PDF')
     ),
     (
-        # Have only one reserve driver (#55)
+        # 2: Has only one reserve driver (#55)
         '2024%20Japanese%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
         4,
@@ -37,7 +37,7 @@ race_list = [
         pytest.warns(UserWarning, match='New drivers found in entry list PDF')
     ),
     (
-        # Have a driver (Ricciardo) incorrectly indicated as having a reserve driver (looks like
+        # 3: Has a driver (Ricciardo) incorrectly indicated as having a reserve driver (looks like
         # FIA copy-paste error from previous race) (#23)
         '2024%20Chinese%20Grand%20Prix%20-%20Entry%20List.pdf',
         2024,
@@ -47,7 +47,7 @@ race_list = [
                      match='Found reserve drivers in the main table, but no reserve driver table')
     ),
     (
-        # Weird PDF page margin (#33)
+        # 4: Weird PDF page margin (#33)
         '2025_australian_grand_prix_-_entry_list_corrected_.pdf',
         2025,
         1,
@@ -55,7 +55,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Weird PDF page margin (#33)
+        # 5: Weird PDF page margin (#33)
         '2025_japanese_grand_prix_-_entry_list.pdf',
         2025,
         3,
@@ -63,8 +63,8 @@ race_list = [
         pytest.warns(UserWarning, match='New drivers found in entry list PDF')
     ),
     (
-        # Car No. superscript shown as regular text w/ smaller font size, rather than a proper
-        # superscript (#48)
+        # 6: Car No. superscript shown as regular text w/ smaller font size, rather than a proper
+        #    superscript (#48)
         '2025_bahrain_grand_prix_-_entry_list.pdf',
         2025,
         4,
@@ -72,7 +72,7 @@ race_list = [
         pytest.warns(UserWarning, match='New drivers found in entry list PDF')
     ),
     (
-        # Two and only two reserve drivers (#55)
+        # 7: Two and only two reserve drivers (#55)
         '2025_spanish_grand_prix_-_entry_list.pdf',
         2025,
         9,
@@ -80,7 +80,7 @@ race_list = [
         pytest.warns(UserWarning, match='New drivers found in entry list PDF')
     ),
     (
-        # Has optional cols. like "TLA" (#76)
+        # 8: Has optional cols. like "TLA" (#76)
         '2026_australian_grand_prix_-_entry_list_v2.pdf',
         2026,
         1,

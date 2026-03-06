@@ -11,7 +11,7 @@ from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
-        # Normal quali.
+        # 0: Normal quali.
         '2024_22_usa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2024_22_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -22,7 +22,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Title is image rather than string
+        # 1: Title is image rather than string
         'doc_53_-_2024_chinese_grand_prix_-_final_qualifying_classification.pdf',
         '2024_05_chn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -33,7 +33,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # DNF drivers in quali.
+        # 2: DNF drivers in quali.
         '2024_02_ksa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2024_02_ksa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -44,7 +44,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # DNF drivers in sprint quali.
+        # 3: DNF drivers in sprint quali.
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionprovisionalclassification_v01.pdf',
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -55,8 +55,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Antonelli's name being long, which breaks the older parser
-        # DNS drivers in quali.
+        # 4: Antonelli's name being long and also DNS drivers
         '2025_01_aus_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2025,
@@ -67,7 +66,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # DSQ drivers in quali.
+        # 5: DSQ drivers in quali.
         'https://www.fia.com/sites/default/files/decision-document/2024%20Monaco%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
         '2024_08_mon_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -78,7 +77,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # No "POLE POSITION" in quali. classification
+        # 6: No "POLE POSITION"
         'https://www.fia.com/sites/default/files/decision-document/2024%20Australian%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
         '2024_03_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2024,
@@ -89,7 +88,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Text is image in classification PDF
+        # 7: Text is image in classification PDF
         'https://www.fia.com/system/files/decision-document/2025_australian_grand_prix_-_final_qualifying_classification.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2025,
@@ -100,8 +99,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Antonelli's name wrapped in two lines
-        # DNF drivers in quali.
+        # 8: Antonelli's name wrapped in two lines and also DNF drivers in quali.
         'https://www.fia.com/system/files/decision-document/2025_chinese_grand_prix_-_final_sprint_qualifying_classification.pdf',
         '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
         2025,
@@ -112,7 +110,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # DNQ drivers in quali. (#50)
+        # 9: DNQ drivers in quali. (#50)
         '2025_04_brn_f1_q0_timing_qualifyingsessionfinalclassification_v01.pdf',
         '2025_04_brn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2025,
@@ -123,7 +121,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Without lap times PDF (#47)
+        # 10: Without lap times PDF (#47)
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
         None,
         2025,
@@ -134,7 +132,7 @@ race_list = [
         pytest.warns(UserWarning, match='Lap times PDF is missing')
     ),
     (
-        # Lap times are incorrectly matched with quali. sessions (#51)
+        # 11: Lap times are incorrectly matched with quali. sessions (#51)
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
         '2025_07_ita_f1_q0_timing_qualifyingsessionlaptimes_v01_0.pdf',
         2025,
@@ -145,7 +143,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # Has DISQUALIFIED table (#61)
+        # 12: Has DISQUALIFIED table (#61)
         'https://www.fia.com/system/files/decision-document/2025_azerbaijan_grand_prix_-_final_qualifying_classification.pdf',
         '2025_17_aze_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         2025,

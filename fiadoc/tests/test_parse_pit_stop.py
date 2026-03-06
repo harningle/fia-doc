@@ -10,7 +10,7 @@ from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
-        # Normal pit stop summary spanning over three pages
+        # 0: Normal pit stop summary spanning over three pages
         '2023_14_ned_f1_r0_timing_racepitstopsummary_v01.pdf',
         2023,
         13,
@@ -18,7 +18,7 @@ race_list = [
         '2023_13_race_pit_stop.json'
     ),
     (
-        # Table very short (only one row)
+        # 1: Table very short (only one row)
         '2025_02_chn_f1_s0_timing_sprintpitstopsummary_v01.pdf',
         2025,
         2,
