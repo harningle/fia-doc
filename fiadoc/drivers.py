@@ -15,7 +15,6 @@ from filelock import FileLock
 
 from ._constants import REGULAR_DRIVERS
 
-
 BASE_URL = 'https://api.jolpi.ca/ergast/f1'
 TIMEOUT = 10  # Seconds
 
