@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Driver and team and race constants"""
+"""Constants and configs. that need manual updating"""
 # Manually map driver and team names to their ID in jolpica database
 TEAMS = {
     2023: {
@@ -77,7 +77,6 @@ QUALI_DRIVERS = {
     }
 }
 
-"""PDF parsing settings"""
 # Regular drivers in each season
 REGULAR_DRIVERS = {
     2023: {
@@ -184,8 +183,17 @@ REGULAR_DRIVERS = {
     }
 }
 
+
 # Best DPI for PDF parsing
 DPI = 600
+
+# Expected cols. in the PDFs
+EXPECTED_COLS: dict[str, dict[str, set]] = {
+    'entry_list': {
+        'required': {'no.', 'constructor'},
+        'optional': {'tla', 'driver', 'nat', 'team'}
+    }
+}
 
 
 if __name__ == '__main__':
