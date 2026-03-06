@@ -1269,10 +1269,49 @@ class RaceParser(BaseParser):
             # No unclassified drivers
             not_classified = pd.DataFrame(columns=df.columns)
 
+        # Repeat the same for "DISQUALIFIED" table, if any
+        disqualified = page.search_for('DISQUALIFIED',
+                                         clip=(0, b_table + 1, page.w, page.h),
+                                         dpi=300)
+        if disqualified:
+            if black_lines := page.search_for_black_lines(
+                    clip=(0, disqualified[0].y1, page.w, page.h)
+            ):
+                t_table_body = black_lines[0] + 1
+            else:
+                doc.close()
+                raise ParsingError(f'Cannot find the black line separating table header and table '
+                                   f'body for "disqualified" on {page_no_str}')
+            if white_strips := page.search_for_white_strips(
+                    clip=(0, t_table_body, page.w, page.h),
+                    height=col_row_height / 2
+            ):
+                b_table = white_strips[0] + 1
+            else:
+                doc.close()
+                raise ParsingError(
+                    f'Could not find the bottom of "disqualified" table by white strip on '
+                    f'{page_no_str}'
+                )
+            hlines = page.search_for_grey_white_rows(clip=(0, t_table_body, page.w, b_table),
+                                                     min_height=col_row_height / 3)
+            disqualified = page.parse_table_by_grid(vlines=vlines,
+                                                    hlines=hlines,
+                                                    header_included=False,
+                                                    allow_multiple_texts_per_cell=[2, 4])
+            disqualified.columns = df.columns
+            disqualified.position = None  # No finishing position for disqualified drivers
+            disqualified = disqualified.map(self._normalise_textblock, merge_multi_tbs=True)
+        else:
+            # No unclassified drivers
+            disqualified = pd.DataFrame(columns=df.columns)
+
         df['is_classified'] = True # Set all drivers from the main table as classified
         not_classified['finishing_status'] = 11  # TODO: should clean up the code later
         not_classified['is_classified'] = False
-        df = pd.concat([df, not_classified], ignore_index=True)
+        disqualified['finishing_status'] = 20    # TODO: should clean up the code later
+        disqualified['is_classified'] = False
+        df = pd.concat([df, not_classified, disqualified], ignore_index=True)
 
         # Clean up finishing status, e.g. is lapped? Is DSQ?
         df.loc[df.gap.fillna('').str.contains('LAP', regex=False), 'finishing_status'] = 1
@@ -1300,7 +1339,7 @@ class RaceParser(BaseParser):
         del df['temp']
 
         df.car_no = df.car_no.astype(int)
-        df.laps_completed = df.laps_completed.fillna(0).astype(int)
+        df.laps_completed = df.laps_completed.astype(float)  # TODO: why cast to float?
         df.time = df.time.apply(duration_to_millisecond)
         # TODO: gap to the leader is to be cleaned later, so we can use it for cross validation
         # TODO: is the `.fillna(0)` safe? See 2024 Brazil race Hulkenberg
@@ -1351,7 +1390,9 @@ class RaceParser(BaseParser):
                             status=x.finishing_status,
                             points=x.points,
                             time=x.time,
-                            laps_completed=x.laps_completed,
+                            laps_completed=x.laps_completed
+                                           if pd.notna(x.laps_completed)
+                                           else None,
                             fastest_lap_rank=x.fastest_lap_rank if pd.notna(x.fastest_lap_time)
                                              else None,
                             grid=x.starting_grid
