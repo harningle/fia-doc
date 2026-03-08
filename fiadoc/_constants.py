@@ -1,83 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Constants and configs. that need manual updating"""
 # Manually map driver and team names to their ID in jolpica database
-DRIVERS = {
-    2023: {
-        'Max Verstappen': 'max_verstappen',
-        'Sergio Perez': 'perez',
-        'Charles Leclerc': 'leclerc',
-        'Carlos Sainz': 'sainz',
-        'George Russell': 'russell',
-        'Lewis Hamilton': 'hamilton',
-        'Esteban Ocon': 'ocon',
-        'Pierre Gasly': 'gasly',
-        'Oscar Piastri': 'piastri',
-        'Lando Norris': 'norris',
-        'Valtteri Bottas': 'bottas',
-        'Zhou Guanyu': 'zhou',
-        'Lance Stroll': 'stroll',
-        'Fernando Alonso': 'alonso',
-        'Kevin Magnussen': 'kevin_magnussen',
-        'Nico Hulkenberg': 'hulkenberg',
-        'Daniel Ricciardo': 'ricciardo',
-        'Yuki Tsunoda': 'tsunoda',
-        'Alexander Albon': 'albon',
-        'Logan Sargeant': 'sargeant',
-        'Nyck de Vries': 'de_vries',
-        'Liam Lawson': 'lawson'
-    },
-    2024: {
-        'Max Verstappen': 'max_verstappen',
-        'Sergio Perez': 'perez',
-        'George Russell': 'russell',
-        'Lewis Hamilton': 'hamilton',
-        'Charles Leclerc': 'leclerc',
-        'Carlos Sainz': 'sainz',
-        'Oscar Piastri': 'piastri',
-        'Lando Norris': 'norris',
-        'Lance Stroll': 'stroll',
-        'Fernando Alonso': 'alonso',
-        'Esteban Ocon': 'ocon',
-        'Pierre Gasly': 'gasly',
-        'Alexander Albon': 'albon',
-        'Logan Sargeant': 'sargeant',
-        'Daniel Ricciardo': 'ricciardo',
-        'Yuki Tsunoda': 'tsunoda',
-        'Valtteri Bottas': 'bottas',
-        'Zhou Guanyu': 'zhou',
-        'Kevin Magnussen': 'kevin_magnussen',
-        'Nico Hulkenberg': 'hulkenberg',
-        'Oliver Bearman': 'bearman',
-        'Franco Colapinto': 'colapinto',
-        'Jack Doohan': 'doohan',
-        'Liam Lawson': 'lawson',
-        'Andrea Kimi Antonelli': 'antonelli'
-    },
-    2025: {
-        'Oscar Piastri': 'piastri',
-        'Lando Norris': 'norris',
-        'Charles Leclerc': 'leclerc',
-        'Lewis Hamilton': 'hamilton',
-        'Max Verstappen': 'max_verstappen',
-        'Liam Lawson': 'lawson',
-        'George Russell': 'russell',
-        'Andrea Kimi Antonelli': 'antonelli',
-        'Kimi Antonelli': 'antonelli',
-        'Lance Stroll': 'stroll',
-        'Fernando Alonso': 'alonso',
-        'Pierre Gasly': 'gasly',
-        'Jack Doohan': 'doohan',
-        'Esteban Ocon': 'ocon',
-        'Oliver Bearman': 'bearman',
-        'Isack Hadjar': 'hadjar',
-        'Yuki Tsunoda': 'tsunoda',
-        'Alexander Albon': 'albon',
-        'Carlos Sainz': 'sainz',
-        'Nico Hulkenberg': 'hulkenberg',
-        'Gabriel Bortoleto': 'bortoleto',
-        'Garbiel Bortoleto': 'bortoleto',  # Typo in entry list in 2025 Australian
-        'Franco Colapinto': 'colapinto'
-    }
-}
 TEAMS = {
     2023: {
         'Red Bull Racing Honda RBPT': 'red_bull',
@@ -114,6 +37,19 @@ TEAMS = {
         'Racing Bulls Honda RBPT': 'rb',
         'Williams Mercedes': 'williams',
         'Kick Sauber Ferrari': 'sauber'
+    },
+    2026: {
+        'McLaren Mercedes': 'mclaren',
+        'Mercedes': 'mercedes',
+        'Red Bull Racing Red Bull Ford': 'red_bull',
+        'Ferrari': 'ferrari',
+        'Atlassian Williams Mercedes': 'williams',
+        'Racing Bulls Red Bull Ford': 'rb',
+        'Aston Martin Aramco Honda': 'aston_martin',
+        'Haas Ferrari': 'haas',
+        'Audi': 'audi',
+        'Alpine Mercedes': 'alpine',
+        'Cadillac Ferrari': 'cadillac'
     }
 }
 
@@ -133,9 +69,137 @@ QUALI_DRIVERS = {
         1: float('inf'),
         2: 15,
         3: 10
+    },
+    2026: {
+        1: float('inf'),
+        2: 16,
+        3: 10
+    }
+}
+
+# Regular drivers in each season
+REGULAR_DRIVERS = {
+    2023: {
+        'max verstappen': 'max_verstappen',
+        'sergio perez': 'perez',
+        'charles leclerc': 'leclerc',
+        'carlos sainz': 'sainz',
+        'george russell': 'russell',
+        'lewis hamilton': 'hamilton',
+        'esteban ocon': 'ocon',
+        'pierre gasly': 'gasly',
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'valtteri bottas': 'bottas',
+        'zhou guanyu': 'zhou',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'kevin magnussen': 'kevin_magnussen',
+        'nico hulkenberg': 'hulkenberg',
+        'daniel ricciardo': 'ricciardo',
+        'yuki tsunoda': 'tsunoda',
+        'alexander albon': 'albon',
+        'logan sargeant': 'sargeant',
+        'nyck de vries': 'de_vries',
+        'liam lawson': 'lawson'
+    },
+    2024: {
+        'max verstappen': 'max_verstappen',
+        'sergio perez': 'perez',
+        'george russell': 'russell',
+        'lewis hamilton': 'hamilton',
+        'charles leclerc': 'leclerc',
+        'carlos sainz': 'sainz',
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'esteban ocon': 'ocon',
+        'pierre gasly': 'gasly',
+        'alexander albon': 'albon',
+        'logan sargeant': 'sargeant',
+        'daniel ricciardo': 'ricciardo',
+        'yuki tsunoda': 'tsunoda',
+        'valtteri bottas': 'bottas',
+        'zhou guanyu': 'zhou',
+        'kevin magnussen': 'kevin_magnussen',
+        'nico hulkenberg': 'hulkenberg',
+        'oliver bearman': 'bearman',
+        'franco colapinto': 'colapinto',
+        'jack doohan': 'doohan',
+        'liam lawson': 'lawson',
+        'andrea kimi antonelli': 'antonelli'
+    },
+    2025: {
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'charles leclerc': 'leclerc',
+        'lewis hamilton': 'hamilton',
+        'max verstappen': 'max_verstappen',
+        'liam lawson': 'lawson',
+        'george russell': 'russell',
+        'andrea kimi antonelli': 'antonelli',
+        'kimi antonelli': 'antonelli',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'pierre gasly': 'gasly',
+        'jack doohan': 'doohan',
+        'esteban ocon': 'ocon',
+        'oliver bearman': 'bearman',
+        'isack hadjar': 'hadjar',
+        'yuki tsunoda': 'tsunoda',
+        'alexander albon': 'albon',
+        'carlos sainz': 'sainz',
+        'nico hulkenberg': 'hulkenberg',
+        'gabriel bortoleto': 'bortoleto',
+        'garbiel bortoleto': 'bortoleto',  # typo in entry list in 2025 australian
+        'franco colapinto': 'colapinto'
+    },
+    2026: {
+        'oscar piastri': 'piastri',
+        'lando norris': 'norris',
+        'george russell': 'russell',
+        'andrea kimi antonelli': 'antonelli',
+        'kimi antonelli': 'antonelli',
+        'max verstappen': 'max_verstappen',
+        'isack hadjar': 'hadjar',
+        'charles leclerc': 'leclerc',
+        'lewis hamilton': 'hamilton',
+        'alexander albon': 'albon',
+        'carlos sainz': 'sainz',
+        'arvid lindblad': 'arvid_lindblad',
+        'liam lawson': 'lawson',
+        'lance stroll': 'stroll',
+        'fernando alonso': 'alonso',
+        'esteban ocon': 'ocon',
+        'oliver bearman': 'bearman',
+        'nico hulkenberg': 'hulkenberg',
+        'gabriel bortoleto': 'bortoleto',
+        'garbiel bortoleto': 'bortoleto',  # Typo in entry list in 2025 australian
+        'pierre gasly': 'gasly',
+        'franco colapinto': 'colapinto',
+        'sergio perez': 'perez',
+        'valtteri bottas': 'bottas'
     }
 }
 
 
-if __name__ == '__name__':
+# Best DPI for PDF parsing
+DPI = 600
+
+# Expected cols. in the PDFs
+EXPECTED_COLS: dict[str, dict[str, set]] = {
+    'entry_list': {
+        'required': {'no.', 'constructor'},
+        'optional': {'tla', 'driver', 'nat', 'team'}
+    },
+    'fp': {
+        'required': {'no', 'driver', 'nat', 'entrant', 'time', 'laps', 'gap', 'int', 'km/h',
+                     'time of day'},
+        'optional': {}
+    }
+}
+
+
+if __name__ == '__main__':
     pass
