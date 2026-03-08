@@ -19,7 +19,6 @@
     ]
 }
 """
-
 from jolpica.schemas import data_import
 from pydantic import ConfigDict
 

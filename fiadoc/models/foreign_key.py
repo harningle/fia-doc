@@ -11,24 +11,12 @@ class SessionValidatorMixin:
     @classmethod
     def clean_session(cls, session: str) -> str:
         match session.lower().strip():
-            case (
-                "r"
-                | "q1"
-                | "q2"
-                | "q3"
-                | "sr"
-                | "sq1"
-                | "sq2"
-                | "sq3"
-                | "fp1"
-                | "fp2"
-                | "fp3"
-            ):
+            case 'r' | 'q1' | 'q2' | 'q3' | 'sr' | 'sq1' | 'sq2' | 'sq3' | 'fp1' | 'fp2' | 'fp3':
                 return session.upper()
-            case "race":  # Some simple mapping
-                return "R"
-            case "sprint" | "sprint_race" | "sprint race":
-                return "SR"
+            case 'race':  # Some simple mapping
+                return 'R'
+            case 'sprint' | 'sprint_race' | 'sprint race':
+                return 'SR'
             case _:
                 raise ValueError(
                     f'Invalid session: {session}. Must be one of: "R", "Q1", "Q2",'
