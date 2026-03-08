@@ -118,7 +118,7 @@ class Drivers:
                 if driver['driverId'].lower() == 'zhou':  # Exception for ZHOU Guanyu
                     full_name = 'Zhou Guanyu'
                 else:
-                    full_name = f'{driver['givenName']} {driver['familyName']}'
+                    full_name = f'{driver["givenName"]} {driver["familyName"]}'
                 drivers[full_name.lower()] = driver['driverId']
 
             offset += limit

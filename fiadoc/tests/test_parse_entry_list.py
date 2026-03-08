@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 import pytest
 import requests_mock
 
+os.environ['FIADOC_CACHE_DIR'] = TemporaryDirectory().name
+
 from fiadoc.drivers import BASE_URL
 from fiadoc.parser import EntryListParser
 from fiadoc.utils import download_pdf, sort_json
@@ -90,8 +92,6 @@ race_list = [
 ]
 # Not going to test year 2023 for entry list, as their PDF format is different, and we are not
 # interested in retrospectively parsing old entry list PDFs
-
-os.environ['FIADOC_CACHE_DIR'] = TemporaryDirectory().name
 
 
 @pytest.fixture

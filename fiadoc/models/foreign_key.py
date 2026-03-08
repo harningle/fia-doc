@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """Frequently used foreign key models for the data objects"""
-from typing import Self
-
 from jolpica.schemas import data_import
 from pydantic import ConfigDict, field_validator, model_validator
 
@@ -48,37 +46,26 @@ class PitStopForeignKeys(data_import.PitStopForeignKeys, SessionValidatorMixin):
     model_config = ConfigDict(extra='forbid')
 
 
-class RoundEntryForeignKeys(data_import.RoundEntryForeignKeys):
+class TeamReferenceValidatorMixin:
     @model_validator(mode='before')
-    def get_team_reference(self) -> Self:
-        if self['year'] in TEAMS:
-            if self['team_reference'] in TEAMS[self['year']]:
-                self['team_reference'] = TEAMS[self['year']][self['team_reference']]
-                return self
+    @classmethod
+    def get_team_reference(cls, data: dict) -> dict:
+        if data['year'] in TEAMS:
+            if data['team_reference'] in TEAMS[data['year']]:
+                data['team_reference'] = TEAMS[data['year']][data['team_reference']]
+                return data
             else:
                 raise ValueError(
-                    f"team {self['team_reference']} not found in year {self['year']}'s team name "
-                    f"mapping. Available teams: {TEAMS[self['year']].keys()}"
+                    f"team {data['team_reference']} not found in year {data['year']}'s team name "
+                    f"mapping. Available teams: {TEAMS[data['year']].keys()}"
                 )
         else:
-            raise ValueError(f'year {self["year"]} not supported. Available years: {TEAMS.keys()}')
+            raise ValueError(f'year {data["year"]} not supported. Available years: {TEAMS.keys()}')
 
+
+class RoundEntryForeignKeys(data_import.RoundEntryForeignKeys, TeamReferenceValidatorMixin):
     model_config = ConfigDict(extra='forbid')
 
 
-class TeamDriverForeignKeys(data_import.TeamDriverForeignKeys):
-    @model_validator(mode='before')
-    def get_team_reference(self) -> Self:
-        if self['year'] in TEAMS:
-            if self['team_reference'] in TEAMS[self['year']]:
-                self['team_reference'] = TEAMS[self['year']][self['team_reference']]
-                return self
-            else:
-                raise ValueError(
-                    f"team {self['team_reference']} not found in year {self['year']}'s team name "
-                    f"mapping. Available teams: {TEAMS[self['year']].keys()}"
-                )
-        else:
-            raise ValueError(f'year {self["year"]} not supported. Available years: {TEAMS.keys()}')
-
+class TeamDriverForeignKeys(data_import.TeamDriverForeignKeys, TeamReferenceValidatorMixin):
     model_config = ConfigDict(extra='forbid')

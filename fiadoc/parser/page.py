@@ -18,10 +18,13 @@ from paddleocr import PaddleOCR
 
 from .._constants import DPI
 
-OCR = PaddleOCR(lang='en',
-                use_doc_orientation_classify=False,
-                use_doc_unwarping=False,
-                use_textline_orientation=False)  # TODO: lazy init.
+# Strikeout line location: it shouldn't be too close to the top or bottom of the text bbox
+STRIKEOUT_LINE_MARGIN = 0.2
+
+# Allow apostrophe
+printable += '‘’'  # For names like "O’ward", where we want to keep "’"
+
+_OCR_INSTANCE: Optional[PaddleOCR] = None  # For lazy init.
 
 # Common OCR mistakes
 # TODO: very fragile...
@@ -35,11 +38,18 @@ OCR_ERRORS = {
     '↓': '1'
 }
 
-# Strikeout line location: it shouldn't be too close to the top or bottom of the text bbox
-STRIKEOUT_LINE_MARGIN = 0.2
 
-# Allow apostrophe
-printable += '‘’'  # For names like "O’ward", where we want to keep "’"
+def get_ocr_instance():
+    """Initialises and returns a singleton PaddleOCR instance"""
+    global _OCR_INSTANCE
+    if _OCR_INSTANCE is None:
+        _OCR_INSTANCE = PaddleOCR(
+            lang='en',
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False
+        )
+    return _OCR_INSTANCE
 
 
 class Page:
@@ -89,7 +99,7 @@ class Page:
                                                            dtype=np.uint8)
                                              .reshape((pixmap.height, pixmap.width, 3))
                                              .copy())
-        ocr_results = OCR.predict(pixmap_arr)[0]
+        ocr_results = get_ocr_instance().predict(pixmap_arr)[0]
         ocr_results = zip(ocr_results['rec_boxes'], ocr_results['rec_texts'])
 
         # Because of the DPI, the bounding boxes of texts after OCR may not be in the same
@@ -363,7 +373,7 @@ class Page:
         pixmap_arr[np.all(pixmap_arr >= 200, axis=2)] = 255  # noqa: PLR2004
 
         # OCR the clipped area
-        match OCR.predict(pixmap_arr):
+        match get_ocr_instance().predict(pixmap_arr):
             case []:
                 return []
             case [dict() as ocr_results]:
@@ -582,19 +592,19 @@ class Page:
 
                 # Need to check if the found text is indeed in the cell's bbox. PyMuPDF is
                 # notoriously bad for NOT respecting the `clip` parameter
-                for k in range(len(textblocks) - 1, -1, -1):  # TODO: bad practice
-                    bbox = textblocks[k].bbox
-                    # Drop text outside the cell bbox
+                valid_tbs: list[TextBlock] = []
+                for tb in textblocks:
+                    bbox = tb.bbox
                     if (bbox[0] < l - tol) or (bbox[1] < t - tol) or (bbox[2] > r + tol) \
                             or (bbox[3] > b + tol):
                         warnings.warn(f'Text found outside the cell bbox on {page_no_str}. Cell '
-                                      f'bbox = {cell_bbox_str}. Text found = {textblocks[k]}. '
-                                      f'Ignoring it')
-                        textblocks.pop(k)
+                                      f'bbox = {cell_bbox_str}. Text found = {tb}. Ignoring it')
+                    else:
+                        valid_tbs.append(tb)
 
                 # If we had something before, but after filtering out the out-of-bbox texts, now
                 # nothing is left, this is an error
-                if not textblocks:
+                if not valid_tbs:
                     raise ParsingError(f'Found text outside the cell bbox on {page_no_str}, and '
                                        f'no valid text left after removing them. Row #. = {i}, '
                                        f'col. #. = {j}. Cell bbox = {cell_bbox_str}')
@@ -602,16 +612,16 @@ class Page:
                 # Should only have one textblock in a cell, unless `allow_multiple_texts_per_cell`
                 # includes this col.
                 if allow_multiple_texts_per_cell and (j in allow_multiple_texts_per_cell):
-                    row.append(textblocks)
+                    row.append(valid_tbs)
                     continue
                 # If this col. is not in `allow_multiple_texts_per_cell`, but we found multiple
                 # texts, raise an error
-                if len(textblocks) > 1:
+                if len(valid_tbs) > 1:
                     raise ParsingError(f'Found multiple texts in one cell on {page_no_str}. Row '
                                        f'#. = {i}, col. #. = {j}. Cell bbox = {cell_bbox_str}. '
-                                       f'Texts found = {textblocks}')
+                                       f'Texts found = {valid_tbs}')
                 # Normal case will reach here
-                row.append(textblocks[0])
+                row.append(valid_tbs[0])
             cells.append(row)
 
         if header_included:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Test the parser against all PDFs in 2024. This assumes we have PDFs stored in `data/pdf` folder,
-and have the naming convention of:
+Test the parser against all local PDFs. This covers all PDFs stored in `data/pdf` folder, w/ the
+naming convention of:
 
 1. entry list: <year>_<round>_(revised or corrected_)entry_list.pdf
 2. quali.: <year>_<round>_quali_<final or provisional>_classification.pdf and

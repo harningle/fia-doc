@@ -95,7 +95,7 @@ ignore = [
   "PLR0912",  # TODO: skip too many branches or statements or func. args. for now. Need to refactor
   "PLR0915",
   "PLR0913",
-  "PLR1714",  # Write out all comparisons for readability"PLW1641",  # No need hash for objects
+  "PLR1714",  # Write out all comparisons for readability
   "PLW1641",  # No need hash for object
   "UP009",    # UTF-8 encoding
   "UP007",    # I prefer `Optional[xxx]` over xxx | None
