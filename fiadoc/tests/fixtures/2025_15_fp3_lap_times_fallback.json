@@ -1,0 +1,402 @@
+[
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 4,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 68972
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 81,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 69214
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 63,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 69858
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 55,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 69913
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 1,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 69925
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 16,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 69938
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 23,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70099
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 18,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70103
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 6,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70166
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 14,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70232
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 30,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70300
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 22,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70349
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 5,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70361
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 44,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70373
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 87,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70595
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 27,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70599
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 12,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70697
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 31,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70801
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 10,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 70963
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    },
+    {
+        "object_type": "Lap",
+        "foreign_keys": {
+            "year": 2025,
+            "round": 15,
+            "car_number": 43,
+            "session": "FP3"
+        },
+        "objects": [
+            {
+                "number": null,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 71054
+                },
+                "is_entry_fastest_lap": true,
+                "is_deleted": false
+            }
+        ]
+    }
+]
