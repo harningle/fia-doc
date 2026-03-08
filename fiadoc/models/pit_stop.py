@@ -19,8 +19,7 @@
     ]
 }
 """
-
-from jolpica_schemas import data_import
+from jolpica.schemas import data_import
 from pydantic import ConfigDict
 
 from .foreign_key import PitStopForeignKeys
@@ -29,7 +28,7 @@ from .foreign_key import PitStopForeignKeys
 class PitStopObject(data_import.PitStopObject):
     duration: dict[str, str | int]
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class PitStopData(
@@ -38,4 +37,4 @@ class PitStopData(
     foreign_keys: PitStopForeignKeys
     objects: list[PitStopObject]
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')

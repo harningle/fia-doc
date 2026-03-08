@@ -278,5 +278,209 @@
                 "car_number": 5
             }
         ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "frederik_vesti",
+            "team_reference": "mercedes",
+            "round": 4
+        },
+        "objects": [
+            {
+                "car_number": 72
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "felipe_drugovich",
+            "team_reference": "aston_martin",
+            "round": 4
+        },
+        "objects": [
+            {
+                "car_number": 34
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "dino_beganovic",
+            "team_reference": "ferrari",
+            "round": 4
+        },
+        "objects": [
+            {
+                "car_number": 38
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "ayumu_iwasa",
+            "team_reference": "red_bull",
+            "round": 4
+        },
+        "objects": [
+            {
+                "car_number": 37
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "luke_browning",
+            "team_reference": "williams",
+            "round": 4
+        },
+        "objects": [
+            {
+                "car_number": 46
+            }
+        ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "ryo_hirakawa",
+            "team_reference": "haas",
+            "round": 4
+        },
+        "objects": [
+            {
+                "car_number": 50
+            }
+        ]
+    },
+    {
+        "object_type": "Driver",
+        "foreign_keys": {},
+        "objects": [
+            {
+                "reference": "frederik_vesti",
+                "forename": "Frederik",
+                "surname": "Vesti",
+                "country_code": "DEN"
+            },
+            {
+                "reference": "felipe_drugovich",
+                "forename": "Felipe",
+                "surname": "Drugovich",
+                "country_code": "BRA"
+            },
+            {
+                "reference": "dino_beganovic",
+                "forename": "Dino",
+                "surname": "Beganovic",
+                "country_code": "SWE"
+            },
+            {
+                "reference": "ayumu_iwasa",
+                "forename": "Ayumu",
+                "surname": "Iwasa",
+                "country_code": "JPN"
+            },
+            {
+                "reference": "luke_browning",
+                "forename": "Luke",
+                "surname": "Browning",
+                "country_code": "GBR"
+            },
+            {
+                "reference": "ryo_hirakawa",
+                "forename": "Ryo",
+                "surname": "Hirakawa",
+                "country_code": "JPN"
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "frederik_vesti",
+            "team_reference": "mercedes",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "felipe_drugovich",
+            "team_reference": "aston_martin",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "dino_beganovic",
+            "team_reference": "ferrari",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "ayumu_iwasa",
+            "team_reference": "red_bull",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "luke_browning",
+            "team_reference": "williams",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "ryo_hirakawa",
+            "team_reference": "haas",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
     }
 ]

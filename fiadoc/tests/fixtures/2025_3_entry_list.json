@@ -278,5 +278,44 @@
                 "car_number": 5
             }
         ]
+    },
+    {
+        "object_type": "RoundEntry",
+        "foreign_keys": {
+            "year": 2025,
+            "driver_reference": "ryo_hirakawa",
+            "team_reference": "alpine",
+            "round": 3
+        },
+        "objects": [
+            {
+                "car_number": 62
+            }
+        ]
+    },
+    {
+        "object_type": "Driver",
+        "foreign_keys": {},
+        "objects": [
+            {
+                "reference": "ryo_hirakawa",
+                "forename": "Ryo",
+                "surname": "Hirakawa",
+                "country_code": "JPN"
+            }
+        ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "driver_reference": "ryo_hirakawa",
+            "team_reference": "alpine",
+            "year": 2025
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
     }
 ]
