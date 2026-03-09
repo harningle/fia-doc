@@ -1568,6 +1568,64 @@ class RaceParser(BaseParser):
         #       No. as 1, 2, 3, ... for each driver?
         return df
 
+    @staticmethod
+    def _group_words_by_line(words: list[tuple], y_tol: float = 1.0) -> list[list[tuple]]:
+        """Group word tuples into visual lines based on their top y-position."""
+        lines: list[list[tuple]] = []
+        for word in sorted(words, key=lambda x: (x[1], x[0])):
+            if (not lines) or abs(word[1] - lines[-1][0][1]) > y_tol:
+                lines.append([word])
+            else:
+                lines[-1].append(word)
+        return [sorted(line, key=lambda x: x[0]) for line in lines]
+
+    def _parse_lap_chart_overflow_page(
+            self,
+            page: Page,
+            t_table_header: float,
+            b_table: float
+    ) -> pd.DataFrame:
+        """Parse continuation pages that only contain overflow positions like 21 and 22."""
+        words = page.get_text('words', clip=(0, t_table_header, page.w, b_table))
+        words = [(w.bbox[0], w.bbox[1], w.bbox[2], w.bbox[3], w.text) for w in words]
+        lines = self._group_words_by_line(words)
+
+        cols: Optional[list[str]] = None
+        col_centres: dict[str, float] = {}
+        rows: list[dict[str, str | None]] = []
+        for line in lines:
+            texts = [w[4] for w in line]
+            if not texts or texts[0] == 'Page':
+                continue
+
+            if cols is None:
+                if texts[0] != 'POS':
+                    continue
+                cols = ['POS', *texts[1:]]
+                col_centres = {w[4]: (w[0] + w[2]) / 2 for w in line[1:]}
+                continue
+
+            if texts[0] == 'GRID':
+                label = 'GRID'
+                data_words = line[1:]
+            elif texts[0] == 'LAP' and len(texts) >= 2:
+                label = f'LAP {texts[1]}'
+                data_words = line[2:]
+            else:
+                continue
+
+            row = {'POS': label} | {col: None for col in cols[1:]}
+            for word in data_words:
+                centre = (word[0] + word[2]) / 2
+                nearest_col = min(col_centres, key=lambda col: abs(centre - col_centres[col]))
+                row[nearest_col] = word[4]
+            rows.append(row)
+
+        if cols is None:
+            raise ParsingError(f'Cannot detect overflow lap chart cols. on p.{page.number} in '
+                               f'{page.file}')
+        return pd.DataFrame(rows, columns=cols)
+
     def _parse_lap_chart(self) -> pd.DataFrame:
         doc = pymupdf.open(self.lap_chart_file)
         dfs = []
@@ -1593,99 +1651,98 @@ class RaceParser(BaseParser):
                 raise ParsingError(f'Cannot find any black line below the table header '
                                    f'on {page_no_str}')
 
-            # Table bottom is a white strip
-            """
-            A white strip of any height is fine. Because the table always has a black vertical line
-            between col. 0 and col. 1, so there is no white strip at all in the table. Any white
-            strip must indicate the end of the table.
-            """
-            if white_strips := page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
-                                                            height=1):
-                b_table = white_strips[0] + 1
+            if len(black_lines) == 1:
+                # Overflow pages only contain the left label column plus overflow positions.
+                df = self._parse_lap_chart_overflow_page(page, t_table_header, black_lines[0] - 1)
             else:
-                doc.close()
-                raise ParsingError(f'Cannot find any white strip below the table on {page_no_str}')
-
-            # Get cols.
-            cols = self._detect_cols(page,
-                                     clip=(0, t_table_header, page.w, t_table_body - 1),
-                                     col_min_gap=3,  # Col. names are quite far from each other
-                                     min_black_line_length=0.5)
-            if len(cols) <= 1:
-                doc.close()
-                raise ParsingError(f'Expected at least two cols. on {page_no_str}. Found: {cols}')
-            if cols[0].text != 'POS':
-                doc.close()
-                raise ParsingError(f'Expected "POS" to be the zero-th col. on {page_no_str}. '
-                                   f'Found: {cols[0]}')
-            for i in range(1, len(cols)):
-                if not re.match(r'^\d+$', cols[i].text):
+                # Table bottom is a white strip
+                """
+                A white strip of any height is fine. Because the table always has a black vertical
+                line between col. 0 and col. 1, so there is no white strip at all in the table.
+                Any white strip must indicate the end of the table.
+                """
+                if white_strips := page.search_for_white_strips(
+                        clip=(0, t_table_body, page.w, page.h),
+                        height=1
+                ):
+                    b_table = white_strips[0] + 1
+                else:
                     doc.close()
-                    raise ParsingError(f'Expected the {i}-th col. to be a number on '
-                                       f'{page_no_str}. Found: {cols[i]}')
+                    raise ParsingError(f'Cannot find any white strip below the table on '
+                                       f'{page_no_str}')
 
-            # Find a black vertical line below the black horizontal line above. This separates the
-            # zero-th col. and the first col.
-            """
-            `Page.search_for_black_lines` is for horizontal lines only. So to search for vertical
-            lines, we rotate the page, i.e. applying [[0, -1], [1, 0]].
-            """
-            page.set_rotation(270)
-            black_lines = page.search_for_black_lines(clip=(t_table_body, 0, b_table, page.w),
-                                                      min_length=0.7)
-            black_lines = [page.w - i for i in black_lines]  # Transpose back
-            page.set_rotation(0)
-            if len(black_lines) != 1:
-                raise ParsingError(f'Cannot find or find multiple vertical black lines below the '
-                                   f'table header on {page_no_str}: {black_lines}')
-            l_first_col = black_lines[0]
-            vlines = [0,
-                      l_first_col,
-                      *[(cols[i].r + cols[i + 1].l) / 2 for i in range(1, len(cols) - 1)],
-                      cols[-1].r + 1]
+                # Get cols.
+                cols = self._detect_cols(page,
+                                         clip=(0, t_table_header, page.w, t_table_body - 1),
+                                         col_min_gap=3,
+                                         min_black_line_length=0.5)
+                if len(cols) <= 1:
+                    doc.close()
+                    raise ParsingError(f'Expected at least two cols. on {page_no_str}. Found: '
+                                       f'{cols}')
+                if cols[0].text != 'POS':
+                    doc.close()
+                    raise ParsingError(f'Expected "POS" to be the zero-th col. on {page_no_str}. '
+                                       f'Found: {cols[0]}')
+                for i in range(1, len(cols)):
+                    if not re.match(r'^\d+$', cols[i].text):
+                        doc.close()
+                        raise ParsingError(f'Expected the {i}-th col. to be a number on '
+                                           f'{page_no_str}. Found: {cols[i]}')
 
-            # Locate rows by POS col.
-            """
-            There is no background colour to indicate the rows, so we brute force the row positions
-            by looking at "POS" col., i.e. the positions of "GRID", "LAP 1", "LAP 2", etc. We can
-            transpose the page and then use `._detect_cols` to get the positions. We don't care
-            about the text, because the page is transposed, so of course the texts will be wrong,
-            but the positions of the text are correct. We use a small `col_min_gap`, because after
-            transpose, the char. width will become char. height, so the gap needs to be adjusted
-            accordingly.
-            """
-            page.set_rotation(270)
-            rows = self._detect_cols(
-                page,
-                clip=(t_table_body + 1, page.w - l_first_col - 1, b_table, page.w),
-                col_min_gap=0.3
-            )
-            page.set_rotation(0)
-            if not rows:
-                doc.close()
-                raise ParsingError(f'Cannot detect any rows in the zero-th col. on {page_no_str}')
-            hlines = [t_table_body,
-                      *[(rows[i].r + rows[i + 1].l) / 2 for i in range(len(rows) - 1)],
-                      b_table]
+                # Find a black vertical line below the black horizontal line above. This separates
+                # the zero-th col. and the first col.
+                page.set_rotation(270)
+                black_lines = page.search_for_black_lines(clip=(t_table_body, 0, b_table, page.w),
+                                                          min_length=0.7)
+                black_lines = [page.w - i for i in black_lines]
+                page.set_rotation(0)
+                if len(black_lines) != 1:
+                    raise ParsingError(f'Cannot find or find multiple vertical black lines below '
+                                       f'the table header on {page_no_str}: {black_lines}')
+                l_first_col = black_lines[0]
+                vlines = [0,
+                          l_first_col,
+                          *[(cols[i].r + cols[i + 1].l) / 2 for i in range(1, len(cols) - 1)],
+                          cols[-1].r + 1]
 
-            # Parse the table
-            df = page.parse_table_by_grid(vlines=vlines,
-                                          hlines=hlines,
-                                          header_included=False,
-                                          tol=3)
-            df = df.map(self._normalise_textblock)
+                # Locate rows by POS col.
+                page.set_rotation(270)
+                rows = self._detect_cols(
+                    page,
+                    clip=(t_table_body + 1, page.w - l_first_col - 1, b_table, page.w),
+                    col_min_gap=0.3
+                )
+                page.set_rotation(0)
+                if not rows:
+                    doc.close()
+                    raise ParsingError(f'Cannot detect any rows in the zero-th col. on '
+                                       f'{page_no_str}')
+                hlines = [t_table_body,
+                          *[(rows[i].r + rows[i + 1].l) / 2 for i in range(len(rows) - 1)],
+                          b_table]
 
-            # Reshape to long format, where a row is (lap, driver, position)
-            df.columns = [i.text for i in cols]
-            df.index.name = None
+                # Parse the table
+                df = page.parse_table_by_grid(vlines=vlines,
+                                              hlines=hlines,
+                                              header_included=False,
+                                              tol=3)
+                df = df.map(self._normalise_textblock)
+                df.columns = [i.text for i in cols]
+                df.index.name = None
             if (df.POS == 'GRID').any():
-                self.starting_grid = (df[df.POS == 'GRID']
-                                      .drop(columns='POS')
-                                      .T
-                                      .reset_index()
-                                      .rename(columns={'index': 'starting_grid', 0: 'car_no'}))
-                self.starting_grid.car_no = self.starting_grid.car_no.astype(int)
-                self.starting_grid.starting_grid = self.starting_grid.starting_grid.astype(int)
+                starting_grid = (df[df.POS == 'GRID']
+                                 .drop(columns='POS')
+                                 .T
+                                 .reset_index()
+                                 .rename(columns={'index': 'starting_grid', 0: 'car_no'}))
+                starting_grid.car_no = starting_grid.car_no.astype(int)
+                starting_grid.starting_grid = starting_grid.starting_grid.astype(int)
+                if self.__dict__.get('starting_grid') is None:
+                    self.starting_grid = starting_grid
+                else:
+                    self.starting_grid = pd.concat([self.starting_grid, starting_grid],
+                                                   ignore_index=True)
                 df = df[df.POS != 'GRID']
             df.POS = df.POS.str.removeprefix('LAP ').astype(int)
             df = (df.set_index('POS')
