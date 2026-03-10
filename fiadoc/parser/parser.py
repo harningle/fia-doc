@@ -42,6 +42,7 @@ DRIVERS = Drivers(cache_dir=os.environ.get('FIADOC_CACHE_DIR', None))
 WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
 LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
                    # considered to be the same line
+LAP_LABEL_PARTS = 2
 
 
 class BaseParser:
@@ -1608,7 +1609,7 @@ class RaceParser(BaseParser):
             if texts[0] == 'GRID':
                 label = 'GRID'
                 data_words = line[1:]
-            elif texts[0] == 'LAP' and len(texts) >= 2:
+            elif texts[0] == 'LAP' and len(texts) >= LAP_LABEL_PARTS:
                 label = f'LAP {texts[1]}'
                 data_words = line[2:]
             else:
