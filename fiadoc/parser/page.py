@@ -41,7 +41,8 @@ OCR_ERRORS = {
 
 def get_ocr_instance():
     """Initialises and returns a singleton PaddleOCR instance"""
-    global _OCR_INSTANCE
+    # TODO: don't use global
+    global _OCR_INSTANCE  # noqa: PLW0603
     if _OCR_INSTANCE is None:
         _OCR_INSTANCE = PaddleOCR(
             lang='en',
@@ -82,7 +83,7 @@ class Page:
             tol: Optional[float] = 2,
             dpi: Optional[int] = DPI,
             **kwargs
-    ) -> list['BBox']:
+    ) -> list['TextBlock']:
         """`pymupdf.Page.search_for`, with OCR"""
         # Usual search
         if results := self._pymupdf_page.search_for(text, **kwargs):
@@ -113,10 +114,10 @@ class Page:
             )
         ) for i in ocr_results]
 
-        found = [i.bbox for i in ocr_results if text.lower() in i.text.lower()]
-        found = [pymupdf.Rect(i) for i in found
-                 if i[0] > clip[0] - tol and i[1] > clip[1] - tol
-                 and i[2] < clip[2] + tol and i[3] < clip[3] + tol]
+        found = [i for i in ocr_results
+                 if text.lower() in i.text.lower()
+                 and i.bbox[0] > clip[0] - tol and i.bbox[1] > clip[1] - tol
+                 and i.bbox[2] < clip[2] + tol and i.bbox[3] < clip[3] + tol]
         return found
 
     @staticmethod
@@ -148,6 +149,7 @@ class Page:
     def _native_get_text(
             self,
             option: Literal['text', 'words', 'blocks', 'dict'] = 'text',
+            small_area: bool = False,
             **kwargs
     ) -> list['TextBlock']:
         """
@@ -203,7 +205,9 @@ class Page:
                 case 2:
                     # Edge case: Antonelli's name may be wrapped into two lines, so we have two
                     # textblocks here, both of which are normal text
-                    if any(n in span['text'].lower()
+                    # Or if we specify `small_area`, then joins everything, no matter superscript
+                    # or not, into one textblock
+                    if small_area or any(n in span['text'].lower()
                            for span in spans
                            for n in ['andrea kimi', 'antonelli']):
                         return [TextBlock(text=' '.join(span['text'].strip() for span in spans),
@@ -321,7 +325,7 @@ class Page:
             raise NotImplementedError('`expected` is not supported yet')
 
         # Try simple search first
-        if results := self._native_get_text(option, clip=clip, **kwargs):
+        if results := self._native_get_text(option, clip=clip, small_area=small_area, **kwargs):
             return results
         logging.debug('No text found natively. Proceed with OCR')
 
@@ -583,7 +587,13 @@ class Page:
                 cell_bbox_str = f'({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f})'  # For error/warnings
 
                 # Get text inside the cell defined by (l, t, r, b)
-                textblocks = self.get_text('dict', clip=(l, t, r, b))
+                if allow_multiple_texts_per_cell and (j in allow_multiple_texts_per_cell):
+                    # If allow multiple text blocks in this cell, then use `small_area` to join all
+                    # found text blocks into one
+                    textblocks = self.get_text('dict', clip=(l, t, r, b), small_area=True)
+                else:
+                    textblocks = self.get_text('dict', clip=(l, t, r, b))
+
                 if not textblocks:
                     # OK to have an empty cell, e.g. the pit col. in quali. lap times PDF should be
                     # empty for non-stop laps
@@ -893,7 +903,7 @@ class TextBlock:
     def text(self, value: str):
         if not isinstance(value, str):
             raise TypeError(f'Invalid `text`: {value}. Expected a string')
-        self._text = value
+        self._text = value.strip()
 
     @property
     def bbox(self) -> Optional[BBox]:

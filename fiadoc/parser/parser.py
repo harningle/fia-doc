@@ -1070,9 +1070,10 @@ class RaceParser(BaseParser):
     def __init__(
             self,
             classification_file: str | os.PathLike,
-            lap_analysis_file: str | os.PathLike,
-            history_chart_file: str | os.PathLike,
-            lap_chart_file: str | os.PathLike,
+            lap_analysis_file: Optional[str | os.PathLike],
+            history_chart_file: Optional[str | os.PathLike],
+            lap_chart_file: Optional[str | os.PathLike],
+            sector_analysis_file: Optional[str | os.PathLike],
             year: int,
             round_no: int,
             session: RaceSessionT
@@ -1081,21 +1082,12 @@ class RaceParser(BaseParser):
         self.lap_analysis_file = lap_analysis_file
         self.history_chart_file = history_chart_file
         self.lap_chart_file = lap_chart_file
+        self.sector_analysis_file = sector_analysis_file
         self.session = session
         self.year = year
         self.round_no = round_no
         self._check_session()
         # self._cross_validate()
-
-    @cached_property
-    def is_pdf_complete(self) -> bool:
-        """Check if we have all lap times PDFs. If not, won't be able to get lap times df"""
-        if self.classification_file is None:
-            raise FileNotFoundError("Classification PDF is missing. Can't parse anything")
-        if (self.lap_analysis_file is None or self.history_chart_file is None
-                or self.lap_chart_file is None):
-            return False
-        return True
 
     @cached_property
     def classification_df(self) -> pd.DataFrame:
@@ -1111,17 +1103,13 @@ class RaceParser(BaseParser):
 
         TODO: refactor
         """
-        if not self.is_pdf_complete:
-            raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
-                                    "parse starting grid or lap times")
+        if not self.lap_chart_file:
+            raise FileNotFoundError('Lap chart PDF is missing. Cannot get starting grid')
         _ = self.lap_times_df
         return self.starting_grid
 
     @cached_property
     def lap_times_df(self) -> pd.DataFrame:
-        if not self.is_pdf_complete:
-            raise FileNotFoundError("Lap chart, history chart, or lap time PDFs is missing. Can't "
-                                    "parse starting grid or lap times")
         self.starting_grid = None
         return self._parse_lap_times()
 
@@ -1368,9 +1356,9 @@ class RaceParser(BaseParser):
         df.finishing_status = df.finishing_status.astype(int)
 
         # Merge in starting grid from lap chart PDF
-        if self.is_pdf_complete:
+        try:
             df = df.merge(self.starting_grid, on='car_no', how='left')
-        else:
+        except:  # TODO: dirty catch  # noqa: E722
             df['starting_grid'] = None
 
         def to_json() -> list[dict]:
@@ -1918,308 +1906,259 @@ class RaceParser(BaseParser):
         return pd.concat(dfs, ignore_index=True)
 
     def _parse_sector_analysis(self) -> pd.DataFrame:
+        """Parse "Race Sector Analysis" PDF"""
+        doc = pymupdf.open(self.sector_analysis_file)
+        dfs = []
+        page: Page
+        for page in doc:
+            # Find "Sector Analysis"
+            page = Page(page, file=self.sector_analysis_file)  # noqa: PLW2901
+            page_no_str = f'p.{page.number} in {page.file}'
+            top_half = (page.w * 0.3, page.h * 0.1, page.w * 0.7, page.h / 4)
+            sector_analysis = page.search_for('Sector Analysis', clip=top_half, dpi=100)
+            if len(sector_analysis) != 1:
+                doc.close()
+                raise ParsingError(f'Find none or multiple "Sector Analysis" on {page_no_str}')
+            b_sector_analysis = sector_analysis[0].y1
+            sector_analysis_height = sector_analysis[0].bbox[3] - sector_analysis[0].bbox[1]
 
-        """Parse "Qualifying/Sprint Quali./Shootout Session Lap Times" PDF"""
-        doc = pymupdf.open(self.lap_times_file)
-        df = []
-        for page_n, page in enumerate(doc):
-            # Page width
-            page = Page(page)  # noqa: PLW2901
-            w = page.bound()[2]
+            """
+            Layout is:
 
-            # Positions of "LAP" and "TIME". They are the top of each table. One driver may have
-            # multiple tables starting from roughly the same top y-position
-            lap_time_pos = page.search_for('LAP TIME')
+            Race Sector Analysis
+            [white strip]
+            driver No. [whitespace] driver name
+            [white strip]
+            SECTOR 1 [whitespace] SECTOR 2 [whitespace] SECTOR 3
+            [white strip]
+            LAP [whitespace] TIME [whitespace] KM/H [whitespace] TIME [whitespace] KM/H ...
+            [black line]
+            table content
+            [white strip]
+            potentially another table for another driver
+            """
 
-            if not lap_time_pos and (page_n + 1) == len(doc):
-                # the last page may be emtpy
-                continue
+            # Find all white strips below "Sector Analysis"
+            if not (white_strips := page.search_for_white_strips(
+                    clip=(0, b_sector_analysis, page.w, page.h)
+            )):
+                doc.close()
+                raise ParsingError(f'Expect at least a white strip below "Sector Analysis" on '
+                                   f'{page_no_str}. Found: {white_strips}')
 
-            assert len(lap_time_pos) >= 1, \
-                f'Expected at least one "LAP TIME", got {len(lap_time_pos)} in {self.lap_times_file}'
-            ys = [i.y1 for i in lap_time_pos]
-            ys.sort()  # Sort these "LAP"'s from top to bottom
-            top_pos = [ys[0]]
-            for y in ys[1:]:
-                # Many "LAP"'s are roughly at the same height (usually two drivers share the full
-                # width of the page, and each of them have one table, so two tables
-                # and two "LAP"'s are vertically at the same y-position). We only need those at
-                # different/unique y-positions. If there is a 10+ px vertical gap, we take it as a
-                # "LAP" at a lower y-position
-                if y - top_pos[-1] > LINE_MIN_VGAP:
-                    top_pos.append(y)
+            # Between every two consecutive white strips, see if we can find a driver No. and name
+            pat = re.compile(r"^(\d{1,2})\s+([A-Za-z'‘’ ]+)$")
+            drivers: list[TextBlock] = []
+            for i in range(len(white_strips) - 1):
+                if car_no_driver := page.get_text(
+                    'blocks',
+                    clip=(0, white_strips[i] + 1, page.w / 3, white_strips[i + 1] + 1)
+                ):  # `page.w / 3` assumes a driver's name won't occupy > 1/3 of the page width
+                    # In case OCR breaks the text into multiple blocks
+                    if len(car_no_driver) >= 2:  # noqa: PLR2004
+                        driver_tb = TextBlock(text=' '.join(i.text for i in car_no_driver),
+                                              bbox=(min(i.bbox[0] for i in car_no_driver),
+                                                    min(i.bbox[1] for i in car_no_driver),
+                                                    max(i.bbox[2] for i in car_no_driver),
+                                                    max(i.bbox[3] for i in car_no_driver)))
+                    else:
+                        driver_tb = car_no_driver[0]
+                    if pat.match(driver_tb.text.strip()):
+                        drivers.append(driver_tb)
 
-            # Bottom of the table is the next "LAP TIME", or the bottom of the page
-            ys = [i.y0 for i in lap_time_pos]
-            ys.sort()
-            bottom_pos = [ys[0]]
-            for y in ys[1:]:
-                if y - bottom_pos[-1] > LINE_MIN_VGAP:
-                    bottom_pos.append(y)
-            b = page.bound()[3]
-            bottom_pos.append(b)
-            bottom_pos = bottom_pos[1:]  # The first "LAP TIME" is not the bottom of any table
+            # Parse the tables for each driver
+            pat = re.compile(r'^SECTOR\s+1\s+SECTOR\s+2\s+SECTOR\s+3$')
+            for driver_tb in drivers:
+                car_no = int(driver_tb.text.split(maxsplit=1)[0])
 
-            # Find the tables located between each `top_pos` and `bottom_pos`
-            for row in range(len(top_pos)):
-                # Each row usually has two drivers. Iterate over each driver
-                for col in range(2):
+                # Below each driver's name, should have "SECTOR 1 SECTOR 2 SECTOR 3", unless he has
+                # no lap at all (e.g. DNS or crash before sector 1 finishes)
+                white_strips = page.search_for_white_strips(
+                    clip=(0, driver_tb.y1 + 1, page.w, page.h),
+                    height=sector_analysis_height / 3
+                )
+                if len(white_strips) < 2:  # noqa: PLR2004
+                    raise ParsingError(f'Expected at least two white strips below the driver '
+                                       f'"{driver_tb.text}" on {page_no_str}. Found: '
+                                       f'{white_strips}')
+                sector_tbs = page.get_text(
+                    'blocks',
+                    clip=(0, white_strips[0] + 1, page.w * 0.5, white_strips[1] + 1)
+                )
+                if len(sector_tbs) >= 2:  # noqa: PLR2004
+                    sector_tb = TextBlock(text=' '.join(i.text for i in sector_tbs),
+                                          bbox=(min(i.bbox[0] for i in sector_tbs),
+                                                min(i.bbox[1] for i in sector_tbs),
+                                                max(i.bbox[2] for i in sector_tbs),
+                                                max(i.bbox[3] for i in sector_tbs)))
+                elif len(sector_tbs) == 1:
+                    sector_tb = sector_tbs[0]
+                # Find nothing. Can be a DNS driver at the bottom of the page
+                else:
+                    warnings.warn(f'Found no "SECTOR 1 SECTOR 2 SECTOR 3" text below driver '
+                                  f'"{driver_tb.text}" on {page_no_str}. Skipping him. Please '
+                                  f'check if this is expected, e.g. DNS')
+                    continue
+                # Find something else. Can be a DNS driver and we find the next driver's text
+                if not pat.match(sector_tb.text.strip()):
+                    warnings.warn(f'Expected "SECTOR 1 SECTOR 2 SECTOR 3" text below driver '
+                                  f'{driver_tb.text} on {page_no_str}. Found: {sector_tb.text}. '
+                                  f'Skipping him. Please check if this is expected, e.g. DNS')
+                    continue
 
-                    # Find the driver name, which is located immediately above the table
-                    driver = page.get_text(
-                        'text',
-                        clip=(
-                            col * w / 3,        # Each driver occupies ~1/3 of the page width
-                            top_pos[row] - 50,  # Driver name is usually 30-50 px above the table
-                            (col + 1) * w / 3,
-                            top_pos[row] - 30
+                # Find the horizontal black line below "SECTOR 1 SECTOR 2 SECTOR 3", which
+                # separates the table's header and content
+                if black_lines := page.search_for_black_lines(
+                    clip=(0, sector_tb.y1 + 1, page.w, page.h),
+                    min_length=0.4
+                ):
+                    b_table_header = black_lines[0]
+                else:
+                    doc.close()
+                    raise ParsingError(f'Cannot find any black line below "SECTOR 1 SECTOR 2 '
+                                       f'SECTOR 3" for driver {driver_tb.text} on {page_no_str}')
+
+                # Find the next white strip below the black line, which is the end of the table
+                if white_strips := page.search_for_white_strips(
+                    clip=(0, b_table_header + 1, page.w, page.h)
+                ):
+                    b_tables = white_strips[0] + 1
+                else:
+                    doc.close()
+                    raise ParsingError(f'Cannot find any white strip below the table for driver '
+                                       f'{driver_tb.text} on {page_no_str}')
+
+                # Find the two side-by-side tables for the driver, which are separated by a
+                # vertical white strip
+                page.set_rotation(90)
+                table_separators = page.search_for_white_strips(
+                    clip=(page.h - b_tables, driver_tb.x0 - 1, page.h - b_table_header - 1, page.w),
+                    height=sector_analysis_height / 3
+                )
+                page.set_rotation(0)
+                if len(table_separators) >= 3:  # noqa: PLR2004
+                    doc.close()
+                    raise ParsingError(f'Expected one or two tables for driver {driver_tb.text} '
+                                       f'on {page_no_str}. Found more than two vertical white '
+                                       f'strips separating the tables: {table_separators}')
+                table_separators.insert(0, driver_tb.x0 - 1)
+
+                # Parse each table for the driver
+                for l_table, r_table in zip(table_separators[:-1], table_separators[1:]):
+                    # Refine table bottom
+                    if white_strips := page.search_for_white_strips(
+                            clip=(l_table, b_table_header + 1, r_table, b_tables + 10),
+                            height=sector_analysis_height / 3
+                    ):
+                        b_table = white_strips[0] + 1
+                    else:
+                        doc.close()
+                        raise ParsingError(
+                            f'Cannot find any white strip below the table in ('
+                            f'{l_table:.1f}, {b_table_header:.1f}, {r_table:.1f}, '
+                            f'{b_tables:.1f}) on {page_no_str}'
                         )
-                    ).strip()
-                    if not driver:  # In the very last row may not have both drivers if the
-                        continue  # number of drivers is not even.
-                                  # TODO: may want a test here. Every row above should have
-                                  #       precisely two drivers
-                    car_no, driver = driver.split(maxsplit=1)
 
-                    # Find the horizontal line(s) below "LAP" and "TIME". This is the top of the
-                    # table(s)
-                    bbox = (col * w / 2, top_pos[row], (col + 1) * w / 2, bottom_pos[row])
-                    lines = [i for i in page.get_drawings_in_bbox(bbox)
-                             if np.isclose(i['rect'].y0, i['rect'].y1, atol=1)
-                             and i['fill'] is None]
-                    """
-                    The horizontal lines inside the table area may not always be the line below its
-                    header. When we have lap time deleted, we will have additional lines with grey
-                    colour. The `i['fill'] is None` filters out these lap time deleted lines
-                    """
-                    assert len(lines) >= 1, f'Expected at least one horizontal line for ' \
-                        f'table(s) in row {row}, col {col} in page {page.number} in ' \
-                        f'{self.lap_times_file}. Found none'
-                    assert np.allclose(
-                        [i['rect'].y0 for i in lines],
-                        lines[0]['rect'].y0,
-                        atol=1
-                    ), \
-                        f'Horizontal lines for table(s) in row {row}, col {col} in page ' \
-                        f'{page.number} in {self.lap_times_file} are not at the same y-position'
-
-                    # Concat lines.
-                    """
-                    The lines above are can be segmented. E.g., one line is from x = 0 to x = 100,
-                    and another is from x = 101 to x = 200. The two lines are basically one line,
-                    so we want to horizontally concatenate them
-                    """
-                    assert len(lines) <= 8, \
-                        f'Expected at most eight horizontal lines for table(s) in row {row}, ' \
-                        f'col {col} in page {page.number} in {self.lap_times_file}. Found ' \
-                        f'{len(lines)}'
-                    lines.sort(key=lambda x: x['rect'].x0)
-                    rect = lines[0]['rect']
-                    top_lines = [(rect.x0, rect.y0, rect.x1, rect.y1)]
-                    for line in lines[1:]:
-                        rect = line['rect']
-                        prev_line = top_lines[-1]
-                        # If one line ends where the other starts, they are the same line
-                        if np.isclose(rect.x0, prev_line[2], atol=1):
-                            top_lines[-1] = (prev_line[0], prev_line[1], rect.x1, prev_line[3])
-                        # If one line starts where the other ends, they are the same line
-                        elif np.isclose(rect.x1, prev_line[0], atol=1):
-                            top_lines[-1] = (rect.x0, prev_line[1], prev_line[2], prev_line[3])
-                        # Otherwise, it's a new line
-                        else:
-                            top_lines.append((rect.x0, rect.y0, rect.x1, rect.y1))
-
-                    # Find the column separators
-                    """
-                    The left and right boundary of each table is simply the left and right end of
-                    the top line. The right of column 0, which is "LAP", is the right boundary of
-                    the text "LAP". We don't really know the right boundary for the pit column, but
-                    that's roughly at the mid point of top line. Then from the mid point to the
-                    right end is the "TIME" column. In practice, we use mid point - 5 as the right
-                    boundary for the pit column.
-
-                    Below, `col_seps` is a list of column separators for each table. That is,
-                    `col_seps[1]` gives the column separators for the second table in this row.
-                    """
-                    col_seps = []
-                    for line in top_lines:
-                        lap = page.search_for('LAP',clip=(line[0], line[1] - 15, line[2], line[3]))
-                        assert len(lap) == 1, f'Expected exactly one "LAP" above the top line at ' \
-                            f'({line[0], line[1], line[2], line[3]}) on p.{page.number} in ' \
-                            f'{self.lap_times_file}. Found {len(lap)}'
-                        kmh = page.search_for('KM/H',clip=(line[0], line[1] - 15, line[2], line[3]))
-                        assert len(kmh) == 3, f'Expected exactly three "KM/H" above the top line at ' \
-                            f'({line[0], line[1], line[2], line[3]}) on p.{page.number} in ' \
-                            f'{self.lap_times_file}. Found {len(lap)}'
-                        col_seps.append([
-                            (line[0], lap[0].x1),
-                            (lap[0].x1, lap[0].x1 + 5),
-                            (kmh[-1].x1 + 5, line[2])
-                        ])
-
-                    # Find the white and grey rectangles under the top lines. Each row is either
-                    # coloured/filled in white or grey, so we can get the row's top and bottom
-                    # y-positions from these rectangles
-                    rects = [i for i in page.get_drawings_in_bbox(bbox)
-                             if i['rect'].y1 - i['rect'].y0 > LINE_MIN_VGAP]
-                    ys = [j for i in rects for j in [i['rect'].y0, i['rect'].y1]]
-                    ys.sort()
-                    row_seps = [ys[0]]
-                    for y in ys[1:]:
-                        if y - row_seps[-1] > LINE_MIN_VGAP:
-                            row_seps.append(y)
-                    row_seps = [(row_seps[i], row_seps[i + 1]) for i in range(len(row_seps) - 1)]
-
-                    # Finally we are good to parse the tables using these separators
-                    temp = []
-                    for cols in col_seps:
-                        tab, superscript, cross_out = page.parse_table_by_grid(
-                            vlines=cols, hlines=row_seps
+                    # Cols.
+                    cols = self._detect_cols(
+                        page,
+                        clip=(l_table, sector_tb.y1 + 1, r_table, b_table_header - 1),
+                        col_min_gap=2
+                    )
+                    if [i.text.lower() for i in cols] \
+                            != EXPECTED_COLS['race_sector_analysis']['required']:
+                        doc.close()
+                        raise ParsingError(
+                            f'Expected cols. {EXPECTED_COLS["race_sector_analysis"]['required']} '
+                            f'in ({l_table:.1f}, {sector_tb.y1:.1f}, {r_table:.1f}, '
+                            f'{b_table_header:.1f}) on {page_no_str}. Found: {cols}'
                         )
-                        assert len(superscript) == 0, \
-                            f'Some superscript(s) found in table at ({cols[0][0]:.1f}, ' \
-                            f'{row_seps[0][0]:.1f}, {cols[2][1]:.1f}, {row_seps[-1][1]:.1f}) in ' \
-                            f'page {page.number} in {self.lap_times_file}. But we expect none'
-                        for i, _, _ in cross_out:
-                            tab.loc[i, 'lap_time_deleted'] = True
+                    vlines = [l_table,
+                              (cols[0].r + cols[1].l) / 2,
+                              (cols[1].r + cols[2].l) / 2,
+                              (cols[2].r + cols[3].l) / 2,
+                              (cols[3].r + cols[4].l) / 2,
+                              (cols[4].r + cols[5].l) / 2,
+                              (cols[5].r + cols[6].l) / 2,  # Leave enough width for "TIME" col.,
+                              cols[6].r + 1,                # in case it is "INCOMPLETE"
+                              r_table]
 
-                        temp.append(tab)
-
-                    # One driver may have multiple tables. Concatenate them
-                    temp = pd.concat(temp, ignore_index=True)
-
-                    if (temp == "").all().all():
-                        # driver has no laps
+                    # Rows are coloured in white and grey alternately
+                    hlines = page.search_for_grey_white_rows(
+                        clip=(l_table, b_table_header + 1, r_table, b_table + 1),
+                        min_height=np.mean([i.b - i.t for i in cols]) / 2,
+                        min_width=0.5
+                    )
+                    if not hlines:
+                        warnings.warn(f'No lap found for {driver_tb.text} on {page_no_str}. '
+                                      f'Please check if this is expected, e.g. DNS')
                         continue
 
-                    temp['car_no'] = car_no
-                    temp['driver'] = driver
-                    df.append(temp)
+                    # Parse the table
+                    df = page.parse_table_by_grid(vlines=vlines,
+                                                  hlines=hlines,
+                                                  header_included=False,
+                                                  allow_multiple_texts_per_cell=[0])
+                    df.columns = ['lap', 'sector_1_time', 'sector_1_speed', 'sector_2_time',
+                                  'sector_2_speed', 'sector_3_time', 'sector_3_speed', 'lap_time']
+                    df['car_no'] = car_no
+                    df['lap_time_deleted'] = df.lap_time.apply(lambda x: x.strikeout is True)
+                    df = df.map(self._normalise_textblock)
+                    dfs.append(df)
 
         # Clean up
-        df = pd.concat(df, ignore_index=True)
-        if 'lap_time_deleted' not in df.columns:
-            df['lap_time_deleted'] = False
-        df = (df.fillna({'lap_time_deleted': False})
-              .rename(columns={0: 'lap_no', 1: 'pit', 2: 'lap_time'}))
-        df.car_no = df.car_no.astype(int)
-        df = df.replace('', None)
-        df.pit = (df.pit == 'P').astype(bool)
-        df.loc[df['lap_time'] == 'INCOMPLETE', ('lap_time', 'lap_time_deleted')] = (None, True)
-
-        # The very first lap has a timestamp (hh:mm:ss) for its lap time. All subsequent laps
-        # of a driver have a proper lap time (mm:ss.ms). There may be one or multiple additional
-        # empty rows at the beginning of the table that only contain a timestamp. Drop all "first"
-        # laps that contain a time stamp instead of an actual lap time.
-        for car_no in df.car_no.unique():
-            n_colon = df.loc[df.car_no == car_no, 'lap_time'].apply(
-                lambda t: t.count(':') if t else 0
-            )
-            min_idx = n_colon[n_colon == 2].index.min()
-            max_idx = n_colon[n_colon == 2].index.max()
-
-            if pd.isna(min_idx) or pd.isna(max_idx):
-                # the driver hasn't done any good quali laps
-                continue
-
-            df.drop(index=range(min_idx, max_idx), inplace=True)
-
-            # lap numbers are offset for no apparent reason, just recreate them now correctly
-            n_laps = (df.car_no == car_no).sum()
-            df.loc[df.car_no == car_no, 'lap_no'] = range(1, n_laps + 1)
-
-        df.lap_no = df.lap_no.astype(int)
-
-        df = self._assign_session_to_lap(self.classification_df, df)
-
-        # Check if any fastest laps are wrong
-        invalid_fastest_lap_drivers = set()
-        def is_fastest_lap_valid() -> bool:
-            """Check whether the fastest laps in lap times PDF match the ones in classification PDF
-
-            This function checks, for each driver in each quali. session, whether his fastest lap
-            time in lap times PDF is the same as the one in classification PDF. This is a necessary
-            and sufficient condition to ensure that the fastest lap times are correct. However, it
-            is necessary but not sufficient to guarantee that all lap times are correct/all laps
-            are correctly matched to their quali. sessions.
-
-            This partially fixes #51: when we get `False`here, there must be something wrong with
-            linking laps to quali. sessions. In such case, we will have to use the fastest lap time
-            from classification as fallback to ensure the fastest lap times are correct.
-            """
-            classification_df = self.classification_df[['NO', 'Q1', 'Q2', 'Q3']]
-            lap_times_df = df[['car_no', 'lap_no', 'Q', 'lap_time', 'is_fastest_lap']]
-            is_valid = True
-
-            # Whether there is at most one fastest lap for each given driver in each given session
-            """
-            May have no fastest lap, e.g. a usual out lap, starting the flying lap, abort the lap,
-            into pit. Two laps in total, but neither of them is a fastest lap. So here we check if
-            #. of fastest laps per driver per session <= 1.
-            """
-            temp = (lap_times_df.groupby(['Q', 'car_no'])
-                    .is_fastest_lap
-                    .sum()
-                    .reset_index(name='n_fastest_laps'))
-            temp = temp[temp.n_fastest_laps > 1]
-            if not temp.empty:
-                is_valid = False
-                invalid_fastest_lap_drivers.update(temp.car_no.unique())
-                # TODO: should get a warning here
-
-            # Compare the fastest lap times in lap times and classification PDFs
-            lap_times_df = lap_times_df[
-                lap_times_df.is_fastest_lap
-                & (~lap_times_df.car_no.isin(invalid_fastest_lap_drivers))
-            ]
-            for q in [1, 2, 3]:
-                temp = lap_times_df[lap_times_df.Q == q].merge(
-                    classification_df,
-                    left_on='car_no',
-                    right_on='NO',
-                    how='left',
-                    validate='1:1'
-                )
-                temp = temp[temp.lap_time != temp[f'Q{q}']]
-                if not temp.empty:
-                    is_valid = False
-                    invalid_fastest_lap_drivers.update(temp.car_no.unique())
-                # TODO: should get a warning here
-            return is_valid
-
-        if not is_fastest_lap_valid():
-            df = self._apply_fallback_fastest_laps(df, invalid_fastest_lap_drivers)
-
-        # TODO: bad practice
-        df.to_json = partial(quali_lap_times_to_json,
-                             df=df, year=self.year, round_no=self.round_no, session=self.session)
+        df = pd.concat(dfs, ignore_index=True)
+        df['pit'] = df.lap.str.contains('P', regex=False)
+        df = df[df.lap_time != 'INCOMPLETE']                            # TODO: check if correct
+        df.lap = (df.lap.astype(str)
+                  .str.rstrip(' P')
+                  .str.removesuffix('.0')
+                  .astype(int))  # TODO: check if correct
         return df
 
     def _parse_lap_times(self) -> pd.DataFrame:
-        # Get lap times from Race Lap Analysis PDF
-        df = self._parse_lap_analysis()
-        df = df.rename(columns={'time': 'lap_time'})
+        # Get lap times from Race Lap Analysis PDF or Race Sector Analysis PDF
+        if self.lap_analysis_file:
+            df = self._parse_lap_analysis()
+        elif self.sector_analysis_file:
+            df = self._parse_sector_analysis()
+        else:
+            raise FileNotFoundError('Neither lap analysis PDF nor sector analysis PDF is '
+                                    'provided. Cannot get lap times')
 
         # Lap 1's lap times are calendar time in Race Lap Analysis. To get the actual lap time for
         # lap 1, we parse Race History Chart PDF
-        lap_1 = (self._parse_history_chart()[['car_no', 'lap', 'time']]
-                 .sort_values(by=['car_no', 'lap'])
-                 .groupby('car_no')
-                 .first()  # See #60
-                 .assign(lap=1)
-                 .reset_index())
-        df = df.merge(lap_1, on=['car_no', 'lap'], how='outer', indicator=True, validate='1:1')
-        assert (df[df.lap == 1]['_merge'] == 'both').all(), \
-            f"Lap 1's data do not match in {self.lap_analysis_file} and {self.history_chart_file}"
-        df.loc[df.lap == 1, 'lap_time'] = df.loc[df.lap == 1, 'time']
-        del df['time'], df['_merge'], lap_1
+        if self.history_chart_file:
+            lap_1 = (self._parse_history_chart()[['car_no', 'lap', 'time']]
+                     .sort_values(by=['car_no', 'lap'])
+                     .groupby('car_no')
+                     .first()  # See #60
+                     .assign(lap=1)
+                     .reset_index())
+            df = df.merge(lap_1, on=['car_no', 'lap'], how='outer', indicator=True, validate='1:1')
+            assert (df[df.lap == 1]['_merge'] == 'both').all(), (
+                f'Some cars on lap 1 only appear in one of {self.lap_analysis_file} and '
+                f'{self.history_chart_file}'
+            )
+            df.loc[df.lap == 1, 'lap_time'] = df.loc[df.lap == 1, 'time']
+            del df['time'], df['_merge'], lap_1
+        else:
+            warnings.warn("Lap 1' lap times are missing because history chart PDF is not "
+                          "available")
+            df = df[df.lap != 1]
 
         # Merge in car positions from Race Lap Chart PDF
-        positions = self._parse_lap_chart()
-        df = df.merge(positions, on=['car_no', 'lap'], how='outer', indicator=True, validate='1:1')
-        assert (df._merge == 'both').all(), f'Some laps only found in only one of ' \
-                                            f'{self.lap_analysis_file} and {self.lap_chart_file}'
-        del df['_merge'], positions
+        if self.lap_chart_file:
+            df = df.merge(self._parse_lap_chart(), on=['car_no', 'lap'], how='outer',
+                          indicator=True, validate='1:1')
+            assert (df._merge == 'both').all(), (
+                f'Some laps only found in only one of {self.lap_analysis_file} and '
+                f'{self.lap_chart_file}'
+            )
+            del df['_merge']
+        else:
+            warnings.warn('Positions are missing because lap chart PDF is not available')
+            df['position'] = None
 
         # Merge in the fastest lap info. from final classification
         # TODO: drivers DNS or DNF before end of lap 1 have no lap at all, so drop them. Check
@@ -2241,7 +2180,7 @@ class RaceParser(BaseParser):
             diff = temp[temp.lap_time != temp.fastest_lap_time]
             raise AssertionError(f'fastest lap time in lap times PDF does not match the one in '
                                  f'classification PDF\n: {diff.to_string(index=False)}')
-        df['is_fastest_lap'] = df.lap == df.fastest_lap_no
+        df['is_fastest_lap'] = (df.lap == df.fastest_lap_no)
         del df['fastest_lap_time'], df['fastest_lap_no']
 
         def to_json() -> list[dict]:
