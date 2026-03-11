@@ -1,0 +1,498 @@
+[
+    {
+        "foreign_keys": {
+            "car_number": 63,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 6,
+                "is_classified": true,
+                "laps_completed": 58,
+                "points": 25,
+                "position": 1,
+                "status": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 4986801
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 12,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 3,
+                "is_classified": true,
+                "laps_completed": 58,
+                "points": 18,
+                "position": 2,
+                "status": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 4989775
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 16,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 5,
+                "is_classified": true,
+                "laps_completed": 58,
+                "points": 15,
+                "position": 3,
+                "status": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5002320
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 44,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 4,
+                "is_classified": true,
+                "laps_completed": 58,
+                "points": 12,
+                "position": 4,
+                "status": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5002945
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 1,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 2,
+                "is_classified": true,
+                "laps_completed": 58,
+                "points": 10,
+                "position": 5,
+                "status": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5038542
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 3,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 1,
+                "is_classified": true,
+                "laps_completed": 58,
+                "points": 8,
+                "position": 6,
+                "status": 0,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5041418
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 87,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 11,
+                "is_classified": true,
+                "laps_completed": 57,
+                "points": 6,
+                "position": 7,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 4991394
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 41,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 12,
+                "is_classified": true,
+                "laps_completed": 57,
+                "points": 4,
+                "position": 8,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 4998617
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 5,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 8,
+                "is_classified": true,
+                "laps_completed": 57,
+                "points": 2,
+                "position": 9,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 4999576
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 10,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 15,
+                "is_classified": true,
+                "laps_completed": 57,
+                "points": 1,
+                "position": 10,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5015828
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 31,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 14,
+                "is_classified": true,
+                "laps_completed": 57,
+                "points": 0,
+                "position": 11,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5016651
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 23,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 13,
+                "is_classified": true,
+                "laps_completed": 57,
+                "points": 0,
+                "position": 12,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5042876
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 30,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 10,
+                "is_classified": true,
+                "laps_completed": 57,
+                "points": 0,
+                "position": 13,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5043974
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 43,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 7,
+                "is_classified": true,
+                "laps_completed": 56,
+                "points": 0,
+                "position": 14,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 4995288
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 55,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 9,
+                "is_classified": true,
+                "laps_completed": 56,
+                "points": 0,
+                "position": 15,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5023687
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 11,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 19,
+                "is_classified": true,
+                "laps_completed": 55,
+                "points": 0,
+                "position": 16,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 4994651
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 18,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 17,
+                "is_classified": false,
+                "laps_completed": 43,
+                "points": 0,
+                "position": 17,
+                "status": 1,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 5067834
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 14,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 18,
+                "is_classified": false,
+                "laps_completed": 21,
+                "points": 0,
+                "position": 18,
+                "status": 11,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 2905789
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 77,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 20,
+                "is_classified": false,
+                "laps_completed": 15,
+                "points": 0,
+                "position": 19,
+                "status": 11,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 1471911
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 6,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "fastest_lap_rank": 16,
+                "is_classified": false,
+                "laps_completed": 10,
+                "points": 0,
+                "position": 20,
+                "status": 11,
+                "time": {
+                    "_type": "timedelta",
+                    "milliseconds": 865525
+                }
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 81,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "is_classified": false,
+                "laps_completed": 0,
+                "points": 0,
+                "position": 21,
+                "status": 30
+            }
+        ]
+    },
+    {
+        "foreign_keys": {
+            "car_number": 27,
+            "round": 1,
+            "session": "R",
+            "year": 2026
+        },
+        "object_type": "SessionEntry",
+        "objects": [
+            {
+                "is_classified": false,
+                "laps_completed": 0,
+                "points": 0,
+                "position": 22,
+                "status": 30
+            }
+        ]
+    }
+]
