@@ -183,6 +183,7 @@ def prepare_race_data(request, tmp_path) -> tuple[list[dict], list[dict], list[d
     return (sort_json(classification_data),     sort_json(lap_times_data),
             sort_json(expected_classification), sort_json(expected_lap_times))
 
+
 def test_parse_race(prepare_race_data):
     classification_data, lap_times_data, expected_classification, expected_lap_times \
         = prepare_race_data

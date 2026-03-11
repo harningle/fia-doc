@@ -203,13 +203,19 @@ class Page:
                     textblocks = [TextBlock(text=spans[0]['text'], bbox=spans[0]['bbox'])]
                 # Two texts found. Should be one usual text and one superscript
                 case 2:
-                    # Edge case: Antonelli's name may be wrapped into two lines, so we have two
-                    # textblocks here, both of which are normal text
-                    # Or if we specify `small_area`, then joins everything, no matter superscript
-                    # or not, into one textblock
-                    if small_area or any(n in span['text'].lower()
-                           for span in spans
-                           for n in ['andrea kimi', 'antonelli']):
+                    # Edge case 1: Antonelli's name may be wrapped into two lines, so we have two
+                    #              textblocks here, both of which are normal text
+                    # Edge case 2: in sector analysis PDF, lap No. col. and pit col. are too close
+                    #              each other, so we can't reliably separate them by position, but
+                    #              have to parse the two cols. as one. In this case, we also have
+                    #              two textblocks, both of which are normal text. The second
+                    #              textblock should be "P" for pit
+                    if (
+                            any(n in span['text'].lower()
+                                for span in spans
+                                for n in ['andrea kimi', 'antonelli'])
+                            or (spans[-1]['text'].lower() == 'p')
+                    ):
                         return [TextBlock(text=' '.join(span['text'].strip() for span in spans),
                                           bbox=(min(span['bbox'][0] for span in spans),
                                                 min(span['bbox'][1] for span in spans),
@@ -587,12 +593,7 @@ class Page:
                 cell_bbox_str = f'({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f})'  # For error/warnings
 
                 # Get text inside the cell defined by (l, t, r, b)
-                if allow_multiple_texts_per_cell and (j in allow_multiple_texts_per_cell):
-                    # If allow multiple text blocks in this cell, then use `small_area` to join all
-                    # found text blocks into one
-                    textblocks = self.get_text('dict', clip=(l, t, r, b), small_area=True)
-                else:
-                    textblocks = self.get_text('dict', clip=(l, t, r, b))
+                textblocks = self.get_text('dict', clip=(l, t, r, b))
 
                 if not textblocks:
                     # OK to have an empty cell, e.g. the pit col. in quali. lap times PDF should be
