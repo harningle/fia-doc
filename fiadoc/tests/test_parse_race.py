@@ -111,10 +111,12 @@ race_list = [
     ),
     (
         # 7: Use sector analysis PDF when lap analysis PDF is missing (#jolpica/jolpica-f1#331)
+        #    Lap chart PDF has 22 cars so need two pages to show all of them (#83)
+        # TODO: maybe separate this into two tests, so one test only cover one issue?
         'https://www.fia.com/system/files/decision-document/2026_australian_grand_prix_-_final_race_classification.pdf',
         None,
         '2026_01_aus_f1_r0_timing_racehistorychart_v01.pdf',
-        None,
+        '2026_01_aus_f1_r0_timing_racelapchart_v01.pdf',
         '2026_01_aus_f1_r0_timing_racesectoranalysis_v01.pdf',
         2026,
         1,

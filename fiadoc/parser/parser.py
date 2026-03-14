@@ -1559,6 +1559,7 @@ class RaceParser(BaseParser):
     def _parse_lap_chart(self) -> pd.DataFrame:
         doc = pymupdf.open(self.lap_chart_file)
         dfs = []
+        starting_grid_dfs = []
         page: Page
         for page in doc:
             page = Page(page, file=self.lap_chart_file)  # noqa: PLW2901
@@ -1574,7 +1575,8 @@ class RaceParser(BaseParser):
 
             # Table header is above a black line
             if black_lines := page.search_for_black_lines(
-                    clip=(0, t_table_header, page.w, page.h)
+                    clip=(0, t_table_header, page.w, page.h),
+                    min_length=((lap_chart[0].bbox[2] - lap_chart[0].bbox[0]) / 2) / page.w
             ):
                 t_table_body = black_lines[0]
             else:
@@ -1667,13 +1669,11 @@ class RaceParser(BaseParser):
             df.columns = [i.text for i in cols]
             df.index.name = None
             if (df.POS == 'GRID').any():
-                self.starting_grid = (df[df.POS == 'GRID']
-                                      .drop(columns='POS')
-                                      .T
-                                      .reset_index()
-                                      .rename(columns={'index': 'starting_grid', 0: 'car_no'}))
-                self.starting_grid.car_no = self.starting_grid.car_no.astype(int)
-                self.starting_grid.starting_grid = self.starting_grid.starting_grid.astype(int)
+                starting_grid_dfs.append(df[df.POS == 'GRID']
+                                         .drop(columns='POS')
+                                         .T
+                                         .reset_index()
+                                         .rename(columns={'index': 'starting_grid', 0: 'car_no'}))
                 df = df[df.POS != 'GRID']
             df.POS = df.POS.str.removeprefix('LAP ').astype(int)
             df = (df.set_index('POS')
@@ -1684,6 +1684,15 @@ class RaceParser(BaseParser):
             df.position = df.position.astype(int)           # 11 will have a missing car No.
             df.car_no = df.car_no.astype(int)
             dfs.append(df)
+
+        if not starting_grid_dfs:
+            doc.close()
+            raise ParsingError(f'Cannot find any starting grid row in {self.lap_chart_file}')
+
+        starting_grid = pd.concat(starting_grid_dfs, ignore_index=True)
+        starting_grid.car_no = starting_grid.car_no.astype(int)
+        starting_grid.starting_grid = starting_grid.starting_grid.astype(int)
+        self.starting_grid = starting_grid
         return pd.concat(dfs, ignore_index=True)
 
     def _parse_lap_analysis(self) -> pd.DataFrame:
