@@ -2,13 +2,15 @@ import hashlib
 import os
 import re
 import shutil
+import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import pymupdf
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
@@ -25,59 +27,6 @@ rc = {'figure.figsize': (8, 6),
       'ytick.major.width': 0.2}
 plt.rcdefaults()
 plt.rcParams.update(rc)
-
-PDF_SIGNATURE = b'%PDF-'
-DEFAULT_TIMEOUT = 30
-DEFAULT_RETRIES = 3
-PDF_CACHE_ENV_VAR = 'FIADOC_DOWNLOAD_CACHE_DIR'
-
-
-def _default_download_cache_dir() -> Path:
-    cache_dir = os.environ.get(PDF_CACHE_ENV_VAR)
-    if cache_dir:
-        path = Path(cache_dir)
-    elif cache_dir := os.environ.get('FIADOC_CACHE_DIR'):
-        path = Path(cache_dir) / 'downloads'
-    elif os.name == 'posix':
-        path = Path.home() / '.cache' / 'fiadoc' / 'downloads'
-    else:
-        path = Path(tempfile.gettempdir()) / 'fiadoc-downloads'
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _pdf_cache_path(url: str) -> Path:
-    return _default_download_cache_dir() / f'{hashlib.sha256(url.encode("utf-8")).hexdigest()}.pdf'
-
-
-def _is_valid_pdf(content: bytes, content_type: str | None = None) -> bool:
-    if not content.startswith(PDF_SIGNATURE):
-        return False
-    if content_type is None:
-        return True
-    return 'pdf' in content_type.lower()
-
-
-def _download_session() -> requests.Session:
-    retry = Retry(
-        total=DEFAULT_RETRIES,
-        connect=DEFAULT_RETRIES,
-        read=DEFAULT_RETRIES,
-        status=DEFAULT_RETRIES,
-        backoff_factor=1,
-        status_forcelist=(408, 425, 429, 500, 502, 503, 504),
-        allowed_methods=('GET',),
-        raise_on_status=False
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session = requests.Session()
-    session.mount('https://', adapter)
-    session.mount('http://', adapter)
-    session.headers.update({
-        'User-Agent': 'fia-doc-tests/0.0.1 (+https://github.com/harningle/fia-doc)',
-        'Accept': 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.1',
-    })
-    return session
 
 
 def duration_to_millisecond(s: str | None) -> dict[str, str | int] | None:
@@ -154,10 +103,68 @@ def time_to_timedelta(d: str) -> pd.Timedelta:
         raise ValueError(f'unknown date format: {d}')
 
 
-def download_pdf(url: str, out_path: str | os.PathLike) -> None:
+def _default_cache_dir() -> Path:
     """
-    Download a PDF file from the given URL. This downloads PDFs for testing. This is a temporary
-    solution. Will be deleted when Philipp's package is ready
+    Use `FIADOC_CACHE_DIR` env. var. if set. Otherwise, default to:
+
+    * Windows: %LocalAppData%/fiadoc/Cache
+    * macOS: ~/Library/Caches/fiadoc
+    * Linux: ~/.cache/fiadoc
+    """
+    env = os.environ.get('FIADOC_CACHE_DIR')
+    if env:
+        cache_dir = Path(env)
+    else:
+        match sys.platform:
+            case 'linux':
+                cache_dir = Path.home() / '.cache' / 'fiadoc'
+            case 'darwin':
+                cache_dir = Path.home() / 'Library' / 'Caches' / 'fiadoc'
+            case 'win32':
+                cache_dir = Path.home() / 'AppData' / 'Local' / 'fiadoc' / 'Cache'
+            case _:
+                raise NotImplementedError(f'Unsupported platform: {sys.platform}')
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def _default_download_cache_dir() -> Path:
+    path = _default_cache_dir() / 'downloads'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _pdf_cache_path(url: str) -> Path:
+    return _default_download_cache_dir() / f'{hashlib.sha256(url.encode("utf-8")).hexdigest()}.pdf'
+
+
+def _is_valid_pdf(content: bytes) -> bool:
+    try:
+        pymupdf.open(stream=content, filetype='pdf')
+        return True
+    except:
+        return False
+
+
+def _download_session(n_retries: int = 3) -> requests.Session:
+    retry = Retry(total=n_retries,
+                  backoff_factor=1,
+                  status_forcelist=(408, 425, 429, 500, 502, 503, 504),
+                  allowed_methods=('GET',),
+                  raise_on_status=False)
+    adapter = HTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
+
+def download_pdf(url: str, out_path: str | os.PathLike, n_retries: int = 3) -> None:
+    """
+    Download a PDF file from the given URL with caching and validation.
+    
+    PDFs are cached locally based on URL hash. Subsequent downloads of the same URL will use the
+    cached version if it exists.
     """
     out_path = Path(out_path)
     cache_path = _pdf_cache_path(url)
@@ -165,17 +172,14 @@ def download_pdf(url: str, out_path: str | os.PathLike) -> None:
         shutil.copy2(cache_path, out_path)
         return
 
-    last_error: str | None = None
-    session = _download_session()
-    for attempt in range(1, DEFAULT_RETRIES + 2):
+    last_error: Optional[Exception] = None
+    session = _download_session(n_retries=n_retries)
+    for attempt in range(3):
         try:
-            resp = session.get(url, timeout=DEFAULT_TIMEOUT)
+            resp = session.get(url)
             resp.raise_for_status()
-            content_type = resp.headers.get('content-type')
-            if not _is_valid_pdf(resp.content, content_type):
-                first_bytes = resp.content[:32]
-                last_error = (f'Expected a PDF from {url}, got status {resp.status_code}, '
-                              f'content-type {content_type!r}, first bytes {first_bytes!r}')
+            if not _is_valid_pdf(resp.content):
+                last_error = pymupdf.FileDataError(f'Failed to open the PDF at {url}')
             else:
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(cache_path, 'wb') as f:
@@ -183,13 +187,9 @@ def download_pdf(url: str, out_path: str | os.PathLike) -> None:
                 shutil.copy2(cache_path, out_path)
                 return
         except requests.RequestException as e:
-            last_error = f'Failed to download {url}: {e}'
-
-        if attempt <= DEFAULT_RETRIES:
-            time.sleep(attempt)
-
-    raise ValueError(last_error or f'Failed to download a valid PDF from {url}')
-    return
+            last_error = e
+        time.sleep(attempt + 1)
+    raise last_error
 
 
 def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:

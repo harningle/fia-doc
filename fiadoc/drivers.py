@@ -14,6 +14,7 @@ import requests
 from filelock import FileLock
 
 from ._constants import REGULAR_DRIVERS
+from .utils import _default_cache_dir
 
 BASE_URL = 'https://api.jolpi.ca/ergast/f1'
 TIMEOUT = 10  # Seconds
@@ -37,29 +38,10 @@ class Drivers:
             self._cache_dir = Path(cache_dir)
             self._cache_dir.mkdir(parents=True, exist_ok=True)
         else:
-            self._cache_dir = self._default_cache_dir
+            self._cache_dir = _default_cache_dir()
 
         # Manually maintained once a year for regular drivers. Will default to this to speed up
         self.regular_drivers = REGULAR_DRIVERS
-
-    @cached_property
-    def _default_cache_dir(self) -> Path:
-        """
-        * Windows: %LocalAppData%/fiadoc/Cache
-        * macOS: ~/Library/Caches/fiadoc
-        * Linux: ~/.cache/fiadoc
-        """
-        match sys.platform:
-            case 'linux':
-                cache_dir = Path.home() / '.cache' / 'fiadoc'
-            case 'darwin':
-                cache_dir = Path.home() / 'Library' / 'Caches' / 'fiadoc'
-            case 'win32':
-                cache_dir = Path.home() / 'AppData' / 'Local' / 'fiadoc' / 'Cache'
-            case _:
-                raise NotImplementedError(f'Unsupported platform: {sys.platform}')
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        return cache_dir
 
     @cached_property
     def cached_drivers(self) -> dict[str, str]:
@@ -82,7 +64,9 @@ class Drivers:
     def _get_driver_count():
         """
         Get the total #. of drivers from jolpica API. Will use this count as the sole criteria to
-        decide whether to refresh the local cache
+        decide whether to refresh the local cache. This means, if Jolpica revises an existing
+        driver, with no driver being added or deleted, the total driver count will remain the same,
+        and we won't be able to refresh local cache.
         """
         url = f'{BASE_URL}/drivers/?format=json&limit=1'
         try:

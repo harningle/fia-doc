@@ -4,7 +4,7 @@ from fiadoc.utils import download_pdf
 
 
 def test_download_pdf_saves_valid_pdf(requests_mock, tmp_path, monkeypatch):
-    monkeypatch.setenv('FIADOC_DOWNLOAD_CACHE_DIR', str(tmp_path / 'cache'))
+    monkeypatch.setenv('FIADOC_CACHE_DIR', str(tmp_path / 'cache'))
     url = 'https://example.com/test.pdf'
     pdf = b'%PDF-1.4\n1 0 obj\n<<>>\nendobj\n'
     requests_mock.get(url, content=pdf, headers={'Content-Type': 'application/pdf'})
@@ -13,13 +13,13 @@ def test_download_pdf_saves_valid_pdf(requests_mock, tmp_path, monkeypatch):
     download_pdf(url, out_path)
 
     assert out_path.read_bytes() == pdf
-    cached = list((tmp_path / 'cache').glob('*.pdf'))
+    cached = list((tmp_path / 'cache' / 'downloads').glob('*.pdf'))
     assert len(cached) == 1
     assert cached[0].read_bytes() == pdf
 
 
 def test_download_pdf_uses_cache(requests_mock, tmp_path, monkeypatch):
-    monkeypatch.setenv('FIADOC_DOWNLOAD_CACHE_DIR', str(tmp_path / 'cache'))
+    monkeypatch.setenv('FIADOC_CACHE_DIR', str(tmp_path / 'cache'))
     url = 'https://example.com/test.pdf'
     pdf = b'%PDF-1.4\n1 0 obj\n<<>>\nendobj\n'
     requests_mock.get(url, content=pdf, headers={'Content-Type': 'application/pdf'})
@@ -36,7 +36,7 @@ def test_download_pdf_uses_cache(requests_mock, tmp_path, monkeypatch):
 
 
 def test_download_pdf_rejects_non_pdf(requests_mock, tmp_path, monkeypatch):
-    monkeypatch.setenv('FIADOC_DOWNLOAD_CACHE_DIR', str(tmp_path / 'cache'))
+    monkeypatch.setenv('FIADOC_CACHE_DIR', str(tmp_path / 'cache'))
     url = 'https://example.com/test.pdf'
     requests_mock.get(url, content=b'<html>blocked</html>', headers={'Content-Type': 'text/html'})
 
