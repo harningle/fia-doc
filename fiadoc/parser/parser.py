@@ -11,7 +11,7 @@ import pandas as pd
 import pymupdf
 from scipy.ndimage import find_objects, label
 
-from .._constants import DPI, EXPECTED_COLS, QUALI_DRIVERS
+from .._constants import DPI, EXPECTED_COLS, QUALI_DRIVERS, REGULAR_DRIVERS
 from ..drivers import Drivers
 from ..models.classification import SessionEntryImport, SessionEntryObject
 from ..models.driver import (
@@ -472,9 +472,9 @@ class EntryListParser(BaseParser):
                 df['nat'] = None         # still create a DriverObject with country code = None
                 warnings.warn('Col. "Nat" is missing in the entry list PDF. Will set country code '
                               'to None for any new driver')
+            regular_drivers = REGULAR_DRIVERS.get(self.year, {})
             for x in df.itertuples():
-                # Check if the driver exists in Jolpica. If not, create a DriverObject and
-                # TeamDriverObject (mark him as a junior driver) for him
+                # Check if the driver exists in Jolpica. If not, create a DriverObject for him
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter('always')
                     driver_id = DRIVERS.get_driver_id(year=self.year, full_name=x.driver)
@@ -488,21 +488,26 @@ class EntryListParser(BaseParser):
                                     country_code=x.nat if isinstance(x.nat, str) else None
                                 )
                             )
-                            new_team_drivers.append(
-                                TeamDriverImport(
-                                    object_type='TeamDriver',
-                                    foreign_keys=TeamDriverForeignKeys(
-                                        year=self.year,
-                                        team_reference=x.constructor,
-                                        driver_reference=driver_id
-                                    ),
-                                    objects=[
-                                        TeamDriverObject(
-                                            role=2
-                                        )
-                                    ]
-                                ).model_dump(exclude_unset=True)
-                            )
+
+                # Always create a TeamDriver entry for non-regular drivers, regardless of whether
+                # they are in or not in Jolpica DB, because they may drive for different teams
+                # across rounds (e.g. Paul Aron debuted for Sauber but later drove for Alpine)
+                if x.driver.lower() not in regular_drivers:
+                    new_team_drivers.append(
+                        TeamDriverImport(
+                            object_type='TeamDriver',
+                            foreign_keys=TeamDriverForeignKeys(
+                                year=self.year,
+                                team_reference=x.constructor,
+                                driver_reference=driver_id
+                            ),
+                            objects=[
+                                TeamDriverObject(
+                                    role=2
+                                )
+                            ]
+                        ).model_dump(exclude_unset=True)
+                    )
 
                 drivers.append(RoundEntryImport(
                     object_type='RoundEntry',
@@ -523,7 +528,8 @@ class EntryListParser(BaseParser):
                 warnings.warn('New drivers found in entry list PDF')
                 drivers.append(DriverImport(objects=new_driver_objects)
                                .model_dump(exclude_none=True))  # Need default foreign key here so
-                drivers.extend(new_team_drivers)                # can't `exclude_unset`
+            if new_team_drivers:                                # can't `exclude_unset`
+                drivers.extend(new_team_drivers)
             return drivers
 
         df.to_json = to_json

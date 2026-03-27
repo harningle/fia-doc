@@ -320,5 +320,18 @@
                 "car_number": 34
             }
         ]
+    },
+    {
+        "object_type": "TeamDriver",
+        "foreign_keys": {
+            "year": 2026,
+            "driver_reference": "jak_crawford",
+            "team_reference": "aston_martin"
+        },
+        "objects": [
+            {
+                "role": 2
+            }
+        ]
     }
 ]
