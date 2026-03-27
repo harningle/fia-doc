@@ -292,8 +292,11 @@ class EntryListParser(BaseParser):
         if {i.text.lower() for i in cols} > req_cols | optional_cols:
             warnings.warn(f'Got unexpected cols. in {self.file}. Expected only {req_cols} and '
                           f'{optional_cols}. Got: {cols}')
-        vlines = [i.bbox[0] - 1 for i in cols] + [page.w]  # Vertical lines separating the cols.
-        col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])  # Table header row height
+        min_col_gap = min(i.bbox[2] - i.bbox[0] for i in cols)
+        # Vertical lines separating the cols. (#84)
+        vlines = [i.bbox[0] - min_col_gap / 3 for i in cols] + [page.w]
+        # Table header row height
+        col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])
 
         # Table ends above a sufficiently tall white strip
         if white_strips := page.search_for_white_strips(clip=(0, b_table_header, page.w, page.h),
