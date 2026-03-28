@@ -90,7 +90,7 @@ race_list = [
         nullcontext()
     ),
     (
-        # 9: Cols. not verticallu aligned
+        # 9: Cols. not vertically aligned
         '2026_japanese_grand_prix_-_entry_list.pdf',
         2026,
         3,

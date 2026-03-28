@@ -292,9 +292,10 @@ class EntryListParser(BaseParser):
         if {i.text.lower() for i in cols} > req_cols | optional_cols:
             warnings.warn(f'Got unexpected cols. in {self.file}. Expected only {req_cols} and '
                           f'{optional_cols}. Got: {cols}')
-        min_col_gap = min(i.bbox[2] - i.bbox[0] for i in cols)
         # Vertical lines separating the cols. (#84)
-        vlines = [i.bbox[0] - min_col_gap / 3 for i in cols] + [page.w]
+        # The narrowest col. is "No.", so adding a third of its width as buffer is good enough
+        min_col_width = min(i.bbox[2] - i.bbox[0] for i in cols)
+        vlines = [i.bbox[0] - min_col_width / 3 for i in cols] + [page.w]
         # Table header row height
         col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])
 
