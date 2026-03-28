@@ -111,10 +111,12 @@ race_list = [
     ),
     (
         # 7: Use sector analysis PDF when lap analysis PDF is missing (#jolpica/jolpica-f1#331)
+        #    Lap chart PDF has 22 cars so need two pages to show all of them (#83)
+        # TODO: maybe separate this into two tests, so one test only cover one issue?
         'https://www.fia.com/system/files/decision-document/2026_australian_grand_prix_-_final_race_classification.pdf',
         None,
         '2026_01_aus_f1_r0_timing_racehistorychart_v01.pdf',
-        None,
+        '2026_01_aus_f1_r0_timing_racelapchart_v01.pdf',
         '2026_01_aus_f1_r0_timing_racesectoranalysis_v01.pdf',
         2026,
         1,
@@ -233,47 +235,6 @@ def test_parse_race(prepare_race_data):
                         f"Driver {driver}'s lap {expected_lap['number']} in {session} time " \
                         f"doesn't match with fastf1: {lap['time']['milliseconds']} vs " \
                         f"{expected_lap['time']['milliseconds']}"
-
-
-def test_parse_melbourne_2026_lap_chart(tmp_path):
-    """2026 Australian GP lap chart should produce the official starting grid."""
-    download_pdf('https://www.fia.com/sites/default/files/2026_01_aus_f1_r0_timing_racelapchart_v01.pdf',
-                 tmp_path / 'lap_chart.pdf')
-    expected = [
-        {'starting_grid': 1, 'car_no': 63},
-        {'starting_grid': 2, 'car_no': 12},
-        {'starting_grid': 3, 'car_no': 6},
-        {'starting_grid': 4, 'car_no': 16},
-        {'starting_grid': 5, 'car_no': 81},
-        {'starting_grid': 6, 'car_no': 1},
-        {'starting_grid': 7, 'car_no': 44},
-        {'starting_grid': 8, 'car_no': 30},
-        {'starting_grid': 9, 'car_no': 41},
-        {'starting_grid': 10, 'car_no': 5},
-        {'starting_grid': 11, 'car_no': 27},
-        {'starting_grid': 12, 'car_no': 87},
-        {'starting_grid': 13, 'car_no': 31},
-        {'starting_grid': 14, 'car_no': 10},
-        {'starting_grid': 15, 'car_no': 23},
-        {'starting_grid': 16, 'car_no': 43},
-        {'starting_grid': 17, 'car_no': 14},
-        {'starting_grid': 18, 'car_no': 11},
-        {'starting_grid': 19, 'car_no': 77},
-        {'starting_grid': 20, 'car_no': 3},
-        {'starting_grid': 21, 'car_no': 55},
-        {'starting_grid': 22, 'car_no': 18},
-    ]
-    parser = RaceParser(tmp_path / 'lap_chart.pdf',
-                        tmp_path / 'lap_chart.pdf',
-                        tmp_path / 'lap_chart.pdf',
-                        tmp_path / 'lap_chart.pdf',
-                        2026,
-                        1,
-                        'race')
-    parser._parse_lap_chart()
-    actual = (parser.starting_grid.sort_values('starting_grid')
-              .to_dict(orient='records'))
-    assert actual == expected
 
 
 @pytest.mark.full

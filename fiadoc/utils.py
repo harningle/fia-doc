@@ -175,7 +175,7 @@ def download_pdf(url: str, out_path: str | os.PathLike, n_retries: int = 3) -> N
 
     last_error: Optional[Exception] = None
     session = _download_session(n_retries=n_retries)
-    for attempt in range(3):
+    for attempt in range(n_retries):
         try:
             resp = session.get(url)
             resp.raise_for_status()

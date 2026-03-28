@@ -85,6 +85,14 @@ race_list = [
         1,
         '2026_1_entry_list.json',
         nullcontext()
+    ),
+    (
+        # 9: Cols. not vertically aligned
+        '2026_japanese_grand_prix_-_entry_list.pdf',
+        2026,
+        3,
+        '2026_3_entry_list.json',
+        nullcontext()
     )
 ]
 # Not going to test year 2023 for entry list, as their PDF format is different, and we are not

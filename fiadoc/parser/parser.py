@@ -11,7 +11,7 @@ import pandas as pd
 import pymupdf
 from scipy.ndimage import find_objects, label
 
-from .._constants import DPI, EXPECTED_COLS, QUALI_DRIVERS
+from .._constants import DPI, EXPECTED_COLS, QUALI_DRIVERS, REGULAR_DRIVERS
 from ..drivers import Drivers
 from ..models.classification import SessionEntryImport, SessionEntryObject
 from ..models.driver import (
@@ -37,12 +37,11 @@ PracticeSessionT = Literal['fp', 'fp1', 'fp2', 'fp3']
 RaceSessionT = Literal['race', 'sprint']
 QualiSessionT = Literal['quali', 'sprint_quali']
 
-DRIVERS = Drivers()
+DRIVERS = Drivers(cache_dir=os.environ.get('FIADOC_CACHE_DIR', None))
 
 WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
 LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
                    # considered to be the same line
-LAP_LABEL_PARTS = 2
 
 
 class BaseParser:
@@ -293,8 +292,12 @@ class EntryListParser(BaseParser):
         if {i.text.lower() for i in cols} > req_cols | optional_cols:
             warnings.warn(f'Got unexpected cols. in {self.file}. Expected only {req_cols} and '
                           f'{optional_cols}. Got: {cols}')
-        vlines = [i.bbox[0] - 1 for i in cols] + [page.w]  # Vertical lines separating the cols.
-        col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])  # Table header row height
+        # Vertical lines separating the cols. (#84)
+        # The narrowest col. is "No.", so adding a third of its width as buffer is good enough
+        min_col_width = min(i.bbox[2] - i.bbox[0] for i in cols)
+        vlines = [i.bbox[0] - min_col_width / 3 for i in cols] + [page.w]
+        # Table header row height
+        col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])
 
         # Table ends above a sufficiently tall white strip
         if white_strips := page.search_for_white_strips(clip=(0, b_table_header, page.w, page.h),
@@ -470,9 +473,9 @@ class EntryListParser(BaseParser):
                 df['nat'] = None         # still create a DriverObject with country code = None
                 warnings.warn('Col. "Nat" is missing in the entry list PDF. Will set country code '
                               'to None for any new driver')
+            regular_drivers = REGULAR_DRIVERS.get(self.year, {})
             for x in df.itertuples():
-                # Check if the driver exists in Jolpica. If not, create a DriverObject and
-                # TeamDriverObject (mark him as a junior driver) for him
+                # Check if the driver exists in Jolpica. If not, create a DriverObject for him
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter('always')
                     driver_id = DRIVERS.get_driver_id(year=self.year, full_name=x.driver)
@@ -486,21 +489,26 @@ class EntryListParser(BaseParser):
                                     country_code=x.nat if isinstance(x.nat, str) else None
                                 )
                             )
-                            new_team_drivers.append(
-                                TeamDriverImport(
-                                    object_type='TeamDriver',
-                                    foreign_keys=TeamDriverForeignKeys(
-                                        year=self.year,
-                                        team_reference=x.constructor,
-                                        driver_reference=driver_id
-                                    ),
-                                    objects=[
-                                        TeamDriverObject(
-                                            role=2
-                                        )
-                                    ]
-                                ).model_dump(exclude_unset=True)
-                            )
+
+                # Always create a TeamDriver entry for non-regular drivers, regardless of whether
+                # they are in or not in Jolpica DB, because they may drive for different teams
+                # across rounds (e.g. Paul Aron debuted for Sauber but later drove for Alpine)
+                if x.driver.lower() not in regular_drivers:
+                    new_team_drivers.append(
+                        TeamDriverImport(
+                            object_type='TeamDriver',
+                            foreign_keys=TeamDriverForeignKeys(
+                                year=self.year,
+                                team_reference=x.constructor,
+                                driver_reference=driver_id
+                            ),
+                            objects=[
+                                TeamDriverObject(
+                                    role=2
+                                )
+                            ]
+                        ).model_dump(exclude_unset=True)
+                    )
 
                 drivers.append(RoundEntryImport(
                     object_type='RoundEntry',
@@ -521,7 +529,8 @@ class EntryListParser(BaseParser):
                 warnings.warn('New drivers found in entry list PDF')
                 drivers.append(DriverImport(objects=new_driver_objects)
                                .model_dump(exclude_none=True))  # Need default foreign key here so
-                drivers.extend(new_team_drivers)                # can't `exclude_unset`
+            if new_team_drivers:                                # can't `exclude_unset`
+                drivers.extend(new_team_drivers)
             return drivers
 
         df.to_json = to_json
@@ -1557,67 +1566,10 @@ class RaceParser(BaseParser):
         #       No. as 1, 2, 3, ... for each driver?
         return df
 
-    @staticmethod
-    def _group_words_by_line(words: list[tuple], y_tol: float = 1.0) -> list[list[tuple]]:
-        """Group word tuples into visual lines based on their top y-position."""
-        lines: list[list[tuple]] = []
-        for word in sorted(words, key=lambda x: (x[1], x[0])):
-            if (not lines) or abs(word[1] - lines[-1][0][1]) > y_tol:
-                lines.append([word])
-            else:
-                lines[-1].append(word)
-        return [sorted(line, key=lambda x: x[0]) for line in lines]
-
-    def _parse_lap_chart_overflow_page(
-            self,
-            page: Page,
-            t_table_header: float,
-            b_table: float
-    ) -> pd.DataFrame:
-        """Parse continuation pages that only contain overflow positions like 21 and 22."""
-        words = page.get_text('words', clip=(0, t_table_header, page.w, b_table))
-        words = [(w.bbox[0], w.bbox[1], w.bbox[2], w.bbox[3], w.text) for w in words]
-        lines = self._group_words_by_line(words)
-
-        cols: Optional[list[str]] = None
-        col_centres: dict[str, float] = {}
-        rows: list[dict[str, str | None]] = []
-        for line in lines:
-            texts = [w[4] for w in line]
-            if not texts or texts[0] == 'Page':
-                continue
-
-            if cols is None:
-                if texts[0] != 'POS':
-                    continue
-                cols = ['POS', *texts[1:]]
-                col_centres = {w[4]: (w[0] + w[2]) / 2 for w in line[1:]}
-                continue
-
-            if texts[0] == 'GRID':
-                label = 'GRID'
-                data_words = line[1:]
-            elif texts[0] == 'LAP' and len(texts) >= LAP_LABEL_PARTS:
-                label = f'LAP {texts[1]}'
-                data_words = line[2:]
-            else:
-                continue
-
-            row = {'POS': label} | {col: None for col in cols[1:]}
-            for word in data_words:
-                centre = (word[0] + word[2]) / 2
-                nearest_col = min(col_centres, key=lambda col: abs(centre - col_centres[col]))
-                row[nearest_col] = word[4]
-            rows.append(row)
-
-        if cols is None:
-            raise ParsingError(f'Cannot detect overflow lap chart cols. on p.{page.number} in '
-                               f'{page.file}')
-        return pd.DataFrame(rows, columns=cols)
-
     def _parse_lap_chart(self) -> pd.DataFrame:
         doc = pymupdf.open(self.lap_chart_file)
         dfs = []
+        starting_grid_dfs = []
         page: Page
         for page in doc:
             page = Page(page, file=self.lap_chart_file)  # noqa: PLW2901
@@ -1633,105 +1585,105 @@ class RaceParser(BaseParser):
 
             # Table header is above a black line
             if black_lines := page.search_for_black_lines(
-                    clip=(0, t_table_header, page.w, page.h)
+                    clip=(0, t_table_header, page.w, page.h),
+                    min_length=((lap_chart[0].bbox[2] - lap_chart[0].bbox[0]) / 2) / page.w
             ):
                 t_table_body = black_lines[0]
             else:
                 raise ParsingError(f'Cannot find any black line below the table header '
                                    f'on {page_no_str}')
 
-            if len(black_lines) == 1:
-                # Overflow pages only contain the left label column plus overflow positions.
-                df = self._parse_lap_chart_overflow_page(page, t_table_header, black_lines[0] - 1)
+            # Table bottom is a white strip
+            """
+            A white strip of any height is fine. Because the table always has a black vertical line
+            between col. 0 and col. 1, so there is no white strip at all in the table. Any white
+            strip must indicate the end of the table.
+            """
+            if white_strips := page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
+                                                            height=1):
+                b_table = white_strips[0] + 1
             else:
-                # Table bottom is a white strip
-                """
-                A white strip of any height is fine. Because the table always has a black vertical
-                line between col. 0 and col. 1, so there is no white strip at all in the table.
-                Any white strip must indicate the end of the table.
-                """
-                if white_strips := page.search_for_white_strips(
-                        clip=(0, t_table_body, page.w, page.h),
-                        height=1
-                ):
-                    b_table = white_strips[0] + 1
-                else:
-                    doc.close()
-                    raise ParsingError(f'Cannot find any white strip below the table on '
-                                       f'{page_no_str}')
+                doc.close()
+                raise ParsingError(f'Cannot find any white strip below the table on {page_no_str}')
 
-                # Get cols.
-                cols = self._detect_cols(page,
-                                         clip=(0, t_table_header, page.w, t_table_body - 1),
-                                         col_min_gap=3,
-                                         min_black_line_length=0.5)
-                if len(cols) <= 1:
+            # Get cols.
+            cols = self._detect_cols(page,
+                                     clip=(0, t_table_header, page.w, t_table_body - 1),
+                                     col_min_gap=3,  # Col. names are quite far from each other
+                                     min_black_line_length=0.5)
+            if len(cols) <= 1:
+                doc.close()
+                raise ParsingError(f'Expected at least two cols. on {page_no_str}. Found: {cols}')
+            if cols[0].text != 'POS':
+                doc.close()
+                raise ParsingError(f'Expected "POS" to be the zero-th col. on {page_no_str}. '
+                                   f'Found: {cols[0]}')
+            for i in range(1, len(cols)):
+                if not re.match(r'^\d+$', cols[i].text):
                     doc.close()
-                    raise ParsingError(f'Expected at least two cols. on {page_no_str}. Found: '
-                                       f'{cols}')
-                if cols[0].text != 'POS':
-                    doc.close()
-                    raise ParsingError(f'Expected "POS" to be the zero-th col. on {page_no_str}. '
-                                       f'Found: {cols[0]}')
-                for i in range(1, len(cols)):
-                    if not re.match(r'^\d+$', cols[i].text):
-                        doc.close()
-                        raise ParsingError(f'Expected the {i}-th col. to be a number on '
-                                           f'{page_no_str}. Found: {cols[i]}')
+                    raise ParsingError(f'Expected the {i}-th col. to be a number on '
+                                       f'{page_no_str}. Found: {cols[i]}')
 
-                # Find a black vertical line below the black horizontal line above. This separates
-                # the zero-th col. and the first col.
-                page.set_rotation(270)
-                black_lines = page.search_for_black_lines(clip=(t_table_body, 0, b_table, page.w),
-                                                          min_length=0.7)
-                black_lines = [page.w - i for i in black_lines]
-                page.set_rotation(0)
-                if len(black_lines) != 1:
-                    raise ParsingError(f'Cannot find or find multiple vertical black lines below '
-                                       f'the table header on {page_no_str}: {black_lines}')
-                l_first_col = black_lines[0]
-                vlines = [0,
-                          l_first_col,
-                          *[(cols[i].r + cols[i + 1].l) / 2 for i in range(1, len(cols) - 1)],
-                          cols[-1].r + 1]
+            # Find a black vertical line below the black horizontal line above. This separates the
+            # zero-th col. and the first col.
+            """
+            `Page.search_for_black_lines` is for horizontal lines only. So to search for vertical
+            lines, we rotate the page, i.e. applying [[0, -1], [1, 0]].
+            """
+            page.set_rotation(270)
+            black_lines = page.search_for_black_lines(clip=(t_table_body, 0, b_table, page.w),
+                                                      min_length=0.7)
+            black_lines = [page.w - i for i in black_lines]  # Transpose back
+            page.set_rotation(0)
+            if len(black_lines) != 1:
+                raise ParsingError(f'Cannot find or find multiple vertical black lines below the '
+                                   f'table header on {page_no_str}: {black_lines}')
+            l_first_col = black_lines[0]
+            vlines = [0,
+                      l_first_col,
+                      *[(cols[i].r + cols[i + 1].l) / 2 for i in range(1, len(cols) - 1)],
+                      cols[-1].r + 1]
 
-                # Locate rows by POS col.
-                page.set_rotation(270)
-                rows = self._detect_cols(
-                    page,
-                    clip=(t_table_body + 1, page.w - l_first_col - 1, b_table, page.w),
-                    col_min_gap=0.3
-                )
-                page.set_rotation(0)
-                if not rows:
-                    doc.close()
-                    raise ParsingError(f'Cannot detect any rows in the zero-th col. on '
-                                       f'{page_no_str}')
-                hlines = [t_table_body,
-                          *[(rows[i].r + rows[i + 1].l) / 2 for i in range(len(rows) - 1)],
-                          b_table]
+            # Locate rows by POS col.
+            """
+            There is no background colour to indicate the rows, so we brute force the row positions
+            by looking at "POS" col., i.e. the positions of "GRID", "LAP 1", "LAP 2", etc. We can
+            transpose the page and then use `._detect_cols` to get the positions. We don't care
+            about the text, because the page is transposed, so of course the texts will be wrong,
+            but the positions of the text are correct. We use a small `col_min_gap`, because after
+            transpose, the char. width will become char. height, so the gap needs to be adjusted
+            accordingly.
+            """
+            page.set_rotation(270)
+            rows = self._detect_cols(
+                page,
+                clip=(t_table_body + 1, page.w - l_first_col - 1, b_table, page.w),
+                col_min_gap=0.3
+            )
+            page.set_rotation(0)
+            if not rows:
+                doc.close()
+                raise ParsingError(f'Cannot detect any rows in the zero-th col. on {page_no_str}')
+            hlines = [t_table_body,
+                      *[(rows[i].r + rows[i + 1].l) / 2 for i in range(len(rows) - 1)],
+                      b_table]
 
-                # Parse the table
-                df = page.parse_table_by_grid(vlines=vlines,
-                                              hlines=hlines,
-                                              header_included=False,
-                                              tol=3)
-                df = df.map(self._normalise_textblock)
-                df.columns = [i.text for i in cols]
-                df.index.name = None
+            # Parse the table
+            df = page.parse_table_by_grid(vlines=vlines,
+                                          hlines=hlines,
+                                          header_included=False,
+                                          tol=3)
+            df = df.map(self._normalise_textblock)
+
+            # Reshape to long format, where a row is (lap, driver, position)
+            df.columns = [i.text for i in cols]
+            df.index.name = None
             if (df.POS == 'GRID').any():
-                starting_grid = (df[df.POS == 'GRID']
-                                 .drop(columns='POS')
-                                 .T
-                                 .reset_index()
-                                 .rename(columns={'index': 'starting_grid', 0: 'car_no'}))
-                starting_grid.car_no = starting_grid.car_no.astype(int)
-                starting_grid.starting_grid = starting_grid.starting_grid.astype(int)
-                if self.__dict__.get('starting_grid') is None:
-                    self.starting_grid = starting_grid
-                else:
-                    self.starting_grid = pd.concat([self.starting_grid, starting_grid],
-                                                   ignore_index=True)
+                starting_grid_dfs.append(df[df.POS == 'GRID']
+                                         .drop(columns='POS')
+                                         .T
+                                         .reset_index()
+                                         .rename(columns={'index': 'starting_grid', 0: 'car_no'}))
                 df = df[df.POS != 'GRID']
             df.POS = df.POS.str.removeprefix('LAP ').astype(int)
             df = (df.set_index('POS')
@@ -1742,6 +1694,15 @@ class RaceParser(BaseParser):
             df.position = df.position.astype(int)           # 11 will have a missing car No.
             df.car_no = df.car_no.astype(int)
             dfs.append(df)
+
+        if not starting_grid_dfs:
+            doc.close()
+            raise ParsingError(f'Cannot find any starting grid row in {self.lap_chart_file}')
+
+        starting_grid = pd.concat(starting_grid_dfs, ignore_index=True)
+        starting_grid.car_no = starting_grid.car_no.astype(int)
+        starting_grid.starting_grid = starting_grid.starting_grid.astype(int)
+        self.starting_grid = starting_grid
         return pd.concat(dfs, ignore_index=True)
 
     def _parse_lap_analysis(self) -> pd.DataFrame:
