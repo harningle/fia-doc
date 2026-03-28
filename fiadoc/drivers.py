@@ -2,7 +2,6 @@
 """Class dealing with driver full name to ID mapping"""
 import json
 import os
-import sys
 import time
 import unicodedata
 import warnings

@@ -28,7 +28,6 @@ def test_download_pdf_uses_cache(requests_mock, tmp_path, monkeypatch):
     second = tmp_path / 'second.pdf'
     download_pdf(url, first)
     requests_mock.reset()
-
     download_pdf(url, second)
 
     assert first.read_bytes() == pdf

@@ -36,10 +36,11 @@ def pytest_configure(config):
     config.addinivalue_line('markers',
                             'full: test against all races in 2024. Extremely slow')
 
-    # Ensure FIADOC_CACHE_DIR is set so all tests share a single persistent cache. On GitHub Action
-    # the env. var. is already set to a directory persisted by actions/cache, so we leave it alone.
-    # Locally we fall back to the same platform-specific path that fiadoc itself uses, so
-    # downloaded PDFs and driver mappings are reused across runs.
+    # Ensure FIADOC_CACHE_DIR is set so all tests share a single persistent cache. GitHub Actions
+    # set env. var. to a directory persisted by actions/cache, so we leave it alone. Locally we
+    # fall back to the `test` subfolder inside the platform-specific path that fiadoc itself uses,
+    # so downloaded PDFs and driver mappings are reused across runs, while separating from the
+    # normal cache
     if 'FIADOC_CACHE_DIR' not in os.environ:
         match sys.platform:
             case 'linux':

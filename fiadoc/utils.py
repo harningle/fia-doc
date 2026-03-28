@@ -3,7 +3,6 @@ import os
 import re
 import shutil
 import sys
-import tempfile
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -139,10 +138,12 @@ def _pdf_cache_path(url: str) -> Path:
 
 
 def _is_valid_pdf(content: bytes) -> bool:
+    if b'%PDF-' not in content[:1024]:  # PyMuPDF can open other file types like HTML even with
+        return False                    # `filetype='pdf'`... So check the bytes here
     try:
         pymupdf.open(stream=content, filetype='pdf')
         return True
-    except:
+    except:  # noqa: E722
         return False
 
 
@@ -162,7 +163,7 @@ def _download_session(n_retries: int = 3) -> requests.Session:
 def download_pdf(url: str, out_path: str | os.PathLike, n_retries: int = 3) -> None:
     """
     Download a PDF file from the given URL with caching and validation.
-    
+
     PDFs are cached locally based on URL hash. Subsequent downloads of the same URL will use the
     cached version if it exists.
     """
