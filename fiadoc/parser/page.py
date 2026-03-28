@@ -6,6 +6,7 @@ import re
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from functools import cache
 from string import printable
 from typing import Literal, Optional
 
@@ -24,8 +25,6 @@ STRIKEOUT_LINE_MARGIN = 0.2
 # Allow apostrophe
 printable += '‘’'  # For names like "O’ward", where we want to keep "’"
 
-_OCR_INSTANCE: Optional[PaddleOCR] = None  # For lazy init.
-
 # Common OCR mistakes
 # TODO: very fragile...
 OCR_ERRORS = {
@@ -39,18 +38,15 @@ OCR_ERRORS = {
 }
 
 
+@cache
 def get_ocr_instance():
     """Initialises and returns a singleton PaddleOCR instance"""
-    # TODO: don't use global
-    global _OCR_INSTANCE  # noqa: PLW0603
-    if _OCR_INSTANCE is None:
-        _OCR_INSTANCE = PaddleOCR(
-            lang='en',
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False
-        )
-    return _OCR_INSTANCE
+    return PaddleOCR(
+        lang='en',
+        use_doc_orientation_classify=False,
+        use_doc_unwarping=False,
+        use_textline_orientation=False
+    )
 
 
 class Page:

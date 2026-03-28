@@ -2,12 +2,9 @@ import json
 import os
 import warnings
 from contextlib import nullcontext
-from tempfile import TemporaryDirectory
 
 import pytest
 import requests_mock
-
-os.environ['FIADOC_CACHE_DIR'] = TemporaryDirectory().name
 
 from fiadoc.drivers import BASE_URL
 from fiadoc.parser import EntryListParser
