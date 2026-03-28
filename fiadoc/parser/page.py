@@ -79,7 +79,7 @@ class Page:
             tol: Optional[float] = 2,
             dpi: Optional[int] = DPI,
             **kwargs
-    ) -> list['BBox']:
+    ) -> list['TextBlock']:
         """`pymupdf.Page.search_for`, with OCR"""
         # Usual search
         if results := self._pymupdf_page.search_for(text, **kwargs):
@@ -110,10 +110,10 @@ class Page:
             )
         ) for i in ocr_results]
 
-        found = [i.bbox for i in ocr_results if text.lower() in i.text.lower()]
-        found = [pymupdf.Rect(i) for i in found
-                 if i[0] > clip[0] - tol and i[1] > clip[1] - tol
-                 and i[2] < clip[2] + tol and i[3] < clip[3] + tol]
+        found = [i for i in ocr_results
+                 if text.lower() in i.text.lower()
+                 and i.bbox[0] > clip[0] - tol and i.bbox[1] > clip[1] - tol
+                 and i.bbox[2] < clip[2] + tol and i.bbox[3] < clip[3] + tol]
         return found
 
     @staticmethod
@@ -145,6 +145,7 @@ class Page:
     def _native_get_text(
             self,
             option: Literal['text', 'words', 'blocks', 'dict'] = 'text',
+            small_area: bool = False,
             **kwargs
     ) -> list['TextBlock']:
         """
@@ -198,11 +199,19 @@ class Page:
                     textblocks = [TextBlock(text=spans[0]['text'], bbox=spans[0]['bbox'])]
                 # Two texts found. Should be one usual text and one superscript
                 case 2:
-                    # Edge case: Antonelli's name may be wrapped into two lines, so we have two
-                    # textblocks here, both of which are normal text
-                    if any(n in span['text'].lower()
-                           for span in spans
-                           for n in ['andrea kimi', 'antonelli']):
+                    # Edge case 1: Antonelli's name may be wrapped into two lines, so we have two
+                    #              textblocks here, both of which are normal text
+                    # Edge case 2: in sector analysis PDF, lap No. col. and pit col. are too close
+                    #              each other, so we can't reliably separate them by position, but
+                    #              have to parse the two cols. as one. In this case, we also have
+                    #              two textblocks, both of which are normal text. The second
+                    #              textblock should be "P" for pit
+                    if (
+                            any(n in span['text'].lower()
+                                for span in spans
+                                for n in ['andrea kimi', 'antonelli'])
+                            or (spans[-1]['text'].lower() == 'p')
+                    ):
                         return [TextBlock(text=' '.join(span['text'].strip() for span in spans),
                                           bbox=(min(span['bbox'][0] for span in spans),
                                                 min(span['bbox'][1] for span in spans),
@@ -318,7 +327,7 @@ class Page:
             raise NotImplementedError('`expected` is not supported yet')
 
         # Try simple search first
-        if results := self._native_get_text(option, clip=clip, **kwargs):
+        if results := self._native_get_text(option, clip=clip, small_area=small_area, **kwargs):
             return results
         logging.debug('No text found natively. Proceed with OCR')
 
@@ -581,6 +590,7 @@ class Page:
 
                 # Get text inside the cell defined by (l, t, r, b)
                 textblocks = self.get_text('dict', clip=(l, t, r, b))
+
                 if not textblocks:
                     # OK to have an empty cell, e.g. the pit col. in quali. lap times PDF should be
                     # empty for non-stop laps
@@ -890,7 +900,7 @@ class TextBlock:
     def text(self, value: str):
         if not isinstance(value, str):
             raise TypeError(f'Invalid `text`: {value}. Expected a string')
-        self._text = value
+        self._text = value.strip()
 
     @property
     def bbox(self) -> Optional[BBox]:

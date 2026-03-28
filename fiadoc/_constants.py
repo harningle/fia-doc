@@ -188,7 +188,7 @@ REGULAR_DRIVERS = {
 DPI = 600
 
 # Expected cols. in the PDFs
-EXPECTED_COLS: dict[str, dict[str, set]] = {
+EXPECTED_COLS: dict[str, dict[str, set | list]] = {
     'entry_list': {
         'required': {'no.', 'constructor'},
         'optional': {'tla', 'driver', 'nat', 'team'}
@@ -196,6 +196,10 @@ EXPECTED_COLS: dict[str, dict[str, set]] = {
     'fp': {
         'required': {'no', 'driver', 'nat', 'entrant', 'time', 'laps', 'gap', 'int', 'km/h',
                      'time of day'},
+        'optional': {}
+    },
+    'race_sector_analysis': {
+        'required': ['lap', 'time', 'km/h', 'time', 'km/h', 'time', 'km/h', 'time'],
         'optional': {}
     }
 }

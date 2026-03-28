@@ -15,6 +15,7 @@ race_list = [
         '2024_10_esp_f1_r0_timing_racelapanalysis_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racehistorychart_v01_1.pdf',
         '2024_10_esp_f1_r0_timing_racelapchart_v01_1.pdf',
+        None,
         2024,
         10,
         'race',
@@ -28,6 +29,7 @@ race_list = [
         '2024_08_mon_f1_r0_timing_racelapanalysis_v01.pdf',
         '2024_08_mon_f1_r0_timing_racehistorychart_v01.pdf',
         '2024_08_mon_f1_r0_timing_racelapchart_v01.pdf',
+        None,
         2024,
         8,
         'race',
@@ -42,6 +44,7 @@ race_list = [
         '2025_10_can_f1_r0_timing_racelapanalysis_v01.pdf',
         '2025_10_can_f1_r0_timing_racehistorychart_v01.pdf',
         '2025_10_can_f1_r0_timing_racelapchart_v01.pdf',
+        None,
         2025,
         10,
         'race',
@@ -52,7 +55,8 @@ race_list = [
     (
         # 3: Only classification PDF available, w/o some lap times PDF
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_race_classification.pdf',
-        '2025_07_ita_f1_r0_timing_racelapanalysis_v01_0.pdf',
+        None,
+        None,
         None,
         None,
         2025,
@@ -61,7 +65,7 @@ race_list = [
         '2025_7_race_classification.json',
         None,
         pytest.raises(FileNotFoundError,
-                      match='Lap chart, history chart, or lap time PDFs is missing')
+                      match='Neither lap analysis PDF nor sector analysis PDF is provided')
     ),
     (
         # 4: Entire PDF is an image (#36)
@@ -69,6 +73,7 @@ race_list = [
         '2025_11_aut_f1_r0_timing_racelapanalysis_v01.pdf',
         '2025_11_aut_f1_r0_timing_racehistorychart_v01.pdf',
         '2025_11_aut_f1_r0_timing_racelapchart_v01.pdf',
+        None,
         2025,
         11,
         'race',
@@ -82,6 +87,7 @@ race_list = [
         '2025_13_bel_f1_s0_timing_sprintlapanalysis_v01.pdf',
         '2025_13_bel_f1_s0_timing_sprinthistorychart_v01.pdf',
         '2025_13_bel_f1_s0_timing_sprintlapchart_v01.pdf',
+        None,
         2025,
         13,
         'sprint',
@@ -95,11 +101,26 @@ race_list = [
         '2025_22_usa_f1_r0_timing_racelapanalysis_v01.pdf',
         '2025_22_usa_f1_r0_timing_racehistorychart_v01.pdf',
         '2025_22_usa_f1_r0_timing_racelapchart_v01.pdf',
+        None,
         2025,
         22,
         'race',
         '2025_22_race_classification.json',
         '2025_22_race_lap_times.json',
+        nullcontext()
+    ),
+    (
+        # 7: Use sector analysis PDF when lap analysis PDF is missing (#jolpica/jolpica-f1#331)
+        'https://www.fia.com/system/files/decision-document/2026_australian_grand_prix_-_final_race_classification.pdf',
+        None,
+        '2026_01_aus_f1_r0_timing_racehistorychart_v01.pdf',
+        None,
+        '2026_01_aus_f1_r0_timing_racesectoranalysis_v01.pdf',
+        2026,
+        1,
+        'race',
+        '2026_1_race_classification.json',
+        '2026_1_race_lap_times.json',
         nullcontext()
     )
 ]
@@ -108,8 +129,9 @@ race_list = [
 @pytest.fixture(params=race_list)
 def prepare_race_data(request, tmp_path) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     # Download and parse race classification and lap times PDFs
-    url_classification, url_lap_analysis, url_history_chart, url_lap_chart, year, round_no, \
-        session, expected_classification, expected_lap_times, context = request.param
+    url_classification, url_lap_analysis, url_history_chart, url_lap_chart, url_sector_analysis, \
+            year, round_no, session, expected_classification, expected_lap_times, context \
+        = request.param
     pdfs = []
     if 'https://' not in url_classification:
         download_pdf('https://www.fia.com/sites/default/files/' + url_classification,
@@ -135,6 +157,12 @@ def prepare_race_data(request, tmp_path) -> tuple[list[dict], list[dict], list[d
         pdfs.append(tmp_path / 'lap_chart.pdf')
     else:
         pdfs.append(None)
+    if url_sector_analysis:
+        download_pdf('https://www.fia.com/sites/default/files/' + url_sector_analysis,
+                     tmp_path / 'sector_analysis.pdf')
+        pdfs.append(tmp_path / 'sector_analysis.pdf')
+    else:
+        pdfs.append(None)
     with context:
         parser = RaceParser(*pdfs, year, round_no, session)
         classification_data = parser.classification_df.to_json()
@@ -154,6 +182,7 @@ def prepare_race_data(request, tmp_path) -> tuple[list[dict], list[dict], list[d
     #       doesn't
     return (sort_json(classification_data),     sort_json(lap_times_data),
             sort_json(expected_classification), sort_json(expected_lap_times))
+
 
 def test_parse_race(prepare_race_data):
     classification_data, lap_times_data, expected_classification, expected_lap_times \
