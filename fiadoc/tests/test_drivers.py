@@ -1,19 +1,16 @@
 # -*- coding: utf-8 -*-
 """If we can handle usual drivers and create driver references for new guys not in Jolpica"""
 import json
-from tempfile import TemporaryDirectory
 
 import pytest
 import requests_mock
 
 from fiadoc.drivers import Drivers, BASE_URL
 
-CACHE_DIR = TemporaryDirectory().name
-
 
 @pytest.fixture
-def drivers() -> Drivers:
-    return Drivers(cache_dir=CACHE_DIR)
+def drivers(tmp_path) -> Drivers:
+    return Drivers(cache_dir=tmp_path)
 
 
 @pytest.fixture

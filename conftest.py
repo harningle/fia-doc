@@ -17,6 +17,10 @@ naming convention of:
          <year>_<round>_race_lap_analysis.pdf, and
          <year>_<round>_race_lap_chart.pdf
 """
+import os
+import sys
+from pathlib import Path
+
 import pytest
 
 
@@ -31,6 +35,24 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     config.addinivalue_line('markers',
                             'full: test against all races in 2024. Extremely slow')
+
+    # Ensure FIADOC_CACHE_DIR is set so all tests share a single persistent cache. GitHub Actions
+    # set env. var. to a directory persisted by actions/cache, so we leave it alone. Locally we
+    # fall back to the `test` subfolder inside the platform-specific path that fiadoc itself uses,
+    # so downloaded PDFs and driver mappings are reused across runs, while separating from the
+    # normal cache
+    if 'FIADOC_CACHE_DIR' not in os.environ:
+        match sys.platform:
+            case 'linux':
+                cache_dir = Path.home() / '.cache' / 'fiadoc' / 'test'
+            case 'darwin':
+                cache_dir = Path.home() / 'Library' / 'Caches' / 'fiadoc' / 'test'
+            case 'win32':
+                cache_dir = Path.home() / 'AppData' / 'Local' / 'fiadoc' / 'Cache' / 'test'
+            case _:
+                raise NotImplementedError(f'Unsupported platform: {sys.platform}')
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        os.environ['FIADOC_CACHE_DIR'] = str(cache_dir)
 
 
 def pytest_runtest_setup(item):
