@@ -1,10 +1,18 @@
+import hashlib
 import os
 import re
-from typing import Any
+import shutil
+import sys
+import time
+from pathlib import Path
+from typing import Any, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import pymupdf
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 rc = {'figure.figsize': (8, 6),
       'axes.facecolor': 'white',  # Remove background colour
@@ -94,15 +102,95 @@ def time_to_timedelta(d: str) -> pd.Timedelta:
         raise ValueError(f'unknown date format: {d}')
 
 
-def download_pdf(url: str, out_path: str | os.PathLike) -> None:
+def _default_cache_dir() -> Path:
     """
-    Download a PDF file from the given URL. This downloads PDFs for testing. This is a temporary
-    solution. Will be deleted when Philipp's package is ready
+    Use `FIADOC_CACHE_DIR` env. var. if set. Otherwise, default to:
+
+    * Windows: %LocalAppData%/fiadoc/Cache
+    * macOS: ~/Library/Caches/fiadoc
+    * Linux: ~/.cache/fiadoc
     """
-    resp = requests.get(url)
-    with open(out_path, 'wb') as f:
-        f.write(resp.content)
-    return
+    env = os.environ.get('FIADOC_CACHE_DIR')
+    if env:
+        cache_dir = Path(env)
+    else:
+        match sys.platform:
+            case 'linux':
+                cache_dir = Path.home() / '.cache' / 'fiadoc'
+            case 'darwin':
+                cache_dir = Path.home() / 'Library' / 'Caches' / 'fiadoc'
+            case 'win32':
+                cache_dir = Path.home() / 'AppData' / 'Local' / 'fiadoc' / 'Cache'
+            case _:
+                raise NotImplementedError(f'Unsupported platform: {sys.platform}')
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def _default_download_cache_dir() -> Path:
+    path = _default_cache_dir() / 'downloads'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _pdf_cache_path(url: str) -> Path:
+    return _default_download_cache_dir() / f'{hashlib.sha256(url.encode("utf-8")).hexdigest()}.pdf'
+
+
+def _is_valid_pdf(content: bytes) -> bool:
+    if b'%PDF-' not in content[:1024]:  # PyMuPDF can open other file types like HTML even with
+        return False                    # `filetype='pdf'`... So check the bytes here
+    try:
+        pymupdf.open(stream=content, filetype='pdf')
+        return True
+    except:  # noqa: E722
+        return False
+
+
+def _download_session(n_retries: int = 3) -> requests.Session:
+    retry = Retry(total=n_retries,
+                  backoff_factor=1,
+                  status_forcelist=(408, 425, 429, 500, 502, 503, 504),
+                  allowed_methods=('GET',),
+                  raise_on_status=False)
+    adapter = HTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
+
+def download_pdf(url: str, out_path: str | os.PathLike, n_retries: int = 3) -> None:
+    """
+    Download a PDF file from the given URL with caching and validation.
+
+    PDFs are cached locally based on URL hash. Subsequent downloads of the same URL will use the
+    cached version if it exists.
+    """
+    out_path = Path(out_path)
+    cache_path = _pdf_cache_path(url)
+    if cache_path.exists():
+        shutil.copy2(cache_path, out_path)
+        return
+
+    last_error: Optional[Exception] = None
+    session = _download_session(n_retries=n_retries)
+    for attempt in range(n_retries):
+        try:
+            resp = session.get(url)
+            resp.raise_for_status()
+            if not _is_valid_pdf(resp.content):
+                last_error = pymupdf.FileDataError(f'Failed to open the PDF at {url}')
+            else:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(cache_path, 'wb') as f:
+                    f.write(resp.content)
+                shutil.copy2(cache_path, out_path)
+                return
+        except requests.RequestException as e:
+            last_error = e
+        time.sleep(attempt + 1)
+    raise last_error
 
 
 def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
