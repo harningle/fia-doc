@@ -1139,7 +1139,7 @@ class RaceParser(BaseParser):
         # Find the page with "Final Classification", on which the table is located
         doc = pymupdf.open(self.classification_file)
         page: Page
-        classification: Optional[list[BBox]] = None
+        classification: Optional[list[TextBlock]] = None
         for page in doc:
             page = Page(page, file=self.classification_file)  # noqa: PLW2901
             top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
