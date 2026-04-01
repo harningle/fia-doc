@@ -1269,8 +1269,8 @@ class RaceParser(BaseParser):
 
         # Repeat the same for "DISQUALIFIED" table, if any
         disqualified = page.search_for('DISQUALIFIED',
-                                         clip=(0, b_table + 1, page.w, page.h),
-                                         dpi=300)
+                                       clip=(0, b_table + 1, page.w, page.h),
+                                       dpi=300)
         if disqualified:
             if black_lines := page.search_for_black_lines(
                     clip=(0, disqualified[0].y1, page.w, page.h)

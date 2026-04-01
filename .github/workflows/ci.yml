@@ -25,13 +25,19 @@ jobs:
           cache: "pip"
           cache-dependency-path: "requirements-dev.txt"
 
-      - name: Cache FIA PDFs
-        uses: actions/cache@v5
+      - name: Restore FIA PDFs cache
+        uses: actions/cache/restore@v5
         with:
           path: ${{ env.FIADOC_CACHE_DIR }}
-          key: fiadoc-cache-${{ runner.os }}-${{ hashFiles('fiadoc/tests/*.py', 'fiadoc/utils.py') }}
-          restore-keys: |
-            fiadoc-cache-${{ runner.os }}-
+          key: fiadoc-pdfs-${{ runner.os }}-dummy  # Dummy key to always miss, so can fall back to
+          restore-keys: |                          # the lastest cache in restore-keys
+            fiadoc-pdfs-${{ runner.os }}-
+
+      - name: Hash PDFs already in cache
+        id: hash-before
+        run: |
+          HASH=$(ls -1 "$FIADOC_CACHE_DIR/downloads" 2>/dev/null | sort | sha256sum | cut -d' ' -f1 || echo "empty")
+          echo "before=$HASH" >> "$GITHUB_OUTPUT"
 
       - name: Install fia-doc
         run: |
@@ -47,3 +53,17 @@ jobs:
 
       - name: Linting
         run: ruff check --output-format=github .
+
+      - name: Hash PDFs after tests
+        if: always()
+        id: hash-after
+        run: |
+          HASH=$(ls -1 "$FIADOC_CACHE_DIR/downloads" 2>/dev/null | sort | sha256sum | cut -d' ' -f1 || echo "empty")
+          echo "after=$HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Save FIA PDFs cache
+        if: always() && github.event_name == 'push' && steps.hash-before.outputs.before != steps.hash-after.outputs.after
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.FIADOC_CACHE_DIR }}
+          key: fiadoc-pdfs-${{ runner.os }}-${{ steps.hash-after.outputs.after }}
