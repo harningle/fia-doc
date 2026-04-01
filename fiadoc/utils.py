@@ -204,3 +204,19 @@ def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             return i
     return _sort_recursively(j)
+
+
+def _pd_concat(objs: list[Optional[pd.DataFrame]], ignore_index: bool = True) -> pd.DataFrame:
+    """
+    To silence "FutureWarning: The behavior of DataFrame concatenation with empty or all-NA
+    entries is deprecated"
+    """
+    cleaned_objs = []
+    for obj in objs:
+        if (obj is not None) and (not obj.empty):
+            obj = obj.dropna(axis=1, how='all')  # Drop all empty cols.  # noqa: PLW2901
+            if not obj.empty:
+                cleaned_objs.append(obj)
+    if not cleaned_objs:
+        raise ValueError('All dfs. are empty or None')
+    return pd.concat(cleaned_objs, ignore_index=ignore_index)

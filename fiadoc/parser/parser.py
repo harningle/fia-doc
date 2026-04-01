@@ -30,7 +30,7 @@ from ..models.foreign_key import (
 )
 from ..models.lap import LapImport, LapObject
 from ..models.pit_stop import PitStopData, PitStopObject
-from ..utils import duration_to_millisecond, time_to_timedelta
+from ..utils import _pd_concat, duration_to_millisecond, time_to_timedelta
 from .page import BBox, Page, ParsingError, TextBlock
 
 PracticeSessionT = Literal['fp', 'fp1', 'fp2', 'fp3']
@@ -1309,7 +1309,7 @@ class RaceParser(BaseParser):
         not_classified['is_classified'] = False
         disqualified['finishing_status'] = 20    # TODO: should clean up the code later
         disqualified['is_classified'] = False
-        df = pd.concat([df, not_classified, disqualified], ignore_index=True)
+        df = _pd_concat([df, not_classified, disqualified])
 
         # Clean up finishing status, e.g. is lapped? Is DSQ?
         df.loc[df.gap.fillna('').str.contains('LAP', regex=False), 'finishing_status'] = 1
@@ -2486,7 +2486,7 @@ class QualifyingParser(BaseParser):
             not_classified['is_classified'] = False
         else:
             not_classified = pd.DataFrame(columns=df.columns)
-        df = pd.concat([df, not_classified], ignore_index=True)
+        df = _pd_concat([df, not_classified])
 
         # Parse "DISQUALIFIED" table, if any
         if disqualified := page.search_for('DISQUALIFIED',
@@ -2529,7 +2529,7 @@ class QualifyingParser(BaseParser):
                 disqualified = pd.DataFrame(columns=df.columns)
         else:
             disqualified = pd.DataFrame(columns=df.columns)
-        df = pd.concat([df, disqualified], ignore_index=True)
+        df = _pd_concat([df, disqualified])
 
         """
         `is_classified` here is simply a flag to indicate whether the driver belongs to the "NOT
@@ -3045,7 +3045,10 @@ class QualifyingParser(BaseParser):
                 })
 
         invalid_laps = pd.DataFrame(invalid_laps)
-        return pd.concat([valid_laps, invalid_laps], ignore_index=True)
+        all_laps = _pd_concat([valid_laps, invalid_laps])
+        if 'lap_no' not in all_laps.columns:  # In case all laps are invalid and thus `lap_no` col.
+            all_laps['lap_no'] = None         # is dropped in the above concat, we add it back
+        return all_laps
 
     @staticmethod
     def _quali_lap_times_to_json(df, year, round_no, session) -> list[dict]:
