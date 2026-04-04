@@ -37,6 +37,20 @@ OCR_ERRORS = {
     '↓': '1'
 }
 
+# `Page.show_page` aesthetic settings
+# TODO: bad practice. Can override plot settings elsewhere
+rc = {'axes.facecolor': 'white',  # Remove background colour
+      'axes.grid': False,         # Turn on grid
+      'axes.linewidth': '0.2',
+      'axes.edgecolor': '0',      # Set axes edge color to be black
+      'font.size': 2,
+      'xtick.major.size': 1,
+      'xtick.major.width': 0.2,
+      'ytick.major.size': 1,
+      'ytick.major.width': 0.2,
+      'figure.autolayout': True}
+plt.rcdefaults()
+plt.rcParams.update(rc)
 
 @cache
 def get_ocr_instance():
