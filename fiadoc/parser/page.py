@@ -7,6 +7,7 @@ import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
+from pathlib import Path
 from string import printable
 from typing import Literal, Optional
 
@@ -51,6 +52,12 @@ rc = {'axes.facecolor': 'white',  # Remove background colour
       'figure.autolayout': True}
 plt.rcdefaults()
 plt.rcParams.update(rc)
+
+# Set to a directory path to save OCR input images for debugging. When None (default), no images
+# are saved. Usage: `page.OCR_DEBUG_DIR = 'debug_ocr'` before parsing.
+OCR_DEBUG_DIR: Optional[str | os.PathLike] = None
+_ocr_debug_counter: int = 0
+
 
 @cache
 def get_ocr_instance():
@@ -453,6 +460,18 @@ class Page:
 
         # Replace light grey pixel (RGB > 200) with white. This improves OCR quality a lot
         pixmap_arr[np.all(pixmap_arr >= 200, axis=2)] = 255  # noqa: PLR2004
+
+        # Save OCR input image for debugging if OCR_DEBUG_DIR is set
+        global _ocr_debug_counter  # noqa: PLW0603
+        if OCR_DEBUG_DIR is not None:
+            from PIL import Image
+            debug_dir = Path(OCR_DEBUG_DIR)
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            _ocr_debug_counter += 1
+            stem = Path(self.file).stem
+            page_num = self._pymupdf_page.number
+            fname = f'{_ocr_debug_counter:03d}_{stem}_p{page_num}'
+            Image.fromarray(pixmap_arr).save(debug_dir / f'{fname}.png')
 
         # OCR the clipped area
         match get_ocr_instance().predict(pixmap_arr):

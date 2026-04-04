@@ -167,3 +167,6 @@ training/labelling/static/
 
 # Mac shit
 .DS_Store
+
+# OCR debug output
+debug_ocr/
