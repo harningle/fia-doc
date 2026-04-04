@@ -11,7 +11,7 @@ import pandas as pd
 import pymupdf
 from scipy.ndimage import find_objects, label
 
-from .._constants import DPI, EXPECTED_COLS, QUALI_DRIVERS, REGULAR_DRIVERS
+from .._constants import EXPECTED_COLS, QUALI_DRIVERS, REGULAR_DRIVERS
 from ..drivers import Drivers
 from ..models.classification import SessionEntryImport, SessionEntryObject
 from ..models.driver import (
@@ -90,11 +90,8 @@ class BaseParser:
                                       of `clip`, are ignored
         :return: List of TextBlock representing the detected cols.
         """
-        # Get the pixmap of `clip` area
-        # TODO: create a get pixmap method in Page
-        pixmap: pymupdf.Pixmap = page.get_pixmap(clip=clip, dpi=DPI)
-        arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8)
-                                      .reshape((pixmap.height, pixmap.width, 3)))
+        # Get the pixmap of `clip` area from cache
+        arr: npt.NDArray[np.uint8] = page.get_pixmap_array(clip=clip, copy=True)
 
         # Replace rows and cols. w/ almost all black pixels with white pixels (those are lines not
         # text). After this step, all black pixels should be texts only
@@ -340,7 +337,8 @@ class EntryListParser(BaseParser):
                                       hlines=hlines,
                                       allow_multiple_texts_per_cell=[0],  # Allow superscripts
                                       header_included=False,
-                                      tol=row_gap)
+                                      tol=row_gap,
+                                      check_strikeout=False)
         df.columns = [i.text.lower() for i in cols]
         df = df.rename(columns={'no.': 'car_no'})
 
@@ -453,7 +451,8 @@ class EntryListParser(BaseParser):
                                                    hlines=hlines_reserve,
                                                    allow_multiple_texts_per_cell=[0],
                                                    header_included=False,
-                                                   tol=col_row_height * 0.3)
+                                                   tol=col_row_height * 0.3,
+                                                   check_strikeout=False)
             reserves_df.columns = [i.text.lower() for i in cols]
             reserves_df = reserves_df.rename(columns={'no.': 'car_no'})
             reserves_df['reserve_for'] = reserves_df.car_no.apply(identify_reserve)
