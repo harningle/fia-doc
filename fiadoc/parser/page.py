@@ -80,37 +80,45 @@ class Page:
         self.file = file           # The PDF file path. Mainly for debug purpose
         self.w = page.bound()[2]   # Width and height, for convenience
         self.h = page.bound()[3]
-        self._pixmap_cache: dict[tuple[int, int], npt.NDArray[np.uint8]] = {}
+        self._pixmap_cache: dict[tuple[int, int, bool], npt.NDArray[np.uint8]] = {}
 
-    def _get_full_page_pixmap(self, dpi: int) -> npt.NDArray[np.uint8]:
-        """Get the full-page pixmap at the given DPI and rotation, caching on first access"""
-        key = (dpi, self._pymupdf_page.rotation)
+    def _get_full_page_pixmap(self, dpi: int, annots: bool = True) -> npt.NDArray[np.uint8]:
+        """Get the full-page pixmap at the given DPI and rotation, caching on first access
+
+        :param dpi: The DPI of the pixmap
+        :param annots: Whether to include annotations. Default is `True`
+        """
+        key = (dpi, self._pymupdf_page.rotation, annots)
         if key not in self._pixmap_cache:
-            pixmap: pymupdf.Pixmap = self._pymupdf_page.get_pixmap(dpi=dpi)
-            self._pixmap_cache[key] = (
-                np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8)
-                .reshape((pixmap.height, pixmap.width, 3))
-                .copy()
-            )
+            pixmap: pymupdf.Pixmap = self._pymupdf_page.get_pixmap(dpi=dpi, annots=annots)
+            self._pixmap_cache[key] = (np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8)
+                                       .reshape((pixmap.height, pixmap.width, 3))
+                                       .copy())
         return self._pixmap_cache[key]
 
-    def get_pixmap_array(self, clip: Optional['BBox'] = None, dpi: int = DPI, copy: bool = False) \
-            -> npt.NDArray[np.uint8]:
+    def get_pixmap_array(
+            self,
+            clip: Optional['BBox'] =
+            None, dpi: int = DPI,
+            copy: bool = False,
+            annots: bool = True
+    ) -> npt.NDArray[np.uint8]:
         """Get page pixmap as a numpy array, sliced from a cached full-page render
 
-        The full page is rendered once per (DPI, rotation) pair and cached. Subsequent calls at the
-        same DPI and rotation return a slice of the cached array. There may be +/-1 px rounding
-        difference vs. a fresh `get_pixmap(clip=...)` call, which is negligible for structural
-        detection (white strips, grey/white rows, connected-component labelling, etc.).
+        The full page is rendered once per (DPI, rotation, annots) combination and cached.
+        Subsequent calls with the same parameters return a slice of the cached array. There may be
+        +/-1 px rounding difference vs. a fresh `.get_pixmap()` call, which is negligible for
+        structural detection (white strips, grey/white rows, connected-component labelling, etc.).
 
         :param clip: `(x0, y0, x1, y1)` in page coordinates. Default is `None`, i.e. full page
         :param dpi: The DPI of the pixmap. Default is 600
         :param copy: If `True`, return a deep copy so the caller can safely modify the array. If
                      `False` (default), return a view/slice of the cached array. It's faster, but
                      the caller **must not** modify it
+        :param annots: Whether to include annotations in the pixmap. Default is `True`
         :return: Pixmap in np.array of shape `(height, width, 3)`, dtype `uint8`
         """
-        arr = self._get_full_page_pixmap(dpi)
+        arr = self._get_full_page_pixmap(dpi, annots=annots)
 
         if clip:
             # Use current (possibly rotated) page bounds, not self.w/self.h which are always the
@@ -441,26 +449,45 @@ class Page:
         2. OCR quality can be really bad. It may say a short light grey line is "-", which breaks
            most of our parsing. So we try our best to avoid OCR-ing such areas
         """
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=dpi, annots=False)
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3))
-                                             .copy())
-        """
-        To get `pixmap` into a numpy array of RGB pixels, we can use either `pixmap.samples` or
-        `pixmap.samples_mv`. The difference is that `pixmap.samples` returns a bytes object, i.e. a
-        copy of the original pixmap, while `pixmap.samples_mv` is a memory view/pointer to the
-        original pixmap. So the latter is significantly faster.
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip,
+                                                                  dpi=dpi,
+                                                                  annots=False,
+                                                                  copy=True)
+        pix_h, pix_w = pixmap_arr.shape[:2]
 
-        However, we still must create a deep `.copy()`. Because PaddleOCR may process the input
-        image inplace, and we are working with a memory view, so during the OCR, the original
-        pixmap may be changed, leading to unexpected errors. I sometimes/very often get segfault
-        errors without the `.copy()`, but can't reproduce it consistently. For safety, always do a
-        copy here.
-
-        A quick benchmark shows that using `pixmap.samples_mv` + `.copy()` is 5x faster than using
-        `pixmap.samples`. This is why we reach the above code.
+        # Remove table border lines
         """
+        The clip area may include a horizontal table border at its top or bottom edge. Even if the
+        clip area has no black text, these black lines/pixels would make the parsers think the cell
+        has black text, triggering expensive OCR on empty cells.
+        
+        To remove these border lines, we search the top and bottom 10% of rows in the pixmap. If a
+        row has a continuous run of black pixels spanning >50% of the row width, replace the row
+        with all white pixels.
+        
+        A visualisation of the below vectorised implementation:
+        Original row:         B B B W B B W 
+        is_black:             1 1 1 0 1 1 0  whether the pixel is black
+        cumsum:               1 2 3 3 4 5 5  cumulative #. of black pixels so far
+        ~is_black:            0 0 0 1 0 0 1  whether the pixel is white
+        cumsum * (~is_black): 0 0 0 3 0 0 5  cumulative #. of black pixels at each white pixel
+        reset:                0 0 0 3 3 3 5  longest black run at the most recent white pixel
+                                             for white pixel: how long is the black run ending here
+                                             for black pixel: how long is the previous black run
+        run_length:           1 2 3 0 1 2 0  length of black pixel runs ending at each pixel
+        """
+        is_black = np.all(pixmap_arr < 50, axis=2)  # noqa: PLR2004
+        cumsum = np.cumsum(is_black, axis=1)
+        reset = np.maximum.accumulate(cumsum * (~is_black), axis=1)
+        run_lengths = cumsum - reset
+        max_run = run_lengths.max(axis=1)
+        border_band = max(1, pix_h // 10)
+        rows_idx = np.r_[0:border_band, pix_h - border_band:pix_h]
+        pixmap_arr[rows_idx[max_run[rows_idx] > pix_w * 0.5], :] = 255
+
+        # Also replace rows anywhere with black run > 80% of row width with all white pixels
+        pixmap_arr[max_run > pix_w * 0.8, :] = 255
+
         if np.sum(pixmap_arr < 50) < 10:  # noqa: PLR2004
             return []
 
@@ -503,7 +530,7 @@ class Page:
                         text=OCR_ERRORS.get(text, text),
                         bbox=self._transform_bbox(
                             bbox=bbox,
-                            from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                            from_page_bound=(0, 0, pix_w, pix_h),
                             to_page_bound=clip
                         ))]
                 else:
@@ -517,7 +544,7 @@ class Page:
                             text=cleaned_text,
                             bbox=self._transform_bbox(
                                 bbox=tuple(i[0]),
-                                from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                                from_page_bound=(0, 0, pix_w, pix_h),
                                 to_page_bound=clip
                             ))
                         )
@@ -603,7 +630,7 @@ class Page:
         np.maximum.at(longest_run_per_row, run_starts[0], run_length)
 
         # Whether a row is a black row (i.e., has a sufficiently long black run)
-        is_black_row: npt.NDArray[np.bool_] = (longest_run_per_row >= pixmap.width * min_length)
+        is_black_row: npt.NDArray[np.bool_] = (longest_run_per_row >= n_cols * min_length)
 
         # Sample down to original resolution
         """

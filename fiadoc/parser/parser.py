@@ -157,8 +157,8 @@ class BaseParser:
             texts = page.get_text('text', clip=(l, t, r, b), small_area=True)
             if len(texts) != 1:
                 raise ParsingError(f'Expected one text block for col. name. Found {texts} inside '
-                                   f'({clip[0]:.2f}, {clip[1]:.2f}, {clip[2]:.2f}, {clip[3]:.2f}) '
-                                   f'on p.{page.number} in {page.file}')
+                                   f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
+                                   f'{page.file}')
             text = texts[0]
             if text.text:
                 # The "/" in "KM/H" is often mis-OCRed. Manually correct it here
