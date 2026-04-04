@@ -338,7 +338,7 @@ class EntryListParser(BaseParser):
                                       allow_multiple_texts_per_cell=[0],  # Allow superscripts
                                       header_included=False,
                                       tol=row_gap,
-                                      check_strikeout=False)
+                                      check_strikeout=None)
         df.columns = [i.text.lower() for i in cols]
         df = df.rename(columns={'no.': 'car_no'})
 
@@ -452,7 +452,7 @@ class EntryListParser(BaseParser):
                                                    allow_multiple_texts_per_cell=[0],
                                                    header_included=False,
                                                    tol=col_row_height * 0.3,
-                                                   check_strikeout=False)
+                                                   check_strikeout=None)
             reserves_df.columns = [i.text.lower() for i in cols]
             reserves_df = reserves_df.rename(columns={'no.': 'car_no'})
             reserves_df['reserve_for'] = reserves_df.car_no.apply(identify_reserve)
@@ -619,12 +619,13 @@ class PracticeParser(BaseParser):
         # Get cols.
         """
         Most cols. names can be easily parsed, except "NAT" and "ENTRANT", which are very close to
-        each other, and sometimes the gap between them is even smaller than the gap between two
-        chars. Therefore, we often get the two cols. as one "NAT ENTRANT". Below we try smaller and
+        each other, and sometimes the gap between them is even smaller than the width of a car.
+        Therefore, we often get the two cols. as one "NAT ENTRANT". Below we try smaller and
         smaller `col_min_gap`, until we get all expected cols. correctly. If even with a very small
-        `col_min_gap` we still can't get the cols. right, raise an error.
+        `col_min_gap` we still can't get the cols. right, then raise an error.
         """
         cols: Optional[list[TextBlock]] = None
+        expected_cols = EXPECTED_COLS['fp_classification']['required']
         for col_min_gap in [1, 0.9, 0.8, 0.7, 0.6, 0.5]:
             try:
                 cols = self._detect_cols(page,
@@ -633,10 +634,10 @@ class PracticeParser(BaseParser):
                 if not cols:
                     raise ParsingError(f'Could not locate cols. in the table header on '
                                        f'{page_no_str}')
-                if {i.text.lower() for i in cols} != EXPECTED_COLS['fp']['required']:
+                if {i.text.lower() for i in cols} != expected_cols:
                     raise ParsingError(
                         f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
-                        f'{EXPECTED_COLS['fp']['required']}. Got: {[i.text for i in cols]}'
+                        f'{expected_cols}. Got: {[i.text for i in cols]}'
                     )
                 break
             except ParsingError:
@@ -644,11 +645,11 @@ class PracticeParser(BaseParser):
             except Exception as e:
                 doc.close()
                 raise e
-        if (not cols) or {i.text.lower() for i in cols} != EXPECTED_COLS['fp']['required']:
+        if (not cols) or {i.text.lower() for i in cols} != expected_cols:
             doc.close()
             raise ParsingError(
-                f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
-                f'{EXPECTED_COLS['fp']['required']}. Got: {[i.text for i in cols]}'
+                f'Got unexpected or miss some cols. on {page_no_str}. Expected: {expected_cols}. '
+                f'Got: {[i.text for i in cols]}'
             )
         vlines = [0,
                   cols[0].bbox[0] - 1,
@@ -678,8 +679,16 @@ class PracticeParser(BaseParser):
                                                  min_height=col_row_height / 2)
 
         # Parse the table using the grid above
-        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False,
-                                      allow_multiple_texts_per_cell=[2, 4])
+        # Only parse needed cols. (e.g. skip NAT, driver name, etc.) to avoid potentially expensive
+        # OCR text extraction. Col. 0 is finishing position, so we `i + 1` below.
+        to_parse = EXPECTED_COLS['fp_classification']['to_parse']
+        parse_cols = {0} | {i + 1 for i, col in enumerate(cols) if col.text.lower() in to_parse}
+        df = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      header_included=False,
+                                      allow_multiple_texts_per_cell=[2, 4],
+                                      parse_cols=parse_cols,
+                                      check_strikeout=None)
         # Allow multiple text blocks in "DRIVER" col. We don't need this col. at all, so don't care
         # if it's correctly parsed, as long as the car. No. col. is correct. The same applies to
         # "ENTRANT" col. as well
@@ -950,9 +959,13 @@ class PracticeParser(BaseParser):
                         )
 
                         # Parse the table
+                        check_strikeout = EXPECTED_COLS['fp_lap_times']['to_check_strikeout']
+                        check_strikeout = [i + 1 for i, c in enumerate(cols)
+                                           if c.text.lower() in check_strikeout]
                         df = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      check_strikeout=check_strikeout or None)
                         if df.empty:
                             continue
                             # TODO: raise a warning here, as we found a driver with zero lap?
@@ -1906,9 +1919,13 @@ class RaceParser(BaseParser):
                             continue
 
                         # Parse the table
+                        check_strikeout = EXPECTED_COLS['race_lap_times']['to_check_strikeout']
+                        check_strikeout = [i + 1 for i, c in enumerate(cols)
+                                           if c.text.lower() in check_strikeout]
                         df = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      check_strikeout=check_strikeout or None)
                         df.columns = ['lap', 'pit', 'lap_time']
                         df['lap_time_deleted'] = df.lap_time.apply(lambda x: x.strikeout is True)
                         df = df.map(self._normalise_textblock)
@@ -2113,10 +2130,15 @@ class RaceParser(BaseParser):
                         continue
 
                     # Parse the table
+                    # TODO: check strikeout index
+                    check_strikeout = EXPECTED_COLS['race_sector_analysis']['to_check_strikeout']
+                    check_strikeout = [i for i, c in enumerate(cols)
+                                       if c.text.lower() in check_strikeout]
                     df = page.parse_table_by_grid(vlines=vlines,
                                                   hlines=hlines,
                                                   header_included=False,
-                                                  allow_multiple_texts_per_cell=[0])
+                                                  allow_multiple_texts_per_cell=[0],
+                                                  check_strikeout=check_strikeout or None)
                     df.columns = ['lap', 'sector_1_time', 'sector_1_speed', 'sector_2_time',
                                   'sector_2_speed', 'sector_3_time', 'sector_3_speed', 'lap_time']
                     df['car_no'] = car_no
@@ -2917,9 +2939,13 @@ class QualifyingParser(BaseParser):
                             continue
 
                         # Parse the table
+                        check_strikeout = EXPECTED_COLS['quali_lap_times']['to_check_strikeout']
+                        check_strikeout = [i + 1 for i, c in enumerate(cols)
+                                           if c.text.lower() in check_strikeout]
                         df = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      check_strikeout=check_strikeout or None)
                         df.columns = ['lap', 'pit', 'lap_time']
                         df['lap_time_deleted'] = df.lap_time.apply(
                             lambda x: x.strikeout is True)

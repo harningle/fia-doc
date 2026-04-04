@@ -242,7 +242,8 @@ def test_page_parse_table_by_grid(page, vlines, hlines, tol, allow_multiple_text
                                       hlines=hlines,
                                       tol=tol,
                                       allow_multiple_texts_per_cell=allow_multiple_texts_per_cell,
-                                      header_included=header_included)
+                                      header_included=header_included,
+                                      check_strikeout=True)
     pd.testing.assert_frame_equal(result,
                                   expected,
                                   check_dtype=False,

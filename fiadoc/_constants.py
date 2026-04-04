@@ -188,19 +188,41 @@ REGULAR_DRIVERS = {
 DPI = 600
 
 # Expected cols. in the PDFs
+"""
+* required: must have cols. If any of these cols. are missing, then means the PDF/table
+            layout changes, and thus we can't parse
+* optional: we cover many years' PDFs, and some cols. are added while others are removed between
+            years. These col. changes don't affect the parsing, so we flag them as optional
+* to_parse: cols. we need to parse. Some required cols. can be skipped to save time, e.g. the
+            country flag col. in classification PDFs. This is different from required cols., as
+            we need all required cols. to make sure the table layout is what we expect, and among
+            these required cols., we only need to parse a subset of them and skip the rest
+"""
 EXPECTED_COLS: dict[str, dict[str, set | list]] = {
     'entry_list': {
         'required': {'no.', 'constructor'},
         'optional': {'tla', 'driver', 'nat', 'team'}
     },
-    'fp': {
+    'fp_classification': {
         'required': {'no', 'driver', 'nat', 'entrant', 'time', 'laps', 'gap', 'int', 'km/h',
                      'time of day'},
-        'optional': {}
+        'to_parse': {'no', 'time', 'laps', 'gap', 'int', 'km/h', 'time of day'}
+    },
+    'fp_lap_times': {
+        'required': {'no', 'time'},
+        'to_check_strikeout': {'time'}
+    },
+    'quali_lap_times': {
+        'required': {'no', 'time'},
+        'to_check_strikeout': {'time'}
+    },
+    'race_lap_times': {
+        'required': {'no', 'time'},
+        'to_check_strikeout': {'time'}
     },
     'race_sector_analysis': {
         'required': ['lap', 'time', 'km/h', 'time', 'km/h', 'time', 'km/h', 'time'],
-        'optional': {}
+        'to_check_strikeout': {'time'}
     }
 }
 

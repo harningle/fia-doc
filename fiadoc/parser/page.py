@@ -670,7 +670,8 @@ class Page:
             tol: float = 3,
             allow_multiple_texts_per_cell: Optional[Sequence[int]] = None,
             header_included: bool = True,
-            check_strikeout: bool = True
+            check_strikeout: Optional[Sequence[int]] | bool = None,
+            parse_cols: Optional[set[int]] = None
     ) -> pd.DataFrame:
         """Parse a table cell by cell, defined by lines separating the cols. and rows
 
@@ -705,26 +706,42 @@ class Page:
                                               0
         :param header_included: whether the first row is header/col. names. Default is False, i.e.
                                 treat everything as table content, and no table header/col. names
-        :param check_strikeout: Whether to check for strikeout text in each cell. Set to `False`
-                                for PDFs that never contain strikeout text (e.g. entry lists) to
-                                avoid expensive per-textblock `search_for_black_lines` calls.
-                                Default is `True`
+        :param check_strikeout: Which cols. to check for strikeout text. Like
+                                `allow_multiple_texts_per_cell`, this is a list of col. indices.
+                                Only cells in these cols. will trigger the expensive per-textblock
+                                strikeout line check. Default is `None`, i.e. don't check anything.
+                                If `True`, then check everything. If `False`, then check nothing
+        :param parse_cols: Col. indices to parse. If provided, only these cols. will have
+                           `.get_text` called; all other cols. are filled with empty `TextBlock`.
+                           Use this to avoid expensive (potential OCR) text extraction for cols.
+                           whose data is not needed. Default is ``None``, i.e. parsed everything
         :return: A `pd.DataFrame`, with each cell being a TextBlock or a list of TextBlocks,
                  depending on `allow_multiple_texts_per_cell`
         """
         page_no_str = f'p.{self.number} in {self.file}'  # For error/warning messages
+        if check_strikeout is False:  # For backward compatibility
+            check_strikeout = None
+        elif check_strikeout is True:
+            check_strikeout = list(range(len(vlines) - 1))
 
         cells: list[list[Optional[TextBlock]]] = []
         for i in range(len(hlines) - 1):
             row = []
             for j in range(len(vlines) - 1):
+                # Skip cols. we don't need to save time
+                if (parse_cols is not None) and (j not in parse_cols):
+                    row.append(TextBlock(text=''))
+                    continue
+
                 l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
                 cell_bbox_str = f'({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f})'  # For error/warnings
 
                 # Get text inside the cell defined by (l, t, r, b)
-                textblocks = self.get_text('dict',
-                                           clip=(l, t, r, b),
-                                           check_strikeout=check_strikeout)
+                textblocks = self.get_text(
+                    'dict',
+                    clip=(l, t, r, b),
+                    check_strikeout=(check_strikeout is not None) and (j in check_strikeout)
+                )
 
                 if not textblocks:
                     # OK to have an empty cell, e.g. the pit col. in quali. lap times PDF should be
