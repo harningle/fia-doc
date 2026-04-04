@@ -19,6 +19,10 @@ import pymupdf
 from paddleocr import PaddleOCR
 
 from .._constants import DPI
+from ..utils import _detect_pymupdf_default_dpi
+
+# Get default DPI of PyMuPDF at runtime, which is 72 usually. Need this for scaling
+_PYMUPDF_DEFAULT_DPI: int = _detect_pymupdf_default_dpi()
 
 # Strikeout line location: it shouldn't be too close to the top or bottom of the text bbox
 STRIKEOUT_LINE_MARGIN = 0.2
@@ -133,7 +137,9 @@ class Page:
         """
         img = self.get_pixmap_array(clip=clip)
         plt.figure(dpi=DPI)
-        plt.imshow(img, extent=(0, img.shape[1] * 72 / DPI, img.shape[0] * 72 / DPI, 0))
+        scaling_factor = DPI / _PYMUPDF_DEFAULT_DPI
+        plt.imshow(img,
+                   extent=(0, img.shape[1] / scaling_factor, img.shape[0] / scaling_factor, 0))
         plt.show()
         return
 
@@ -550,14 +556,14 @@ class Page:
                  from top to bottom
         """
         # Get the pixmap of the clipped area
-        pixmap: pymupdf.Pixmap = self.get_pixmap(
-            clip=clip,
-            matrix=pymupdf.Matrix(scaling_factor, 0, 0, scaling_factor, 0, 0)
-        )
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3))
-                                             .copy())
+        """
+        `scaling_factor` multiplies PyMuPDF's default 72 DPI, so `scaling_factor=4` translates to
+        72 * 4 = 288 DPI, `scaling_factor=16` -> 1152 DPI, etc. The full-page pixmap at this DPI
+        is rendered once and cached; subsequent calls with the same `scaling_factor` are then free
+        array slices.
+        """
+        dpi: int = scaling_factor * _PYMUPDF_DEFAULT_DPI
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip, dpi=dpi)
         n_rows, n_cols, _ = pixmap_arr.shape
 
         # Whether a pixel is black (RGB < `rgb`). Shape = (n_rows, n_cols)
