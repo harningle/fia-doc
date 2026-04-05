@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run RaceParser with OCR debug mode to capture OCR input images"""
+"""Run the parser with OCR debug mode to capture OCR input images"""
 import sys
 from pathlib import Path
 

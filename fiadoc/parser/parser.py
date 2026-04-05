@@ -1197,12 +1197,12 @@ class RaceParser(BaseParser):
         if not cols:
             doc.close()
             raise ParsingError(f'Could not locate cols. in the table header on {page_no_str}')
-        expected_cols = EXPECTED_COLS['race_classification']['required']
+        req_cols = EXPECTED_COLS['race_classification']['required']
         col_names_lower = {i.text.lower() for i in cols}
-        if col_names_lower < expected_cols:
+        if not req_cols.issubset(col_names_lower):
             doc.close()
             raise ParsingError(f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
-                               f'{expected_cols}. Got: {[i.text for i in cols]}')
+                               f'{req_cols}. Got: {[i.text for i in cols]}')
         vlines = [0,
                   cols[0].bbox[0] - 1,
                   (cols[0].bbox[2] + cols[1].bbox[0]) / 2,
@@ -2394,7 +2394,7 @@ class QualifyingParser(BaseParser):
         # Check required cols. are present
         req_cols = EXPECTED_COLS['quali_classification']['required']
         detected_cols = {name.lower() for name in col_name_to_tb}
-        if detected_cols < req_cols:
+        if not req_cols.issubset(detected_cols):
             doc.close()
             raise ParsingError(f'Missing required cols. {req_cols} in {self.classification_file}. '
                                f'Got: {detected_cols}')

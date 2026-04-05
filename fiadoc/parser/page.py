@@ -717,7 +717,7 @@ class Page:
         :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
                        boundaries need to be included
         :param tol: tolerance for text and cell positioning. In principle, all texts should fall
-                    inside the cell's bounding box. Default is 2 pixels, i.e. if text is within 2px
+                    inside the cell's bounding box. Default is 3 pixels, i.e. if text is within 3px
                     of the cell's boundary, it is considered to be inside the cell. If we find any
                     text more than 2px always from the cell's bbox, will raise an error. See #33
         :param allow_multiple_texts_per_cell: Which cols. can have multiple texts per cell. By
@@ -728,8 +728,8 @@ class Page:
                                               set this parameter to [0], i.e. allow col. 0 to have
                                               multiple textblocks per cell. Col. indexes start from
                                               0
-        :param header_included: whether the first row is header/col. names. Default is False, i.e.
-                                treat everything as table content, and no table header/col. names
+        :param header_included: whether the first row is header/col. names. Default is True, i.e.
+                                treat the first row as table header/col. names
         :param check_strikeout: Which cols. to check for strikeout text. Like
                                 `allow_multiple_texts_per_cell`, this is a list of col. indices.
                                 Only cells in these cols. will trigger the expensive per-textblock
