@@ -1154,8 +1154,8 @@ class RaceParser(BaseParser):
         classification: Optional[list[TextBlock]] = None
         for page in doc:
             page = Page(page, file=self.classification_file)  # noqa: PLW2901
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
-            if '.pdf' in page.get_text(clip=top_half, dpi=300)[0].text:  # Fix #59
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h * 0.3)
+            if '.pdf' in page.get_text()[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification', clip=top_half, dpi=100)
             if classification:
@@ -1189,14 +1189,12 @@ class RaceParser(BaseParser):
         if not cols:
             doc.close()
             raise ParsingError(f'Could not locate cols. in the table header on {page_no_str}')
-        if [i.text.upper() for i in cols] != ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'LAPS', 'TIME',
-                                              'GAP', 'INT', 'KM/H', 'FASTEST', 'ON', 'PTS']:
+        expected_cols = EXPECTED_COLS['race_classification']['required']
+        col_names_lower = {i.text.lower() for i in cols}
+        if col_names_lower < expected_cols:
             doc.close()
-            raise ParsingError(
-                f'Got unexpected or miss some cols. on {page_no_str}. Expected "NO", "DRIVER", '
-                f'"NAT", "ENTRANT", "LAPS", "TIME", "GAP", "INT", "KM/H", "FASTEST", "ON", and '
-                f'"PTS". Got: {[i.text for i in cols]}'
-            )
+            raise ParsingError(f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
+                               f'{expected_cols}. Got: {[i.text for i in cols]}')
         vlines = [0,
                   cols[0].bbox[0] - 1,
                   (cols[0].bbox[2] + cols[1].bbox[0]) / 2,
@@ -1226,8 +1224,16 @@ class RaceParser(BaseParser):
                                                  min_height=col_row_height / 2)
 
         # Parse the table using the grid above
-        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False,
-                                      allow_multiple_texts_per_cell=[2, 4])
+        # Only parse needed cols. (e.g. skip driver, nat, entrant, int, km/h) to avoid potentially
+        # expensive text extraction. Col. 0 is finishing position, so we `i + 1` below.
+        to_parse = EXPECTED_COLS['race_classification']['to_parse']
+        parse_cols = {0} | {i + 1 for i, col in enumerate(cols) if col.text.lower() in to_parse}
+        df = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      allow_multiple_texts_per_cell=[2, 4],
+                                      parse_cols=parse_cols,
+                                      check_strikeout=None,
+                                      header_included=False)
         df.columns = ['finishing_position', 'car_no', 'driver', 'nat', 'team', 'laps_completed',
                       'time', 'gap', 'int', 'avg_speed', 'fastest_lap_time', 'fastest_lap_no',
                       'points']
@@ -1241,10 +1247,11 @@ class RaceParser(BaseParser):
         """
 
         # Check if there is a "NOT CLASSIFIED" table below the main table
-        not_classified = page.search_for('NOT CLASSIFIED',
-                                         clip=(0, b_table + 1, page.w, page.h),
-                                         dpi=300)
-
+        not_classified = page.search_for(
+            'NOT CLASSIFIED',
+            clip=(page.w * 0.4, b_table + 1, page.w * 0.6, page.h * 0.95),
+            dpi=300
+        )
         # If yes, repeat the above for the "NOT CLASSIFIED" table
         if not_classified:
             if black_lines := page.search_for_black_lines(
@@ -1270,8 +1277,10 @@ class RaceParser(BaseParser):
                                                      min_height=col_row_height / 3)
             not_classified = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False,
-                                                      allow_multiple_texts_per_cell=[2, 4])
+                                                      allow_multiple_texts_per_cell=[2, 4],
+                                                      parse_cols=parse_cols,
+                                                      check_strikeout=None,
+                                                      header_included=False)
             not_classified.columns = df.columns
             not_classified.position = None  # No finishing position for unclassified drivers
             not_classified = not_classified.map(self._normalise_textblock, merge_multi_tbs=True)
@@ -1280,9 +1289,11 @@ class RaceParser(BaseParser):
             not_classified = pd.DataFrame(columns=df.columns)
 
         # Repeat the same for "DISQUALIFIED" table, if any
-        disqualified = page.search_for('DISQUALIFIED',
-                                       clip=(0, b_table + 1, page.w, page.h),
-                                       dpi=300)
+        disqualified = page.search_for(
+            'DISQUALIFIED',
+            clip=(page.w * 0.4, b_table + 1, page.w * 0.6, page.h * 0.95),
+            dpi=300
+        )
         if disqualified:
             if black_lines := page.search_for_black_lines(
                     clip=(0, disqualified[0].y1, page.w, page.h)
@@ -1307,8 +1318,10 @@ class RaceParser(BaseParser):
                                                      min_height=col_row_height / 3)
             disqualified = page.parse_table_by_grid(vlines=vlines,
                                                     hlines=hlines,
-                                                    header_included=False,
-                                                    allow_multiple_texts_per_cell=[2, 4])
+                                                    allow_multiple_texts_per_cell=[2, 4],
+                                                    parse_cols=parse_cols,
+                                                    check_strikeout=None,
+                                                    header_included=False)
             disqualified.columns = df.columns
             disqualified.position = None  # No finishing position for disqualified drivers
             disqualified = disqualified.map(self._normalise_textblock, merge_multi_tbs=True)
