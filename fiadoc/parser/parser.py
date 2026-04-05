@@ -2318,8 +2318,8 @@ class QualifyingParser(BaseParser):
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)  # noqa: PLW2901
             # Table/page title should appear in top half of the page
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
-            if '.pdf' in page.get_text(clip=top_half, dpi=300)[0].text:  # Fix #59
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
+            if '.pdf' in page.get_text()[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification', clip=top_half, dpi=100)
             if classification:
@@ -2430,9 +2430,9 @@ class QualifyingParser(BaseParser):
         # Boundary between Q1_TIME and Q2
         page.set_rotation(90)
         black_lines = page.search_for_black_lines(clip=(page.h - b_table,
-                                                  col_name_to_tb['Q1_TIME'].r,
-                                                  page.h - t_table_body,
-                                                  col_name_to_tb['Q2'].l),
+                                                        col_name_to_tb['Q1_TIME'].r,
+                                                        page.h - t_table_body,
+                                                        col_name_to_tb['Q2'].l),
                                                   scaling_factor=16)
         if len(black_lines) != 1:
             doc.close()
@@ -2482,9 +2482,11 @@ class QualifyingParser(BaseParser):
         df['is_classified'] = True
 
         # Parse "NOT CLASSIFIED" table, if any
-        if not_classified := page.search_for('NOT CLASSIFIED',
-                                             clip=(0, b_table, page.w, page.h),
-                                             dpi=300):
+        if not_classified := page.search_for(
+                'NOT CLASSIFIED',
+                clip=(page.w * 0.4, b_table, page.w * 0.6, page.h * 0.95),
+                dpi=300
+        ):
             t_table_body = not_classified[0].y1 + 1
             if white_strips:= page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
                                                            height=col_row_height / 3):
@@ -2510,9 +2512,11 @@ class QualifyingParser(BaseParser):
         df = _pd_concat([df, not_classified])
 
         # Parse "DISQUALIFIED" table, if any
-        if disqualified := page.search_for('DISQUALIFIED',
-                                           clip=(0, b_table, page.w, page.h),
-                                           dpi=300):
+        if disqualified := page.search_for(
+                'DISQUALIFIED',
+                clip=(page.w * 0.4, b_table, page.w * 0.6, page.h * 0.95),
+                dpi=300
+        ):
             """
             There can be multiple "DISQUALIFIED" text. E.g., in the penalty notes, we may have
             "DISQUALIFIED", and we may have "DISQUALIFIED" as the table title. The table title
@@ -2745,7 +2749,7 @@ class QualifyingParser(BaseParser):
             # Find "Lap Times"
             page = Page(page, file=self.lap_times_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {self.lap_times_file}'
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             quali_lap_times = page.search_for('Lap Times', clip=top_half, dpi=100)
             if len(quali_lap_times) != 1:
                 doc.close()
@@ -3080,7 +3084,7 @@ class QualifyingParser(BaseParser):
         # TODO: Very bad. Why did I create this method???
         lap_data = []
         # TODO: first lap's lap time is calendar time, not lap time, so drop it
-        # Lap No. can be missing (e.g.#47)
+        # Lap No. can be missing (e.g. #47)
         df = df[(df.lap_no >= 2) | df.lap_no.isna()].copy()  # noqa: PLR2004
         df.lap_time = df.lap_time.apply(duration_to_millisecond)
         for q in [1, 2, 3]:
