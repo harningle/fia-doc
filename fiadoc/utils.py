@@ -7,25 +7,29 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import pymupdf
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
-rc = {'figure.figsize': (8, 6),
-      'axes.facecolor': 'white',  # Remove background colour
-      'axes.grid': False,         # Turn on grid
-      'axes.linewidth': '0.2',
-      'axes.edgecolor': '0',      # Set axes edge color to be black
-      'font.size': 2,
-      'xtick.major.size': 1,
-      'xtick.major.width': 0.2,
-      'ytick.major.size': 1,
-      'ytick.major.width': 0.2}
-plt.rcdefaults()
-plt.rcParams.update(rc)
+
+def _detect_pymupdf_default_dpi() -> int:
+    """Derive PyMuPDF's default DPI empirically
+
+    PDF points are defined as 1 / 72 inch (ISO 32000), and PyMuPDF's identity matrix maps 1 point
+    -> 1 pixel, giving a default of 72 DPI.  Rather than hardcoding that 72 value (because I don't
+    really trust PyMuPDF...), we derive it empirically: render a tiny blank page at the identity
+    matrix and at a known DPI, then solve `base_dpi = known_dpi * identity_width / known_width`.
+    """
+    _doc = pymupdf.open()
+    _doc.new_page(width=100, height=100)
+    _page = _doc[0]
+    _w_identity: int = _page.get_pixmap().width
+    _known_dpi: int = 100
+    _w_known: int = _page.get_pixmap(dpi=_known_dpi).width
+    _doc.close()
+    return round(_known_dpi * _w_identity / _w_known)
 
 
 def duration_to_millisecond(s: str | None) -> dict[str, str | int] | None:

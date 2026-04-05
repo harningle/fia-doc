@@ -7,6 +7,7 @@ import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
+from pathlib import Path
 from string import printable
 from typing import Literal, Optional
 
@@ -18,6 +19,10 @@ import pymupdf
 from paddleocr import PaddleOCR
 
 from .._constants import DPI
+from ..utils import _detect_pymupdf_default_dpi
+
+# Get default DPI of PyMuPDF at runtime, which is 72 usually. Need this for scaling
+_PYMUPDF_DEFAULT_DPI: int = _detect_pymupdf_default_dpi()
 
 # Strikeout line location: it shouldn't be too close to the top or bottom of the text bbox
 STRIKEOUT_LINE_MARGIN = 0.2
@@ -37,6 +42,26 @@ OCR_ERRORS = {
     '↓': '1'
 }
 
+# `Page.show_page` aesthetic settings
+# TODO: bad practice. Can override plot settings elsewhere
+rc = {'axes.facecolor': 'white',  # Remove background colour
+      'axes.grid': False,         # Turn on grid
+      'axes.linewidth': '0.2',
+      'axes.edgecolor': '0',      # Set axes edge color to be black
+      'font.size': 2,
+      'xtick.major.size': 1,
+      'xtick.major.width': 0.2,
+      'ytick.major.size': 1,
+      'ytick.major.width': 0.2,
+      'figure.autolayout': True}
+plt.rcdefaults()
+plt.rcParams.update(rc)
+
+# Set to a directory path to save OCR input images for debugging. When None (default), no images
+# are saved. Usage: `page.OCR_DEBUG_DIR = 'debug_ocr'` before parsing.
+OCR_DEBUG_DIR: Optional[str | os.PathLike] = None
+_ocr_debug_counter: int = 0
+
 
 @cache
 def get_ocr_instance():
@@ -55,6 +80,60 @@ class Page:
         self.file = file           # The PDF file path. Mainly for debug purpose
         self.w = page.bound()[2]   # Width and height, for convenience
         self.h = page.bound()[3]
+        self._pixmap_cache: dict[tuple[int, int, bool], npt.NDArray[np.uint8]] = {}
+
+    def _get_full_page_pixmap(self, dpi: int, annots: bool = True) -> npt.NDArray[np.uint8]:
+        """Get the full-page pixmap at the given DPI and rotation, caching on first access
+
+        :param dpi: The DPI of the pixmap
+        :param annots: Whether to include annotations. Default is `True`
+        """
+        key = (dpi, self._pymupdf_page.rotation, annots)
+        if key not in self._pixmap_cache:
+            pixmap: pymupdf.Pixmap = self._pymupdf_page.get_pixmap(dpi=dpi, annots=annots)
+            self._pixmap_cache[key] = (np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8)
+                                       .reshape((pixmap.height, pixmap.width, 3))
+                                       .copy())
+        return self._pixmap_cache[key]
+
+    def get_pixmap_array(
+            self,
+            clip: Optional['BBox'] =
+            None, dpi: int = DPI,
+            copy: bool = False,
+            annots: bool = True
+    ) -> npt.NDArray[np.uint8]:
+        """Get page pixmap as a numpy array, sliced from a cached full-page render
+
+        The full page is rendered once per (DPI, rotation, annots) combination and cached.
+        Subsequent calls with the same parameters return a slice of the cached array. There may be
+        +/-1 px rounding difference vs. a fresh `.get_pixmap()` call, which is negligible for
+        structural detection (white strips, grey/white rows, connected-component labelling, etc.).
+
+        :param clip: `(x0, y0, x1, y1)` in page coordinates. Default is `None`, i.e. full page
+        :param dpi: The DPI of the pixmap. Default is 600
+        :param copy: If `True`, return a deep copy so the caller can safely modify the array. If
+                     `False` (default), return a view/slice of the cached array. It's faster, but
+                     the caller **must not** modify it
+        :param annots: Whether to include annotations in the pixmap. Default is `True`
+        :return: Pixmap in np.array of shape `(height, width, 3)`, dtype `uint8`
+        """
+        arr = self._get_full_page_pixmap(dpi, annots=annots)
+
+        if clip:
+            # Use current (possibly rotated) page bounds, not self.w/self.h which are always the
+            # original unrotated dimensions
+            bound = self._pymupdf_page.bound()
+            page_w, page_h = bound[2], bound[3]
+            scale_y: float = arr.shape[0] / page_h
+            scale_x: float = arr.shape[1] / page_w
+            px0 = max(0, int(round(clip[0] * scale_x)))
+            px1 = min(arr.shape[1], int(round(clip[2] * scale_x)))
+            py0 = max(0, int(round(clip[1] * scale_y)))
+            py1 = min(arr.shape[0], int(round(clip[3] * scale_y)))
+            arr = arr[py0:py1, px0:px1]
+
+        return arr.copy() if copy else arr
 
     def __getattr__(self, name: str):
         return getattr(self._pymupdf_page, name)  # If a method/attr. is not found, use PyMuPDF's
@@ -64,11 +143,11 @@ class Page:
 
         See https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/table-analysis/show_image.py
         """
-        pixmap = self.get_pixmap(clip=clip, dpi=DPI)
-        img = np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8) \
-            .reshape((pixmap.height, pixmap.width, 3))
+        img = self.get_pixmap_array(clip=clip)
         plt.figure(dpi=DPI)
-        plt.imshow(img, extent=(0, pixmap.w * 72 / DPI, pixmap.h * 72 / DPI, 0))
+        scaling_factor = DPI / _PYMUPDF_DEFAULT_DPI
+        plt.imshow(img,
+                   extent=(0, img.shape[1] / scaling_factor, img.shape[0] / scaling_factor, 0))
         plt.show()
         return
 
@@ -91,21 +170,34 @@ class Page:
         if clip is None:
             raise ValueError('Without OCR we found nothing. And `clip` must be provided when '
                              'searching with OCR, to avoid very slow OCR and bad quality')
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=dpi, annots=False)
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3))
-                                             .copy())
+        # Use cached pixmap array instead of creating a new pixmap each time
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip, dpi=dpi, annots=False,
+                                                                  copy=True)
+
+        # Save OCR input image for debugging if OCR_DEBUG_DIR is set
+        global _ocr_debug_counter  # noqa: PLW0603
+        if OCR_DEBUG_DIR is not None:
+            from PIL import Image  # noqa: PLC0415
+            debug_dir = Path(OCR_DEBUG_DIR)
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            _ocr_debug_counter += 1
+            stem = Path(self.file).stem
+            page_num = self._pymupdf_page.number
+            clip_str = f'c{clip[0]:.2f}_{clip[1]:.2f}_{clip[2]:.2f}_{clip[3]:.2f}'
+            fname = f'{_ocr_debug_counter:03d}_{stem}_p{page_num}_{clip_str}_search_for'
+            Image.fromarray(pixmap_arr).save(debug_dir / f'{fname}.png')
+
         ocr_results = get_ocr_instance().predict(pixmap_arr)[0]
         ocr_results = zip(ocr_results['rec_boxes'], ocr_results['rec_texts'])
 
         # Because of the DPI, the bounding boxes of texts after OCR may not be in the same
         # coordinate system as the original PDF page. Convert them back
+        pix_h, pix_w = pixmap_arr.shape[:2]
         ocr_results = [TextBlock(
             text=OCR_ERRORS.get(i[1], i[1]),
             bbox=self._transform_bbox(
                 bbox=tuple(i[0]),
-                from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                from_page_bound=(0, 0, pix_w, pix_h),
                 to_page_bound=clip
             )
         ) for i in ocr_results]
@@ -146,6 +238,7 @@ class Page:
             self,
             option: Literal['text', 'words', 'blocks', 'dict'] = 'text',
             small_area: bool = False,
+            check_strikeout: bool = True,
             **kwargs
     ) -> list['TextBlock']:
         """
@@ -156,6 +249,10 @@ class Page:
         there can be at most one superscript and at most one regular text in one `.get_text()`
         call, etc. That is, whenever we call `.get_text()` with `option=dict`, we are getting the
         text within a small area, e.g. a table cell
+
+        There is one additional parameter `check_strikeout` for perf. concern. Checking if there is
+        a strikeout line on top of a text needs some slow imaging processing, so we add this flag
+        to skip this step for PDFs that never have strikeout text (e.g. entry list PDFs)
         """
         if option not in {'text', 'words', 'blocks', 'dict'}:
             raise NotImplementedError(f'`option` can only be one of "text", "words", '
@@ -255,16 +352,22 @@ class Page:
                 case _:
                     raise ParsingError(error_message)
 
-            # When `option = dict`, also need to check if any strikeout text
-            for textblock in textblocks:
-                l, t, r, b = textblock.bbox
-                h = b - t
-                if self.search_for_black_lines(
-                        clip=(l, t + STRIKEOUT_LINE_MARGIN * h, r, b - STRIKEOUT_LINE_MARGIN * h),
-                        min_length=0.9,  # We are using the text's bbox, so relative to it, the
-                        rgb=192          # strikeout line should span almost the entire width
-                ):
-                    textblock.strikeout = True
+            # When `option = dict` and `check_strikeout = True`, need to check for strikeout text
+            if check_strikeout:
+                for textblock in textblocks:
+                    l, t, r, b = textblock.bbox
+                    h = b - t
+                    if self.search_for_black_lines(
+                            clip=(
+                                    l,
+                                    t + STRIKEOUT_LINE_MARGIN * h,
+                                    r,
+                                    b - STRIKEOUT_LINE_MARGIN * h
+                            ),
+                            min_length=0.9,  # We are using the text's bbox, so relative to it, the
+                            rgb=192          # strikeout line should span almost the entire width
+                    ):
+                        textblock.strikeout = True
             return textblocks
 
     @staticmethod
@@ -296,6 +399,7 @@ class Page:
             small_area: bool = False,
             expected: Optional[re.Pattern] = None,
             dpi: Optional[int] = DPI,
+            check_strikeout: bool = True,
             **kwargs
     ) -> list['TextBlock']:
         r"""This is `pymupdf.Page.get_text` w/ OCR functionality
@@ -320,6 +424,11 @@ class Page:
         :param dpi: The DPI for OCR. Higher DPI can improve OCR quality, but also significantly
                     slow down the OCR process. Will be ignored if we find text without OCR. Default
                     is 600, which is very slow but has great quality
+        :param check_strikeout: Whether to check for strikeout text when `option='dict'`. Each
+                                check calls `search_for_black_lines` per textblock, which renders
+                                a pixmap. Set to `False` to skip this (e.g. entry list PDFs never
+                                have strikeout text). Default is `True`. This flag is ignored if
+                                `option != 'dict'`
         :param kwargs: Other keyword arguments to pass to `pymupdf.Page.get_text`
         :return: A list of `TextBlock`s
         """
@@ -327,7 +436,8 @@ class Page:
             raise NotImplementedError('`expected` is not supported yet')
 
         # Try simple search first
-        if results := self._native_get_text(option, clip=clip, small_area=small_area, **kwargs):
+        if results := self._native_get_text(option, clip=clip, small_area=small_area,
+                                            check_strikeout=check_strikeout, **kwargs):
             return results
         logging.debug('No text found natively. Proceed with OCR')
 
@@ -352,31 +462,73 @@ class Page:
         2. OCR quality can be really bad. It may say a short light grey line is "-", which breaks
            most of our parsing. So we try our best to avoid OCR-ing such areas
         """
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=dpi, annots=False)
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3))
-                                             .copy())
-        """
-        To get `pixmap` into a numpy array of RGB pixels, we can use either `pixmap.samples` or
-        `pixmap.samples_mv`. The difference is that `pixmap.samples` returns a bytes object, i.e. a
-        copy of the original pixmap, while `pixmap.samples_mv` is a memory view/pointer to the
-        original pixmap. So the latter is significantly faster.
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip,
+                                                                  dpi=dpi,
+                                                                  annots=False,
+                                                                  copy=True)
+        pix_h, pix_w = pixmap_arr.shape[:2]
 
-        However, we still must create a deep `.copy()`. Because PaddleOCR may process the input
-        image inplace, and we are working with a memory view, so during the OCR, the original
-        pixmap may be changed, leading to unexpected errors. I sometimes/very often get segfault
-        errors without the `.copy()`, but can't reproduce it consistently. For safety, always do a
-        copy here.
-
-        A quick benchmark shows that using `pixmap.samples_mv` + `.copy()` is 5x faster than using
-        `pixmap.samples`. This is why we reach the above code.
+        # Remove table border lines
         """
+        The clip area may include a horizontal table border at its top or bottom edge. Even if the
+        clip area has no black text, these black lines/pixels would make the parsers think the cell
+        has black text, triggering expensive OCR on empty cells.
+
+        To remove these border lines, we search the top and bottom 10% of rows in the pixmap. If a
+        row has a continuous run of black pixels spanning >50% of the row width, replace the row
+        with all white pixels.
+
+        A visualisation of the below vectorised implementation:
+        Original row:         B B B W B B W
+        is_black:             1 1 1 0 1 1 0  whether the pixel is black
+        cumsum:               1 2 3 3 4 5 5  cumulative #. of black pixels so far
+        ~is_black:            0 0 0 1 0 0 1  whether the pixel is white
+        cumsum * (~is_black): 0 0 0 3 0 0 5  cumulative #. of black pixels at each white pixel
+        reset:                0 0 0 3 3 3 5  longest black run at the most recent white pixel
+                                             for white pixel: how long is the black run ending here
+                                             for black pixel: how long is the previous black run
+        run_length:           1 2 3 0 1 2 0  length of black pixel runs ending at each pixel
+        """
+        is_black = np.all(pixmap_arr < 50, axis=2)  # noqa: PLR2004
+        cumsum = np.cumsum(is_black, axis=1)
+        reset = np.maximum.accumulate(cumsum * (~is_black), axis=1)
+        run_lengths = cumsum - reset
+        max_run = run_lengths.max(axis=1)
+        border_band = max(1, pix_h // 10)
+        rows_idx = np.r_[0:border_band, pix_h - border_band:pix_h]
+        pixmap_arr[rows_idx[max_run[rows_idx] > pix_w * 0.5], :] = 255
+
+        # Also replace rows anywhere with black run > 80% of row width with all white pixels
+        pixmap_arr[max_run > pix_w * 0.8, :] = 255
+
+        # Remove vertical table border lines (conservatively: only columns that are >95% black)
+        """
+        Similar to horizontal borders, vertical borders can occur between table columns. However,
+        a single black column could be the letter "l" (lowercase L) or "1" (one), so we only remove
+        columns that are >95% black to avoid removing text.
+        """
+        is_black_cols = np.all(pixmap_arr < 50, axis=2)  # TODO: magic value # noqa: PLR2004
+        black_ratio_per_col = np.mean(is_black_cols, axis=0)
+        pixmap_arr[:, black_ratio_per_col > 0.95, :] = 255  # TODO: magic value # noqa: PLR2004
+
         if np.sum(pixmap_arr < 50) < 10:  # noqa: PLR2004
             return []
 
         # Replace light grey pixel (RGB > 200) with white. This improves OCR quality a lot
         pixmap_arr[np.all(pixmap_arr >= 200, axis=2)] = 255  # noqa: PLR2004
+
+        # Save OCR input image for debugging if OCR_DEBUG_DIR is set
+        global _ocr_debug_counter  # noqa: PLW0603
+        if OCR_DEBUG_DIR is not None:
+            from PIL import Image  # noqa: PLC0415
+            debug_dir = Path(OCR_DEBUG_DIR)
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            _ocr_debug_counter += 1
+            stem = Path(self.file).stem
+            page_num = self._pymupdf_page.number
+            clip_str = f'c{clip[0]:.2f}_{clip[1]:.2f}_{clip[2]:.2f}_{clip[3]:.2f}'
+            fname = f'{_ocr_debug_counter:03d}_{stem}_p{page_num}_{clip_str}_get_text'
+            Image.fromarray(pixmap_arr).save(debug_dir / f'{fname}.png')
 
         # OCR the clipped area
         match get_ocr_instance().predict(pixmap_arr):
@@ -402,7 +554,7 @@ class Page:
                         text=OCR_ERRORS.get(text, text),
                         bbox=self._transform_bbox(
                             bbox=bbox,
-                            from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                            from_page_bound=(0, 0, pix_w, pix_h),
                             to_page_bound=clip
                         ))]
                 else:
@@ -416,7 +568,7 @@ class Page:
                             text=cleaned_text,
                             bbox=self._transform_bbox(
                                 bbox=tuple(i[0]),
-                                from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                                from_page_bound=(0, 0, pix_w, pix_h),
                                 to_page_bound=clip
                             ))
                         )
@@ -455,14 +607,14 @@ class Page:
                  from top to bottom
         """
         # Get the pixmap of the clipped area
-        pixmap: pymupdf.Pixmap = self.get_pixmap(
-            clip=clip,
-            matrix=pymupdf.Matrix(scaling_factor, 0, 0, scaling_factor, 0, 0)
-        )
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3))
-                                             .copy())
+        """
+        `scaling_factor` multiplies PyMuPDF's default 72 DPI, so `scaling_factor=4` translates to
+        72 * 4 = 288 DPI, `scaling_factor=16` -> 1152 DPI, etc. The full-page pixmap at this DPI
+        is rendered once and cached; subsequent calls with the same `scaling_factor` are then free
+        array slices.
+        """
+        dpi: int = scaling_factor * _PYMUPDF_DEFAULT_DPI
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip, dpi=dpi)
         n_rows, n_cols, _ = pixmap_arr.shape
 
         # Whether a pixel is black (RGB < `rgb`). Shape = (n_rows, n_cols)
@@ -502,7 +654,7 @@ class Page:
         np.maximum.at(longest_run_per_row, run_starts[0], run_length)
 
         # Whether a row is a black row (i.e., has a sufficiently long black run)
-        is_black_row: npt.NDArray[np.bool_] = (longest_run_per_row >= pixmap.width * min_length)
+        is_black_row: npt.NDArray[np.bool_] = (longest_run_per_row >= n_cols * min_length)
 
         # Sample down to original resolution
         """
@@ -539,9 +691,11 @@ class Page:
             self,
             vlines: list[float],
             hlines: list[float],
-            tol: float = 2,
+            tol: float = 3,
             allow_multiple_texts_per_cell: Optional[Sequence[int]] = None,
-            header_included: bool = True
+            header_included: bool = True,
+            check_strikeout: Optional[Sequence[int]] | bool = None,
+            parse_cols: Optional[Sequence[int]] = None
     ) -> pd.DataFrame:
         """Parse a table cell by cell, defined by lines separating the cols. and rows
 
@@ -563,7 +717,7 @@ class Page:
         :param hlines: y-coords. of horizontal lines separating the rows. Table top and bottom
                        boundaries need to be included
         :param tol: tolerance for text and cell positioning. In principle, all texts should fall
-                    inside the cell's bounding box. Default is 2 pixels, i.e. if text is within 2px
+                    inside the cell's bounding box. Default is 3 pixels, i.e. if text is within 3px
                     of the cell's boundary, it is considered to be inside the cell. If we find any
                     text more than 2px always from the cell's bbox, will raise an error. See #33
         :param allow_multiple_texts_per_cell: Which cols. can have multiple texts per cell. By
@@ -574,22 +728,44 @@ class Page:
                                               set this parameter to [0], i.e. allow col. 0 to have
                                               multiple textblocks per cell. Col. indexes start from
                                               0
-        :param header_included: whether the first row is header/col. names. Default is False, i.e.
-                                treat everything as table content, and no table header/col. names
+        :param header_included: whether the first row is header/col. names. Default is True, i.e.
+                                treat the first row as table header/col. names
+        :param check_strikeout: Which cols. to check for strikeout text. Like
+                                `allow_multiple_texts_per_cell`, this is a list of col. indices.
+                                Only cells in these cols. will trigger the expensive per-textblock
+                                strikeout line check. Default is `None`, i.e. don't check anything.
+                                If `True`, then check everything. If `False`, then check nothing
+        :param parse_cols: Col. indices to parse. If provided, only these cols. will have
+                           `.get_text` called; all other cols. are filled with empty `TextBlock`.
+                           Use this to avoid expensive (potential OCR) text extraction for cols.
+                           whose data is not needed. Default is ``None``, i.e. parsed everything
         :return: A `pd.DataFrame`, with each cell being a TextBlock or a list of TextBlocks,
                  depending on `allow_multiple_texts_per_cell`
         """
         page_no_str = f'p.{self.number} in {self.file}'  # For error/warning messages
+        if check_strikeout is False:  # For backward compatibility
+            check_strikeout = None
+        elif check_strikeout is True:
+            check_strikeout = list(range(len(vlines) - 1))
 
         cells: list[list[Optional[TextBlock]]] = []
         for i in range(len(hlines) - 1):
             row = []
             for j in range(len(vlines) - 1):
+                # Skip cols. we don't need to save time
+                if (parse_cols is not None) and (j not in parse_cols):
+                    row.append(TextBlock(text=''))
+                    continue
+
                 l, t, r, b = vlines[j], hlines[i], vlines[j + 1], hlines[i + 1]
                 cell_bbox_str = f'({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f})'  # For error/warnings
 
                 # Get text inside the cell defined by (l, t, r, b)
-                textblocks = self.get_text('dict', clip=(l, t, r, b))
+                textblocks = self.get_text(
+                    'dict',
+                    clip=(l, t, r, b),
+                    check_strikeout=(check_strikeout is not None) and (j in check_strikeout)
+                )
 
                 if not textblocks:
                     # OK to have an empty cell, e.g. the pit col. in quali. lap times PDF should be
@@ -670,11 +846,8 @@ class Page:
         # TODO: this 4px height is very fragile. Better if get the exact vertical gap in pixels
         #       between two car No. and use (some proportion of) this gap as `height`
 
-        # Get the pixmap of the clipped area
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=DPI)
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3)))
+        # Get the pixmap of the clipped area from cache
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip)
 
         # Find all white rows, i.e. strictly all pixels in the row are white (RGB = 255)
         is_white: npt.NDArray[np.bool_] = np.all(pixmap_arr == 255, axis=(1, 2))  # noqa: PLR2004
@@ -692,7 +865,7 @@ class Page:
 
         # Filter out white strips that are less than `height`px tall, after DPI scaling
         strip_heights: npt.NDArray[np.intp] = ends - starts
-        scaling_factor: float = pixmap.height / (clip[3] - clip[1]) if clip else 1
+        scaling_factor: float = pixmap_arr.shape[0] / (clip[3] - clip[1]) if clip else 1
         is_valid_strip: npt.NDArray[np.bool_] = (strip_heights > height * scaling_factor)
 
         # Return the top y-coords. of the valid white strips, scaled back to the original page
@@ -725,12 +898,8 @@ class Page:
         :return: A list of numbers, where each number is the top y-coord. of a row. The bottom of
                  the last row is also included
         """
-        # Get the pixmap of the clipped area
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=DPI)
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3))
-                                             .copy())
+        # Get the pixmap of the clipped area from cache
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip)
 
         # Convert minimum row height requirement to the new DPI. E.g., if we scale the page from
         # 300 * 300 to 600 * 600, then 10px in the original page should become 20px
@@ -801,7 +970,7 @@ class Page:
         # Check if the first row is white. (If it's grey, then should already be captured above)
         # First check if have enough spacing (80% of a row height) above the first grey row
         t_first_grey_row = grey_rows[0][0] if grey_rows else clip[3]  # May have zero grey row
-        if t_first_grey_row > clip[1] + avg_row_height * 0.8:
+        if t_first_grey_row > clip[1] + avg_row_height * 0.75:
             # Then check if any text in the area above the first grey row
             text = self.get_text('text', clip=(clip[0], clip[1], clip[2], t_first_grey_row))
             if any(i.text for i in text):
@@ -818,7 +987,7 @@ class Page:
 
         # Check if the last row is white, in the same way
         b_last_grey_row = grey_rows[-1][1] if grey_rows else clip[1]
-        if b_last_grey_row < clip[3] - avg_row_height * 0.8:
+        if b_last_grey_row < clip[3] - avg_row_height * 0.75:
             text = self.get_text('text', clip=(clip[0], b_last_grey_row, clip[2], clip[3]))
             if any(i.text for i in text):
                 if avg_row_height:

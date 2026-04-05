@@ -11,7 +11,7 @@ import pandas as pd
 import pymupdf
 from scipy.ndimage import find_objects, label
 
-from .._constants import DPI, EXPECTED_COLS, QUALI_DRIVERS, REGULAR_DRIVERS
+from .._constants import EXPECTED_COLS, QUALI_DRIVERS, REGULAR_DRIVERS
 from ..drivers import Drivers
 from ..models.classification import SessionEntryImport, SessionEntryObject
 from ..models.driver import (
@@ -55,7 +55,8 @@ class BaseParser:
             page: Page,
             clip: BBox,
             col_min_gap: float = 1.1,
-            min_black_line_length: float = 0.9
+            min_black_line_length: float = 0.9,
+            get_text: bool = True
     ) -> list[TextBlock]:
         """
         Search for table header/cols. in the `clip` area
@@ -88,13 +89,14 @@ class BaseParser:
                                       black vertical lines longer than 90% of the height of `clip`,
                                       and any black horizontal lines longer than 90% of the width
                                       of `clip`, are ignored
+        :param get_text: Whether to extract the text of the detected cols. Default is `True`.
+                         Sometimes we only care about the location of the cols., but not the col.
+                         names, e.g. locating row positions in (the rotated) lap chart PDFs. In
+                         such cases, set this to `False` to save time
         :return: List of TextBlock representing the detected cols.
         """
-        # Get the pixmap of `clip` area
-        # TODO: create a get pixmap method in Page
-        pixmap: pymupdf.Pixmap = page.get_pixmap(clip=clip, dpi=DPI)
-        arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv, dtype=np.uint8)
-                                      .reshape((pixmap.height, pixmap.width, 3)))
+        # Get the pixmap of `clip` area from cache
+        arr: npt.NDArray[np.uint8] = page.get_pixmap_array(clip=clip, copy=True)
 
         # Replace rows and cols. w/ almost all black pixels with white pixels (those are lines not
         # text). After this step, all black pixels should be texts only
@@ -157,11 +159,14 @@ class BaseParser:
             t -= 1
             r += 1
             b += 1
+            if not get_text:  # Sometimes we only need the positions, but not the text
+                cols.append(TextBlock(text='', bbox=(l, t, r, b)))
+                continue
             texts = page.get_text('text', clip=(l, t, r, b), small_area=True)
             if len(texts) != 1:
                 raise ParsingError(f'Expected one text block for col. name. Found {texts} inside '
-                                   f'({clip[0]:.2f}, {clip[1]:.2f}, {clip[2]:.2f}, {clip[3]:.2f}) '
-                                   f'on p.{page.number} in {page.file}')
+                                   f'({l:.2f}, {t:.2f}, {r:.2f}, {b:.2f}) on p.{page.number} in '
+                                   f'{page.file}')
             text = texts[0]
             if text.text:
                 # The "/" in "KM/H" is often mis-OCRed. Manually correct it here
@@ -340,7 +345,8 @@ class EntryListParser(BaseParser):
                                       hlines=hlines,
                                       allow_multiple_texts_per_cell=[0],  # Allow superscripts
                                       header_included=False,
-                                      tol=row_gap)
+                                      tol=row_gap,
+                                      check_strikeout=None)
         df.columns = [i.text.lower() for i in cols]
         df = df.rename(columns={'no.': 'car_no'})
 
@@ -453,7 +459,8 @@ class EntryListParser(BaseParser):
                                                    hlines=hlines_reserve,
                                                    allow_multiple_texts_per_cell=[0],
                                                    header_included=False,
-                                                   tol=col_row_height * 0.3)
+                                                   tol=col_row_height * 0.3,
+                                                   check_strikeout=None)
             reserves_df.columns = [i.text.lower() for i in cols]
             reserves_df = reserves_df.rename(columns={'no.': 'car_no'})
             reserves_df['reserve_for'] = reserves_df.car_no.apply(identify_reserve)
@@ -620,12 +627,13 @@ class PracticeParser(BaseParser):
         # Get cols.
         """
         Most cols. names can be easily parsed, except "NAT" and "ENTRANT", which are very close to
-        each other, and sometimes the gap between them is even smaller than the gap between two
-        chars. Therefore, we often get the two cols. as one "NAT ENTRANT". Below we try smaller and
+        each other, and sometimes the gap between them is even smaller than the width of a car.
+        Therefore, we often get the two cols. as one "NAT ENTRANT". Below we try smaller and
         smaller `col_min_gap`, until we get all expected cols. correctly. If even with a very small
-        `col_min_gap` we still can't get the cols. right, raise an error.
+        `col_min_gap` we still can't get the cols. right, then raise an error.
         """
         cols: Optional[list[TextBlock]] = None
+        expected_cols = EXPECTED_COLS['fp_classification']['required']
         for col_min_gap in [1, 0.9, 0.8, 0.7, 0.6, 0.5]:
             try:
                 cols = self._detect_cols(page,
@@ -634,10 +642,10 @@ class PracticeParser(BaseParser):
                 if not cols:
                     raise ParsingError(f'Could not locate cols. in the table header on '
                                        f'{page_no_str}')
-                if {i.text.lower() for i in cols} != EXPECTED_COLS['fp']['required']:
+                if {i.text.lower() for i in cols} != expected_cols:
                     raise ParsingError(
                         f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
-                        f'{EXPECTED_COLS['fp']['required']}. Got: {[i.text for i in cols]}'
+                        f'{expected_cols}. Got: {[i.text for i in cols]}'
                     )
                 break
             except ParsingError:
@@ -645,11 +653,11 @@ class PracticeParser(BaseParser):
             except Exception as e:
                 doc.close()
                 raise e
-        if (not cols) or {i.text.lower() for i in cols} != EXPECTED_COLS['fp']['required']:
+        if (not cols) or {i.text.lower() for i in cols} != expected_cols:
             doc.close()
             raise ParsingError(
-                f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
-                f'{EXPECTED_COLS['fp']['required']}. Got: {[i.text for i in cols]}'
+                f'Got unexpected or miss some cols. on {page_no_str}. Expected: {expected_cols}. '
+                f'Got: {[i.text for i in cols]}'
             )
         vlines = [0,
                   cols[0].bbox[0] - 1,
@@ -679,8 +687,16 @@ class PracticeParser(BaseParser):
                                                  min_height=col_row_height / 2)
 
         # Parse the table using the grid above
-        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False,
-                                      allow_multiple_texts_per_cell=[2, 4])
+        # Only parse needed cols. (e.g. skip NAT, driver name, etc.) to avoid potentially expensive
+        # OCR text extraction. Col. 0 is finishing position, so we `i + 1` below.
+        to_parse = EXPECTED_COLS['fp_classification']['to_parse']
+        parse_cols = {0} | {i + 1 for i, col in enumerate(cols) if col.text.lower() in to_parse}
+        df = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      header_included=False,
+                                      allow_multiple_texts_per_cell=[2, 4],
+                                      parse_cols=parse_cols,
+                                      check_strikeout=None)
         # Allow multiple text blocks in "DRIVER" col. We don't need this col. at all, so don't care
         # if it's correctly parsed, as long as the car. No. col. is correct. The same applies to
         # "ENTRANT" col. as well
@@ -951,9 +967,13 @@ class PracticeParser(BaseParser):
                         )
 
                         # Parse the table
+                        check_strikeout = EXPECTED_COLS['fp_lap_times']['to_check_strikeout']
+                        check_strikeout = [i + 1 for i, c in enumerate(cols)
+                                           if c.text.lower() in check_strikeout]
                         df = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      check_strikeout=check_strikeout or None)
                         if df.empty:
                             continue
                             # TODO: raise a warning here, as we found a driver with zero lap?
@@ -1142,8 +1162,8 @@ class RaceParser(BaseParser):
         classification: Optional[list[TextBlock]] = None
         for page in doc:
             page = Page(page, file=self.classification_file)  # noqa: PLW2901
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
-            if '.pdf' in page.get_text(clip=top_half, dpi=300)[0].text:  # Fix #59
+            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h * 0.3)
+            if '.pdf' in page.get_text()[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification', clip=top_half, dpi=100)
             if classification:
@@ -1177,14 +1197,12 @@ class RaceParser(BaseParser):
         if not cols:
             doc.close()
             raise ParsingError(f'Could not locate cols. in the table header on {page_no_str}')
-        if [i.text.upper() for i in cols] != ['NO', 'DRIVER', 'NAT', 'ENTRANT', 'LAPS', 'TIME',
-                                              'GAP', 'INT', 'KM/H', 'FASTEST', 'ON', 'PTS']:
+        req_cols = EXPECTED_COLS['race_classification']['required']
+        col_names_lower = {i.text.lower() for i in cols}
+        if not req_cols.issubset(col_names_lower):
             doc.close()
-            raise ParsingError(
-                f'Got unexpected or miss some cols. on {page_no_str}. Expected "NO", "DRIVER", '
-                f'"NAT", "ENTRANT", "LAPS", "TIME", "GAP", "INT", "KM/H", "FASTEST", "ON", and '
-                f'"PTS". Got: {[i.text for i in cols]}'
-            )
+            raise ParsingError(f'Got unexpected or miss some cols. on {page_no_str}. Expected: '
+                               f'{req_cols}. Got: {[i.text for i in cols]}')
         vlines = [0,
                   cols[0].bbox[0] - 1,
                   (cols[0].bbox[2] + cols[1].bbox[0]) / 2,
@@ -1214,8 +1232,16 @@ class RaceParser(BaseParser):
                                                  min_height=col_row_height / 2)
 
         # Parse the table using the grid above
-        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False,
-                                      allow_multiple_texts_per_cell=[2, 4])
+        # Only parse needed cols. (e.g. skip driver, nat, entrant, int, km/h) to avoid potentially
+        # expensive text extraction. Col. 0 is finishing position, so we `i + 1` below.
+        to_parse = EXPECTED_COLS['race_classification']['to_parse']
+        parse_cols = {0} | {i + 1 for i, col in enumerate(cols) if col.text.lower() in to_parse}
+        df = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      allow_multiple_texts_per_cell=[2, 4],
+                                      parse_cols=parse_cols,
+                                      check_strikeout=None,
+                                      header_included=False)
         df.columns = ['finishing_position', 'car_no', 'driver', 'nat', 'team', 'laps_completed',
                       'time', 'gap', 'int', 'avg_speed', 'fastest_lap_time', 'fastest_lap_no',
                       'points']
@@ -1229,10 +1255,11 @@ class RaceParser(BaseParser):
         """
 
         # Check if there is a "NOT CLASSIFIED" table below the main table
-        not_classified = page.search_for('NOT CLASSIFIED',
-                                         clip=(0, b_table + 1, page.w, page.h),
-                                         dpi=300)
-
+        not_classified = page.search_for(
+            'NOT CLASSIFIED',
+            clip=(page.w * 0.4, b_table + 1, page.w * 0.6, page.h * 0.95),
+            dpi=300
+        )
         # If yes, repeat the above for the "NOT CLASSIFIED" table
         if not_classified:
             if black_lines := page.search_for_black_lines(
@@ -1258,8 +1285,10 @@ class RaceParser(BaseParser):
                                                      min_height=col_row_height / 3)
             not_classified = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False,
-                                                      allow_multiple_texts_per_cell=[2, 4])
+                                                      allow_multiple_texts_per_cell=[2, 4],
+                                                      parse_cols=parse_cols,
+                                                      check_strikeout=None,
+                                                      header_included=False)
             not_classified.columns = df.columns
             not_classified.position = None  # No finishing position for unclassified drivers
             not_classified = not_classified.map(self._normalise_textblock, merge_multi_tbs=True)
@@ -1268,9 +1297,11 @@ class RaceParser(BaseParser):
             not_classified = pd.DataFrame(columns=df.columns)
 
         # Repeat the same for "DISQUALIFIED" table, if any
-        disqualified = page.search_for('DISQUALIFIED',
-                                       clip=(0, b_table + 1, page.w, page.h),
-                                       dpi=300)
+        disqualified = page.search_for(
+            'DISQUALIFIED',
+            clip=(page.w * 0.4, b_table + 1, page.w * 0.6, page.h * 0.95),
+            dpi=300
+        )
         if disqualified:
             if black_lines := page.search_for_black_lines(
                     clip=(0, disqualified[0].y1, page.w, page.h)
@@ -1295,8 +1326,10 @@ class RaceParser(BaseParser):
                                                      min_height=col_row_height / 3)
             disqualified = page.parse_table_by_grid(vlines=vlines,
                                                     hlines=hlines,
-                                                    header_included=False,
-                                                    allow_multiple_texts_per_cell=[2, 4])
+                                                    allow_multiple_texts_per_cell=[2, 4],
+                                                    parse_cols=parse_cols,
+                                                    check_strikeout=None,
+                                                    header_included=False)
             disqualified.columns = df.columns
             disqualified.position = None  # No finishing position for disqualified drivers
             disqualified = disqualified.map(self._normalise_textblock, merge_multi_tbs=True)
@@ -1414,7 +1447,7 @@ class RaceParser(BaseParser):
             # a black line below the table header
             page = Page(page, file=self.history_chart_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             history_chart = page.search_for('History Chart', clip=top_half, dpi=100)
             if len(history_chart) != 1:
                 doc.close()
@@ -1576,7 +1609,7 @@ class RaceParser(BaseParser):
             page_no_str = f'p.{page.number} in {page.file}'
 
             # Table header/col. names are below "Race Lap Chart"
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             if lap_chart := page.search_for('Lap Chart', clip=top_half, dpi=100):
                 t_table_header = lap_chart[0].y1 + 1
             else:
@@ -1658,7 +1691,8 @@ class RaceParser(BaseParser):
             rows = self._detect_cols(
                 page,
                 clip=(t_table_body + 1, page.w - l_first_col - 1, b_table, page.w),
-                col_min_gap=0.3
+                col_min_gap=0.3,
+                get_text=False
             )
             page.set_rotation(0)
             if not rows:
@@ -1907,9 +1941,13 @@ class RaceParser(BaseParser):
                             continue
 
                         # Parse the table
+                        check_strikeout = EXPECTED_COLS['race_lap_times']['to_check_strikeout']
+                        check_strikeout = [i + 1 for i, c in enumerate(cols)
+                                           if c.text.lower() in check_strikeout]
                         df = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      check_strikeout=check_strikeout or None)
                         df.columns = ['lap', 'pit', 'lap_time']
                         df['lap_time_deleted'] = df.lap_time.apply(lambda x: x.strikeout is True)
                         df = df.map(self._normalise_textblock)
@@ -1933,7 +1971,7 @@ class RaceParser(BaseParser):
             # Find "Sector Analysis"
             page = Page(page, file=self.sector_analysis_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            top_half = (page.w * 0.3, page.h * 0.1, page.w * 0.7, page.h / 4)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             sector_analysis = page.search_for('Sector Analysis', clip=top_half, dpi=100)
             if len(sector_analysis) != 1:
                 doc.close()
@@ -2114,10 +2152,15 @@ class RaceParser(BaseParser):
                         continue
 
                     # Parse the table
+                    # TODO: probably shouldn't hardcode the indices
+                    check_strikeout = [len(cols) - 1]
+                    to_parse = [0, len(cols) - 1]
                     df = page.parse_table_by_grid(vlines=vlines,
                                                   hlines=hlines,
                                                   header_included=False,
-                                                  allow_multiple_texts_per_cell=[0])
+                                                  allow_multiple_texts_per_cell=[0],
+                                                  parse_cols=to_parse,
+                                                  check_strikeout=check_strikeout)
                     df.columns = ['lap', 'sector_1_time', 'sector_1_speed', 'sector_2_time',
                                   'sector_2_speed', 'sector_3_time', 'sector_3_speed', 'lap_time']
                     df['car_no'] = car_no
@@ -2297,8 +2340,8 @@ class QualifyingParser(BaseParser):
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)  # noqa: PLW2901
             # Table/page title should appear in top half of the page
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
-            if '.pdf' in page.get_text(clip=top_half, dpi=300)[0].text:  # Fix #59
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
+            if '.pdf' in page.get_text()[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification', clip=top_half, dpi=100)
             if classification:
@@ -2347,6 +2390,14 @@ class QualifyingParser(BaseParser):
                     session += 1
         col_name_to_tb = {i.text: i for i in cols}  # Col. name --> its TextBlock
         col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])
+
+        # Check required cols. are present
+        req_cols = EXPECTED_COLS['quali_classification']['required']
+        detected_cols = {name.lower() for name in col_name_to_tb}
+        if not req_cols.issubset(detected_cols):
+            doc.close()
+            raise ParsingError(f'Missing required cols. {req_cols} in {self.classification_file}. '
+                               f'Got: {detected_cols}')
 
         # The table ends with a white strip below the table header
         if white_strips:= page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
@@ -2409,9 +2460,9 @@ class QualifyingParser(BaseParser):
         # Boundary between Q1_TIME and Q2
         page.set_rotation(90)
         black_lines = page.search_for_black_lines(clip=(page.h - b_table,
-                                                  col_name_to_tb['Q1_TIME'].r,
-                                                  page.h - t_table_body,
-                                                  col_name_to_tb['Q2'].l),
+                                                        col_name_to_tb['Q1_TIME'].r,
+                                                        page.h - t_table_body,
+                                                        col_name_to_tb['Q2'].l),
                                                   scaling_factor=16)
         if len(black_lines) != 1:
             doc.close()
@@ -2454,16 +2505,25 @@ class QualifyingParser(BaseParser):
                                                  min_height=col_row_height / 3)
 
         # Get the table
-        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False)
+        to_parse = EXPECTED_COLS['quali_classification']['to_parse']
+        parse_cols = {0} | {i + 1 for i, col_name in enumerate(col_name_to_tb)
+                            if col_name.lower() in to_parse}
+        df = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      parse_cols=parse_cols,
+                                      check_strikeout=None,
+                                      header_included=False)
         df.columns = ['position'] + [i for i in col_name_to_tb.keys()]
         df['finishing_status'] = 0
         df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
         df['is_classified'] = True
 
         # Parse "NOT CLASSIFIED" table, if any
-        if not_classified := page.search_for('NOT CLASSIFIED',
-                                             clip=(0, b_table, page.w, page.h),
-                                             dpi=300):
+        if not_classified := page.search_for(
+                'NOT CLASSIFIED',
+                clip=(page.w * 0.4, b_table, page.w * 0.6, page.h * 0.95),
+                dpi=300
+        ):
             t_table_body = not_classified[0].y1 + 1
             if white_strips:= page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
                                                            height=col_row_height / 3):
@@ -2476,7 +2536,9 @@ class QualifyingParser(BaseParser):
                                                      min_height=col_row_height / 3)
             not_classified = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      parse_cols=parse_cols,
+                                                      check_strikeout=None)
             not_classified.columns = df.columns.drop(['finishing_status', 'original_order',
                                                       'is_classified'])
             not_classified.position = None  # No finishing position for unclassified drivers
@@ -2489,9 +2551,11 @@ class QualifyingParser(BaseParser):
         df = _pd_concat([df, not_classified])
 
         # Parse "DISQUALIFIED" table, if any
-        if disqualified := page.search_for('DISQUALIFIED',
-                                           clip=(0, b_table, page.w, page.h),
-                                           dpi=300):
+        if disqualified := page.search_for(
+                'DISQUALIFIED',
+                clip=(page.w * 0.4, b_table, page.w * 0.6, page.h * 0.95),
+                dpi=300
+        ):
             """
             There can be multiple "DISQUALIFIED" text. E.g., in the penalty notes, we may have
             "DISQUALIFIED", and we may have "DISQUALIFIED" as the table title. The table title
@@ -2514,7 +2578,9 @@ class QualifyingParser(BaseParser):
                                                          min_height=col_row_height / 3)
                 disqualified = page.parse_table_by_grid(vlines=vlines,
                                                         hlines=hlines,
-                                                        header_included=False)
+                                                        header_included=False,
+                                                        parse_cols=parse_cols,
+                                                        check_strikeout=None)
                 disqualified.columns = df.columns.drop(['finishing_status', 'original_order',
                                                         'is_classified'])
                 disqualified.position = None  # No finishing position for DSQ drivers
@@ -2724,7 +2790,7 @@ class QualifyingParser(BaseParser):
             # Find "Lap Times"
             page = Page(page, file=self.lap_times_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {self.lap_times_file}'
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             quali_lap_times = page.search_for('Lap Times', clip=top_half, dpi=100)
             if len(quali_lap_times) != 1:
                 doc.close()
@@ -2918,9 +2984,13 @@ class QualifyingParser(BaseParser):
                             continue
 
                         # Parse the table
+                        check_strikeout = EXPECTED_COLS['quali_lap_times']['to_check_strikeout']
+                        check_strikeout = [i + 1 for i, c in enumerate(cols)
+                                           if c.text.lower() in check_strikeout]
                         df = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      check_strikeout=check_strikeout or None)
                         df.columns = ['lap', 'pit', 'lap_time']
                         df['lap_time_deleted'] = df.lap_time.apply(
                             lambda x: x.strikeout is True)
@@ -3055,7 +3125,7 @@ class QualifyingParser(BaseParser):
         # TODO: Very bad. Why did I create this method???
         lap_data = []
         # TODO: first lap's lap time is calendar time, not lap time, so drop it
-        # Lap No. can be missing (e.g.#47)
+        # Lap No. can be missing (e.g. #47)
         df = df[(df.lap_no >= 2) | df.lap_no.isna()].copy()  # noqa: PLR2004
         df.lap_time = df.lap_time.apply(duration_to_millisecond)
         for q in [1, 2, 3]:
@@ -3121,7 +3191,7 @@ class PitStopParser(BaseParser):
             page_no_str = f'p.{page.number} in {self.file}'
 
             # Locate "Pit Stop Summary" title
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             pit_stop_summary = page.search_for('Pit Stop Summary', clip=top_half, dpi=100)
             if len(pit_stop_summary) != 1:
                 raise ParsingError(f'Find none or multiple "Pit Stop Summary" on {page_no_str}')
@@ -3146,9 +3216,9 @@ class PitStopParser(BaseParser):
             cols = self._detect_cols(page,
                                      clip=(0, t_table_header, page.w, b_table_header),
                                      col_min_gap=2)  # Very wide cols., so allow larger gaps
-            if [i.text for i in cols] != ['NO', 'DRIVER', 'ENTRANT', 'LAP', 'TIME OF DAY', 'STOP',
-                                          'DURATION', 'TOTAL TIME']:
-                raise ParsingError(f'Found unexpected or less cols. on {page_no_str}: {cols}')
+            if [i.text.lower() for i in cols] != EXPECTED_COLS['pit_stop_summary']['required']:
+                raise ParsingError(f'Found unexpected or less cols. on {page_no_str}. Got {cols}. '
+                                   f'Expected {EXPECTED_COLS["pit_stop_summary"]["required"]}')
 
             # Table bottom is the first white strip below the table header
             if white_strips := page.search_for_white_strips(
@@ -3163,7 +3233,8 @@ class PitStopParser(BaseParser):
             # Locate the horizontal positions of each col.
             col_pos = self._detect_cols(page,
                                         clip=(0, t_table_header, page.w, b_table),
-                                        col_min_gap=2)
+                                        col_min_gap=2,
+                                        get_text=False)
             if len(cols) != len(col_pos):
                 raise ParsingError(f'Number of detected cols. does not match number of col. names '
                                    f'on p.{page.number} in {self.file}: {cols} vs. {col_pos}')
@@ -3178,7 +3249,13 @@ class PitStopParser(BaseParser):
             )
 
             # Parse
-            df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False)
+            parse_cols = [i for i, col in enumerate(cols)
+                          if col.text.lower() in EXPECTED_COLS['pit_stop_summary']['to_parse']]
+            df = page.parse_table_by_grid(vlines=vlines,
+                                          hlines=hlines,
+                                          header_included=False,
+                                          parse_cols=parse_cols,
+                                          check_strikeout=None)
             df.columns = [i.text for i in cols]
             dfs.append(df)
 
