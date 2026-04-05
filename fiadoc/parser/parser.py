@@ -2340,7 +2340,7 @@ class QualifyingParser(BaseParser):
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)  # noqa: PLW2901
             # Table/page title should appear in top half of the page
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
             if '.pdf' in page.get_text()[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification', clip=top_half, dpi=100)
@@ -3191,7 +3191,7 @@ class PitStopParser(BaseParser):
             page_no_str = f'p.{page.number} in {self.file}'
 
             # Locate "Pit Stop Summary" title
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
             pit_stop_summary = page.search_for('Pit Stop Summary', clip=top_half, dpi=100)
             if len(pit_stop_summary) != 1:
                 raise ParsingError(f'Find none or multiple "Pit Stop Summary" on {page_no_str}')
@@ -3216,9 +3216,9 @@ class PitStopParser(BaseParser):
             cols = self._detect_cols(page,
                                      clip=(0, t_table_header, page.w, b_table_header),
                                      col_min_gap=2)  # Very wide cols., so allow larger gaps
-            if [i.text for i in cols] != ['NO', 'DRIVER', 'ENTRANT', 'LAP', 'TIME OF DAY', 'STOP',
-                                          'DURATION', 'TOTAL TIME']:
-                raise ParsingError(f'Found unexpected or less cols. on {page_no_str}: {cols}')
+            if [i.text.lower() for i in cols] != EXPECTED_COLS['pit_stop_summary']['required']:
+                raise ParsingError(f'Found unexpected or less cols. on {page_no_str}. Got {cols}. '
+                                   f'Expected {EXPECTED_COLS["pit_stop_summary"]["required"]}')
 
             # Table bottom is the first white strip below the table header
             if white_strips := page.search_for_white_strips(
@@ -3233,7 +3233,8 @@ class PitStopParser(BaseParser):
             # Locate the horizontal positions of each col.
             col_pos = self._detect_cols(page,
                                         clip=(0, t_table_header, page.w, b_table),
-                                        col_min_gap=2)
+                                        col_min_gap=2,
+                                        get_text=False)
             if len(cols) != len(col_pos):
                 raise ParsingError(f'Number of detected cols. does not match number of col. names '
                                    f'on p.{page.number} in {self.file}: {cols} vs. {col_pos}')
@@ -3248,7 +3249,13 @@ class PitStopParser(BaseParser):
             )
 
             # Parse
-            df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False)
+            parse_cols = [i for i, col in enumerate(cols)
+                          if col.text.lower() in EXPECTED_COLS['pit_stop_summary']['to_parse']]
+            df = page.parse_table_by_grid(vlines=vlines,
+                                          hlines=hlines,
+                                          header_included=False,
+                                          parse_cols=parse_cols,
+                                          check_strikeout=None)
             df.columns = [i.text for i in cols]
             dfs.append(df)
 

@@ -235,6 +235,11 @@ EXPECTED_COLS: dict[str, dict[str, set | list]] = {
         'required': ['lap', 'time', 'km/h', 'time', 'km/h', 'time', 'km/h', 'time'],
         'to_parse': {'lap', 'time'},
         'to_check_strikeout': {'time'}
+    },
+    'pit_stop_summary': {
+        'required': ['no', 'driver', 'entrant', 'lap', 'time of day', 'stop', 'duration',
+                     'total time'],
+        'to_parse': {'no', 'lap', 'stop', 'time of day'}
     }
 }
 
