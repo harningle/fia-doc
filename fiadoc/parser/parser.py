@@ -2369,6 +2369,14 @@ class QualifyingParser(BaseParser):
         col_name_to_tb = {i.text: i for i in cols}  # Col. name --> its TextBlock
         col_row_height = np.mean([i.bbox[3] - i.bbox[1] for i in cols])
 
+        # Check required cols. are present
+        req_cols = EXPECTED_COLS['quali_classification']['required']
+        detected_cols = {name.lower() for name in col_name_to_tb}
+        if detected_cols < req_cols:
+            doc.close()
+            raise ParsingError(f'Missing required cols. {req_cols} in {self.classification_file}. '
+                               f'Got: {detected_cols}')
+
         # The table ends with a white strip below the table header
         if white_strips:= page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
                                                        height=col_row_height / 3):
@@ -2475,7 +2483,14 @@ class QualifyingParser(BaseParser):
                                                  min_height=col_row_height / 3)
 
         # Get the table
-        df = page.parse_table_by_grid(vlines=vlines, hlines=hlines, header_included=False)
+        to_parse = EXPECTED_COLS['quali_classification']['to_parse']
+        parse_cols = {0} | {i + 1 for i, col_name in enumerate(col_name_to_tb)
+                            if col_name.lower() in to_parse}
+        df = page.parse_table_by_grid(vlines=vlines,
+                                      hlines=hlines,
+                                      parse_cols=parse_cols,
+                                      check_strikeout=None,
+                                      header_included=False)
         df.columns = ['position'] + [i for i in col_name_to_tb.keys()]
         df['finishing_status'] = 0
         df['original_order'] = range(1, len(df) + 1)  # Driver's original order in the PDF
@@ -2499,7 +2514,9 @@ class QualifyingParser(BaseParser):
                                                      min_height=col_row_height / 3)
             not_classified = page.parse_table_by_grid(vlines=vlines,
                                                       hlines=hlines,
-                                                      header_included=False)
+                                                      header_included=False,
+                                                      parse_cols=parse_cols,
+                                                      check_strikeout=None)
             not_classified.columns = df.columns.drop(['finishing_status', 'original_order',
                                                       'is_classified'])
             not_classified.position = None  # No finishing position for unclassified drivers
@@ -2539,7 +2556,9 @@ class QualifyingParser(BaseParser):
                                                          min_height=col_row_height / 3)
                 disqualified = page.parse_table_by_grid(vlines=vlines,
                                                         hlines=hlines,
-                                                        header_included=False)
+                                                        header_included=False,
+                                                        parse_cols=parse_cols,
+                                                        check_strikeout=None)
                 disqualified.columns = df.columns.drop(['finishing_status', 'original_order',
                                                         'is_classified'])
                 disqualified.position = None  # No finishing position for DSQ drivers

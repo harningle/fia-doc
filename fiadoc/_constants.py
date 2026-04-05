@@ -216,6 +216,12 @@ EXPECTED_COLS: dict[str, dict[str, set | list]] = {
         'required': {'no', 'time'},
         'to_check_strikeout': {'time'}
     },
+    'quali_classification': {
+        'required': {'no', 'driver', 'nat', 'entrant', 'q1', 'q1_laps', 'q1_time', 'q2', 'q2_laps',
+                     'q2_time', 'q3', 'q3_laps', 'q3_time'},
+        'to_parse': {'no', 'q1', 'q1_laps', 'q1_time', 'q2', 'q2_laps', 'q2_time', 'q3', 'q3_laps',
+                     'q3_time'}
+    },
     'race_lap_times': {
         'required': {'no', 'time'},
         'to_check_strikeout': {'time'}
