@@ -55,7 +55,8 @@ class BaseParser:
             page: Page,
             clip: BBox,
             col_min_gap: float = 1.1,
-            min_black_line_length: float = 0.9
+            min_black_line_length: float = 0.9,
+            get_text: bool = True
     ) -> list[TextBlock]:
         """
         Search for table header/cols. in the `clip` area
@@ -88,6 +89,10 @@ class BaseParser:
                                       black vertical lines longer than 90% of the height of `clip`,
                                       and any black horizontal lines longer than 90% of the width
                                       of `clip`, are ignored
+        :param get_text: Whether to extract the text of the detected cols. Default is `True`.
+                         Sometimes we only care about the location of the cols., but not the col.
+                         names, e.g. locating row positions in (the rotated) lap chart PDFs. In
+                         such cases, set this to `False` to save time
         :return: List of TextBlock representing the detected cols.
         """
         # Get the pixmap of `clip` area from cache
@@ -154,6 +159,9 @@ class BaseParser:
             t -= 1
             r += 1
             b += 1
+            if not get_text:  # Sometimes we only need the positions, but not the text
+                cols.append(TextBlock(text='', bbox=(l, t, r, b)))
+                continue
             texts = page.get_text('text', clip=(l, t, r, b), small_area=True)
             if len(texts) != 1:
                 raise ParsingError(f'Expected one text block for col. name. Found {texts} inside '
@@ -1439,7 +1447,7 @@ class RaceParser(BaseParser):
             # a black line below the table header
             page = Page(page, file=self.history_chart_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
             history_chart = page.search_for('History Chart', clip=top_half, dpi=100)
             if len(history_chart) != 1:
                 doc.close()
@@ -1601,7 +1609,7 @@ class RaceParser(BaseParser):
             page_no_str = f'p.{page.number} in {page.file}'
 
             # Table header/col. names are below "Race Lap Chart"
-            top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h / 2)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
             if lap_chart := page.search_for('Lap Chart', clip=top_half, dpi=100):
                 t_table_header = lap_chart[0].y1 + 1
             else:
@@ -1683,7 +1691,8 @@ class RaceParser(BaseParser):
             rows = self._detect_cols(
                 page,
                 clip=(t_table_body + 1, page.w - l_first_col - 1, b_table, page.w),
-                col_min_gap=0.3
+                col_min_gap=0.3,
+                get_text=False
             )
             page.set_rotation(0)
             if not rows:
@@ -1962,7 +1971,7 @@ class RaceParser(BaseParser):
             # Find "Sector Analysis"
             page = Page(page, file=self.sector_analysis_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            top_half = (page.w * 0.3, page.h * 0.1, page.w * 0.7, page.h / 4)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
             sector_analysis = page.search_for('Sector Analysis', clip=top_half, dpi=100)
             if len(sector_analysis) != 1:
                 doc.close()
@@ -2143,15 +2152,15 @@ class RaceParser(BaseParser):
                         continue
 
                     # Parse the table
-                    # TODO: check strikeout index
-                    check_strikeout = EXPECTED_COLS['race_sector_analysis']['to_check_strikeout']
-                    check_strikeout = [i for i, c in enumerate(cols)
-                                       if c.text.lower() in check_strikeout]
+                    # TODO: probably shouldn't hardcode the indices
+                    check_strikeout = [len(cols) - 1]
+                    to_parse = [0, len(cols) - 1]
                     df = page.parse_table_by_grid(vlines=vlines,
                                                   hlines=hlines,
                                                   header_included=False,
                                                   allow_multiple_texts_per_cell=[0],
-                                                  check_strikeout=check_strikeout or None)
+                                                  parse_cols=to_parse,
+                                                  check_strikeout=check_strikeout)
                     df.columns = ['lap', 'sector_1_time', 'sector_1_speed', 'sector_2_time',
                                   'sector_2_speed', 'sector_3_time', 'sector_3_speed', 'lap_time']
                     df['car_no'] = car_no

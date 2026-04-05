@@ -233,6 +233,7 @@ EXPECTED_COLS: dict[str, dict[str, set | list]] = {
     },
     'race_sector_analysis': {
         'required': ['lap', 'time', 'km/h', 'time', 'km/h', 'time', 'km/h', 'time'],
+        'to_parse': {'lap', 'time'},
         'to_check_strikeout': {'time'}
     }
 }

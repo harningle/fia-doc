@@ -695,7 +695,7 @@ class Page:
             allow_multiple_texts_per_cell: Optional[Sequence[int]] = None,
             header_included: bool = True,
             check_strikeout: Optional[Sequence[int]] | bool = None,
-            parse_cols: Optional[set[int]] = None
+            parse_cols: Optional[Sequence[int]] = None
     ) -> pd.DataFrame:
         """Parse a table cell by cell, defined by lines separating the cols. and rows
 
