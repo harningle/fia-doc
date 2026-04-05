@@ -170,21 +170,34 @@ class Page:
         if clip is None:
             raise ValueError('Without OCR we found nothing. And `clip` must be provided when '
                              'searching with OCR, to avoid very slow OCR and bad quality')
-        pixmap: pymupdf.Pixmap = self.get_pixmap(clip=clip, dpi=dpi, annots=False)
-        pixmap_arr: npt.NDArray[np.uint8] = (np.frombuffer(buffer=pixmap.samples_mv,
-                                                           dtype=np.uint8)
-                                             .reshape((pixmap.height, pixmap.width, 3))
-                                             .copy())
+        # Use cached pixmap array instead of creating a new pixmap each time
+        pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip, dpi=dpi, annots=False,
+                                                                  copy=True)
+
+        # Save OCR input image for debugging if OCR_DEBUG_DIR is set
+        global _ocr_debug_counter  # noqa: PLW0603
+        if OCR_DEBUG_DIR is not None:
+            from PIL import Image
+            debug_dir = Path(OCR_DEBUG_DIR)
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            _ocr_debug_counter += 1
+            stem = Path(self.file).stem
+            page_num = self._pymupdf_page.number
+            clip_str = f'c{clip[0]:.2f}_{clip[1]:.2f}_{clip[2]:.2f}_{clip[3]:.2f}'
+            fname = f'{_ocr_debug_counter:03d}_{stem}_p{page_num}_{clip_str}_search_for'
+            Image.fromarray(pixmap_arr).save(debug_dir / f'{fname}.png')
+
         ocr_results = get_ocr_instance().predict(pixmap_arr)[0]
         ocr_results = zip(ocr_results['rec_boxes'], ocr_results['rec_texts'])
 
         # Because of the DPI, the bounding boxes of texts after OCR may not be in the same
         # coordinate system as the original PDF page. Convert them back
+        pix_h, pix_w = pixmap_arr.shape[:2]
         ocr_results = [TextBlock(
             text=OCR_ERRORS.get(i[1], i[1]),
             bbox=self._transform_bbox(
                 bbox=tuple(i[0]),
-                from_page_bound=(0, 0, pixmap.width, pixmap.height),
+                from_page_bound=(0, 0, pix_w, pix_h),
                 to_page_bound=clip
             )
         ) for i in ocr_results]
@@ -488,6 +501,16 @@ class Page:
         # Also replace rows anywhere with black run > 80% of row width with all white pixels
         pixmap_arr[max_run > pix_w * 0.8, :] = 255
 
+        # Remove vertical table border lines (conservatively: only columns that are >95% black)
+        """
+        Similar to horizontal borders, vertical borders can occur between table columns. However,
+        a single black column could be the letter "l" (lowercase L) or "1" (one), so we only remove
+        columns that are >95% black to avoid removing text.
+        """
+        is_black_cols = np.all(pixmap_arr < 50, axis=2)
+        black_ratio_per_col = np.mean(is_black_cols, axis=0)
+        pixmap_arr[:, black_ratio_per_col > 0.95, :] = 255
+
         if np.sum(pixmap_arr < 50) < 10:  # noqa: PLR2004
             return []
 
@@ -503,7 +526,8 @@ class Page:
             _ocr_debug_counter += 1
             stem = Path(self.file).stem
             page_num = self._pymupdf_page.number
-            fname = f'{_ocr_debug_counter:03d}_{stem}_p{page_num}'
+            clip_str = f'c{clip[0]:.2f}_{clip[1]:.2f}_{clip[2]:.2f}_{clip[3]:.2f}'
+            fname = f'{_ocr_debug_counter:03d}_{stem}_p{page_num}_{clip_str}_get_text'
             Image.fromarray(pixmap_arr).save(debug_dir / f'{fname}.png')
 
         # OCR the clipped area
