@@ -177,7 +177,7 @@ class Page:
         # Save OCR input image for debugging if OCR_DEBUG_DIR is set
         global _ocr_debug_counter  # noqa: PLW0603
         if OCR_DEBUG_DIR is not None:
-            from PIL import Image
+            from PIL import Image  # noqa: PLC0415
             debug_dir = Path(OCR_DEBUG_DIR)
             debug_dir.mkdir(parents=True, exist_ok=True)
             _ocr_debug_counter += 1
@@ -473,13 +473,13 @@ class Page:
         The clip area may include a horizontal table border at its top or bottom edge. Even if the
         clip area has no black text, these black lines/pixels would make the parsers think the cell
         has black text, triggering expensive OCR on empty cells.
-        
+
         To remove these border lines, we search the top and bottom 10% of rows in the pixmap. If a
         row has a continuous run of black pixels spanning >50% of the row width, replace the row
         with all white pixels.
-        
+
         A visualisation of the below vectorised implementation:
-        Original row:         B B B W B B W 
+        Original row:         B B B W B B W
         is_black:             1 1 1 0 1 1 0  whether the pixel is black
         cumsum:               1 2 3 3 4 5 5  cumulative #. of black pixels so far
         ~is_black:            0 0 0 1 0 0 1  whether the pixel is white
@@ -507,9 +507,9 @@ class Page:
         a single black column could be the letter "l" (lowercase L) or "1" (one), so we only remove
         columns that are >95% black to avoid removing text.
         """
-        is_black_cols = np.all(pixmap_arr < 50, axis=2)
+        is_black_cols = np.all(pixmap_arr < 50, axis=2)  # TODO: magic value # noqa: PLR2004
         black_ratio_per_col = np.mean(is_black_cols, axis=0)
-        pixmap_arr[:, black_ratio_per_col > 0.95, :] = 255
+        pixmap_arr[:, black_ratio_per_col > 0.95, :] = 255  # TODO: magic value # noqa: PLR2004
 
         if np.sum(pixmap_arr < 50) < 10:  # noqa: PLR2004
             return []
@@ -520,7 +520,7 @@ class Page:
         # Save OCR input image for debugging if OCR_DEBUG_DIR is set
         global _ocr_debug_counter  # noqa: PLW0603
         if OCR_DEBUG_DIR is not None:
-            from PIL import Image
+            from PIL import Image  # noqa: PLC0415
             debug_dir = Path(OCR_DEBUG_DIR)
             debug_dir.mkdir(parents=True, exist_ok=True)
             _ocr_debug_counter += 1

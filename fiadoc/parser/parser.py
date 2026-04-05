@@ -1447,7 +1447,7 @@ class RaceParser(BaseParser):
             # a black line below the table header
             page = Page(page, file=self.history_chart_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             history_chart = page.search_for('History Chart', clip=top_half, dpi=100)
             if len(history_chart) != 1:
                 doc.close()
@@ -1609,7 +1609,7 @@ class RaceParser(BaseParser):
             page_no_str = f'p.{page.number} in {page.file}'
 
             # Table header/col. names are below "Race Lap Chart"
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             if lap_chart := page.search_for('Lap Chart', clip=top_half, dpi=100):
                 t_table_header = lap_chart[0].y1 + 1
             else:
@@ -1971,7 +1971,7 @@ class RaceParser(BaseParser):
             # Find "Sector Analysis"
             page = Page(page, file=self.sector_analysis_file)  # noqa: PLW2901
             page_no_str = f'p.{page.number} in {page.file}'
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             sector_analysis = page.search_for('Sector Analysis', clip=top_half, dpi=100)
             if len(sector_analysis) != 1:
                 doc.close()
@@ -2340,7 +2340,7 @@ class QualifyingParser(BaseParser):
         for i in range(len(doc)):
             page = Page(doc[i], file=self.classification_file)  # noqa: PLW2901
             # Table/page title should appear in top half of the page
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             if '.pdf' in page.get_text()[0].text:  # Fix #59
                 continue
             classification = page.search_for('Final Classification', clip=top_half, dpi=100)
@@ -3191,7 +3191,7 @@ class PitStopParser(BaseParser):
             page_no_str = f'p.{page.number} in {self.file}'
 
             # Locate "Pit Stop Summary" title
-            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.4)
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
             pit_stop_summary = page.search_for('Pit Stop Summary', clip=top_half, dpi=100)
             if len(pit_stop_summary) != 1:
                 raise ParsingError(f'Find none or multiple "Pit Stop Summary" on {page_no_str}')
