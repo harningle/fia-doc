@@ -2289,12 +2289,14 @@ class QualifyingParser(BaseParser):
             self,
             classification_file: str | os.PathLike,
             lap_times_file: Optional[str | os.PathLike],
+            sector_analysis_file: Optional[str | os.PathLike],
             year: int,
             round_no: int,
             session: QualiSessionT
     ):
         self.classification_file = classification_file
         self.lap_times_file = lap_times_file
+        self.sector_analysis_file = sector_analysis_file
         self.session = session
         self.year = year
         self.round_no = round_no
@@ -2302,28 +2304,235 @@ class QualifyingParser(BaseParser):
         # self._cross_validate()
 
     @cached_property
-    def is_pdf_complete(self) -> bool:
-        # TODO: need this property?
-        if self.lap_times_file is None:
-            return False
-        return True
-
-    @cached_property
     def classification_df(self) -> pd.DataFrame:
         return self._parse_classification()
 
     @cached_property
     def lap_times_df(self) -> pd.DataFrame:
-        if not self.is_pdf_complete:
-            warnings.warn('Lap times PDF is missing. Can get fastest laps only from the '
-                          'classification PDF')
+        def to_json(df: pd.DataFrame) -> list[dict]:
+            # TODO: Very bad
+            lap_data = []
+            # TODO: first lap's lap time is calendar time, not lap time, so drop it
+            # Lap No. can be missing (e.g. #47)
+            df = df[(df.lap_no >= 2) | df.lap_no.isna()].copy()  # noqa: PLR2004
+            df.lap_time = df.lap_time.apply(duration_to_millisecond)
+            for q in [1, 2, 3]:
+                temp = df[df.Q == q].copy()
+                temp['lap'] = temp.apply(
+                    lambda x: LapObject(
+                        number=x.lap_no,
+                        time=x.lap_time,
+                        is_deleted=x.lap_time_deleted,
+                        is_entry_fastest_lap=x.is_fastest_lap
+                    ),
+                    axis=1
+                )
+                temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
+                temp['session_entry'] = temp['car_no'].map(
+                    lambda x: SessionEntryForeignKeys(
+                        year=self.year,
+                        round=self.round_no,
+                        session=f'Q{q}' if self.session == 'quali' else f'SQ{q}',
+                        car_number=x
+                    )
+                )
+                temp['lap_data'] = temp.apply(
+                    lambda x: LapImport(
+                        object_type='Lap',
+                        foreign_keys=x['session_entry'],
+                        objects=x['lap']
+                    ).model_dump(exclude_unset=True),
+                    axis=1
+                )
+                lap_data.extend(temp['lap_data'].tolist())
+            return lap_data
+
+        def _assign_session_to_lap(classification: pd.DataFrame, lap_times: pd.DataFrame) \
+                -> pd.DataFrame:
+            """TODO: probably need to refactor this later... To tedious now"""
+            # TODO: this can be wrong. See #51
+            # Assign session to lap No., e.g. lap 8 is in Q2, lap 15 is in Q3, etc., based on the
+            # total #. of laps in each session from the classification PDF
+            classification = classification.copy()  # TODO: not the best practice?
+            classification.Q1_LAPS = classification.Q1_LAPS.astype(float)
+            classification.Q2_LAPS = classification.Q2_LAPS.astype(float) + classification.Q1_LAPS
+            lap_times = lap_times.merge(classification[['NO', 'Q1_LAPS', 'Q2_LAPS']],
+                                        left_on='car_no', right_on='NO', how='left')
+            # TODO: should check if all merged. There shouldn't be any left only cars. Can have
+            #       some right only cars, e.g. DNS, so all right only cars should be NOT CLASSIFIED
+            #       drivers
+
+            del lap_times['NO']
+            lap_times['Q'] = 1
+            lap_times.loc[lap_times.lap_no > lap_times.Q1_LAPS, 'Q'] = 2
+            lap_times.loc[lap_times.lap_no > lap_times.Q2_LAPS, 'Q'] = 3
+            # TODO: the lap immediately before the first Q2 and Q3 lap, i.e. the last lap in each
+            #       session, should be a pit lap. Or is it? Crashed? Red flag?
+            del lap_times['Q1_LAPS'], lap_times['Q2_LAPS']
+
+            # Find which lap is the fastest lap, using the classification PDF
+            """
+            The classification PDF identifies the fastest laps by calendar time, e.g. "18:17:46".
+            In the lap times PDF, each driver's first lap time is the calendar time, e.g.
+            "18:05:42"; for the rest laps, the time is the lap time, e.g. "1:24.160". Therefore, we
+            can simply cumsum the lap times to get the calendar time of each lap, e.g.
+
+            18:05:42 + 1:24.160 = 18:07:06.160
+
+            The tricky part is rounding. Sometimes we have 18:17:15.674 -> 18:17:16, but in other
+            times it is 18:17:46.783 -> 18:17:46. It seems to be not rounding to floor, not to
+            ceil, and not to the nearest... Therefore, we allow one second difference. For a given
+            driver, it's impossible to have two different laps finishing within one calendar
+            second, so one second error in calendar time is ok to identify a lap.
+
+            TODO: should check this against historical data
+            """
+            lap_times['calendar_time'] = lap_times.lap_time.apply(time_to_timedelta)
+            lap_times.calendar_time = lap_times.groupby('car_no')['calendar_time'].cumsum()
+            lap_times['is_fastest_lap'] = False
+            for q in [1, 2, 3]:
+                # Round to the floor
+                # TODO: rewrite. What we need is Timedelta('0 days 16:07:13.470000') --> "16:07:13"
+                lap_times['temp'] = lap_times.calendar_time.apply(
+                    lambda x: str(x).split('.')[0].split(' ')[-1]
+                )
+                lap_times = lap_times.merge(classification[['NO', f'Q{q}_TIME']],
+                                            left_on=['car_no', 'temp'],
+                                            right_on=['NO', f'Q{q}_TIME'],
+                                            how='left')
+                del lap_times['NO']
+                # Plus one to the floor, i.e. allow one second error in the merge, and update the
+                # previously non-matched cells using the new merge
+                # TODO: rewrite as well. See above
+                lap_times.temp = lap_times.calendar_time.apply(
+                    lambda x: str(x + pd.Timedelta(seconds=1)).split('.')[0].split(' ')[-1]
+                )
+                lap_times = lap_times.merge(classification[['NO', f'Q{q}_TIME']],
+                                            left_on=['car_no', 'temp'],
+                                            right_on=['NO', f'Q{q}_TIME'],
+                                            how='left',
+                                            suffixes=('', '_y'))
+                del lap_times['NO'], lap_times['temp']
+                lap_times = lap_times.fillna({f'Q{q}_TIME': lap_times[f'Q{q}_TIME_y']})
+                del lap_times[f'Q{q}_TIME_y']
+
+                # Check if all drivers in the final classification are merged
+                temp = classification[['NO', f'Q{q}_TIME']].merge(
+                    lap_times[lap_times[f'Q{q}_TIME'].notna()][['car_no']],
+                    left_on='NO',
+                    right_on='car_no',
+                    indicator=True
+                )
+                temp = temp.dropna(subset=f'Q{q}_TIME')
+                assert (temp['_merge'] == 'both').all(), \
+                    f"Some drivers' fastest laps in Q{q} cannot be found in lap times PDF: " \
+                    f"{', '.join([str(i) for i in temp[temp._merge != 'both']['NO']])}"
+                lap_times.loc[lap_times[f'Q{q}_TIME'].notna(), 'is_fastest_lap'] = True
+                del lap_times[f'Q{q}_TIME']
+            return lap_times
+
+        # If no lap times PDF available at all, then return the fastest laps only
+        if (not self.lap_times_file) and (not self.sector_analysis_file):
+            warnings.warn('Neither lap times PDF nor sector analysis PDF is provided. Can get '
+                          'fastest laps only from the classification PDF. No per-lap data '
+                          'available')
             df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[]),
                                                    self.classification_df.NO.unique())
-            df.to_json = partial(self._quali_lap_times_to_json, df=df,
-                                 year=self.year, round_no=self.round_no, session=self.session)
+            df.to_json = partial(to_json, df)
             return df
-        else:
-            return self._parse_lap_times()
+
+        # If lap times PDF is available
+        if self.lap_times_file:
+            lap_times = self._parse_lap_times()
+
+            # Check if it has the same amount of laps as the classification PDF. If yes, then no
+            # need to look at sector analysis PDF (#51)
+            classification = self.classification_df.copy()
+            classification['total_laps'] = (classification.Q1_LAPS.fillna(0)
+                                            + classification.Q2_LAPS.fillna(0)
+                                            + classification.Q3_LAPS.fillna(0))
+            total_laps = (lap_times.groupby('car_no', as_index=False)
+                          .lap_no
+                          .count()
+                          .rename(columns={'lap_no': 'total_laps_lap_times_pdf'}))
+            total_laps = total_laps.merge(classification[['NO', 'total_laps']],
+                                          left_on='car_no', right_on='NO',
+                                          how='outer', validate='1:1', indicator=True)
+            if (total_laps.total_laps_lap_times_pdf == total_laps.total_laps).all():
+                lap_times = _assign_session_to_lap(classification, lap_times)
+                lap_times.to_json = partial(to_json, lap_times)
+                return lap_times
+
+        # If we reach here, either we don't have lap times PDF, or the lap times PDF doesn't have
+        # all laps, so need to use the sector analysis PDF. If no sector analysis PDF available,
+        # then again fallback to the classification PDF for the fastest laps only. No per-lap data
+        # available
+        if not self.sector_analysis_file:
+            warnings.warn("Total lap numbers in lap times PDF don't agree with classification "
+                          "PDF, and sector analysis PDF is provided. Can get fastest laps only "
+                          "from the classification PDF. No per-lap data available")
+            df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[]),
+                                                   self.classification_df.NO.unique())
+            df.to_json = partial(to_json, df)
+            return df
+
+        # If reaches here, then can use sector analysis PDF to get lap time data
+        warnings.warn("Total lap numbers in lap times PDF don't agree with classification "
+                      "PDF. Proceed with sector analysis PDF to get per-lap data")
+        sector_analysis = self._parse_sector_analysis().drop(columns=[
+            'sector_1_time', 'sector_1_speed', 'sector_2_time', 'sector_2_speed', 'sector_3_time',
+            'sector_3_speed'
+        ]).rename(columns={'lap': 'lap_no'})
+        sector_analysis.lap_no = (sector_analysis.lap_no.ffill()
+                                  + sector_analysis.lap_no.isna()
+                                    .groupby(sector_analysis.lap_no  # Groups separated by
+                                             .notna()                # missing's
+                                             .cumsum())
+                                    .cumsum()).astype(int)
+
+        # Drop the first lap
+        """
+        In 2025 (e.g., 2025 Bahrain), we have two "first lap" in sector analysis PDF (see #51),
+        which are the calendar time of the start time of the first out lap and the lap after the
+        out lap. We don't need any of them, as the time is calendar time rather than lap time.
+        However in 2026 (e.g., 2026 Australian), sector analysis PDF has the same lap numbering as
+        lap times PDF: only one "first lap" which is the calendar time of the first out lap. So to
+        make it consistent, we drop all leading calendar time laps and only keep the last one, so
+        that every driver starts with the out lap, w/ only calendar time but on lap time.
+        """
+        calendar_time_pat = re.compile(r'\d{2}:\d{2}:\d{2}')
+        sector_analysis['is_calendar_time'] = sector_analysis.lap_time.str.match(calendar_time_pat)
+        assert (
+            sector_analysis.groupby('car_no')
+            .is_calendar_time
+            .apply(lambda x: x.is_monotonic_decreasing)
+            .all()
+        ), (
+            'Found calendar time as lap time in the middle of a session. Expect calendar time '
+            'should only appear for the first out lap'
+        )
+        sector_analysis = sector_analysis[~(
+            sector_analysis.is_calendar_time  # Drop only if is calendar time
+            & sector_analysis.groupby('car_no').is_calendar_time.transform(
+                lambda x: x[::-1].cummax()[::-1].shift(-1, fill_value=False)  # `shift(-1) excl.
+            )                                                                 # the last one
+        )]
+        sector_analysis.lap_no = sector_analysis.groupby('car_no').cumcount() + 1
+
+        # Assign session to laps
+        sector_analysis.lap_time = sector_analysis.lap_time.replace('INCOMPLETE', '0:00.000')
+        sector_analysis = _assign_session_to_lap(self.classification_df, sector_analysis)
+        sector_analysis.loc[sector_analysis.lap_time == '0:00.000', 'is_fastest_lap'] = False
+        temp = sector_analysis.groupby(['car_no', 'Q'], as_index=False).is_fastest_lap.sum()
+        temp = temp[temp.is_fastest_lap >= 2]
+        if not temp.empty:
+            raise ParsingError(f'Found multiple fastest lap within a session when assigning '
+                               f'session to laps in sector analysis PDF:\n'
+                               f'{temp.to_string(index=False)}')
+
+        # TODO: should do some checks/cross validation if lap times PDF is available
+        sector_analysis.to_json = partial(to_json, sector_analysis)
+        return sector_analysis
 
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
@@ -2699,89 +2908,6 @@ class QualifyingParser(BaseParser):
         df.to_json = to_json
         return df
 
-    @staticmethod
-    def _assign_session_to_lap(classification: pd.DataFrame, lap_times: pd.DataFrame) \
-            -> pd.DataFrame:
-        """TODO: probably need to refactor this later... To tedious now"""
-        # TODO: this can be wrong. See #51
-        # Assign session to lap No. in lap times, e.g. lap 8 is in Q2, using final classification
-        classification = classification.copy()  # TODO: not the best practice?
-        classification.Q1_LAPS = classification.Q1_LAPS.astype(float)
-        classification.Q2_LAPS = classification.Q2_LAPS.astype(float) + classification.Q1_LAPS
-        lap_times = lap_times.merge(classification[['NO', 'Q1_LAPS', 'Q2_LAPS']],
-                                    left_on='car_no', right_on='NO', how='left')
-        # TODO: should check if all merged. There shouldn't be any left only cars. Can have some
-        #       right only cars, e.g. DNS, so all right only cars should be NOT CLASSIFIED drivers
-
-        del lap_times['NO']
-        lap_times['Q'] = 1
-        lap_times.loc[lap_times.lap_no > lap_times.Q1_LAPS, 'Q'] = 2
-        lap_times.loc[lap_times.lap_no > lap_times.Q2_LAPS, 'Q'] = 3
-        # TODO: the lap immediately before the first Q2 and Q3 lap, i.e. the last lap in each
-        #       session, should be a pit lap. Or is it? Crashed? Red flag?
-        del lap_times['Q1_LAPS'], lap_times['Q2_LAPS']
-
-        # Find which lap is the fastest lap, also using final classification
-        """
-        The final classification PDF identifies the fastest laps using calendar time, e.g.
-        "18:17:46". In the lap times PDF, each driver's first lap time is the calendar time, e.g.
-        "18:05:42"; for the rest laps, the time is the lap time, e.g. "1:24.160". Therefore, we can
-        simply cumsum the lap times to get the calendar time of each lap, e.g.
-
-        18:05:42 + 1:24.160 = 18:07:06.160
-
-        The tricky part is rounding. Sometimes we have 18:17:15.674 -> 18:17:16, but in other times
-        it is 18:17:46.783 -> 18:17:46. It seems to be not rounding to floor, not to ceil, and not
-        to the nearest... Therefore, we allow one second difference. For a given driver, it's
-        impossible to have two different laps finishing within one calendar second, so one second
-        error in calendar time is ok to identify a lap.
-
-        TODO: should check this against historical data
-        """
-        lap_times['calendar_time'] = lap_times.lap_time.apply(time_to_timedelta)
-        lap_times.calendar_time = lap_times.groupby('car_no')['calendar_time'].cumsum()
-        lap_times['is_fastest_lap'] = False
-        for q in [1, 2, 3]:
-            # Round to the floor
-            # TODO: rewrite. What we need is Timedelta('0 days 16:07:13.470000') --> "16:07:13"
-            lap_times['temp'] = lap_times.calendar_time.apply(
-                lambda x: str(x).split('.')[0].split(' ')[-1]
-            )
-            lap_times = lap_times.merge(classification[['NO', f'Q{q}_TIME']],
-                                        left_on=['car_no', 'temp'],
-                                        right_on=['NO', f'Q{q}_TIME'],
-                                        how='left')
-            del lap_times['NO']
-            # Plus one to the floor, i.e. allow one second error in the merge, and update the
-            # previously non-matched cells using the new merge
-            # TODO: rewrite as well. See above
-            lap_times.temp = lap_times.calendar_time.apply(
-                lambda x: str(x + pd.Timedelta(seconds=1)).split('.')[0].split(' ')[-1]
-            )
-            lap_times = lap_times.merge(classification[['NO', f'Q{q}_TIME']],
-                                        left_on=['car_no', 'temp'],
-                                        right_on=['NO', f'Q{q}_TIME'],
-                                        how='left',
-                                        suffixes=('', '_y'))
-            del lap_times['NO'], lap_times['temp']
-            lap_times = lap_times.fillna({f'Q{q}_TIME': lap_times[f'Q{q}_TIME_y']})
-            del lap_times[f'Q{q}_TIME_y']
-
-            # Check if all drivers in the final classification are merged
-            temp = classification[['NO', f'Q{q}_TIME']].merge(
-                lap_times[lap_times[f'Q{q}_TIME'].notna()][['car_no']],
-                left_on='NO',
-                right_on='car_no',
-                indicator=True
-            )
-            temp = temp.dropna(subset=f'Q{q}_TIME')
-            assert (temp['_merge'] == 'both').all(), \
-                f"Some drivers' fastest laps in Q{q} cannot be found in lap times PDF: " \
-                f"{', '.join([str(i) for i in temp[temp._merge != 'both']['NO']])}"
-            lap_times.loc[lap_times[f'Q{q}_TIME'].notna(), 'is_fastest_lap'] = True
-            del lap_times[f'Q{q}_TIME']
-        return lap_times
-
     def _parse_lap_times(self) -> pd.DataFrame:
         """Parse "Qualifying/Sprint Quali./Shootout Session Lap Times" PDF"""
         doc = pymupdf.open(self.lap_times_file)
@@ -3010,70 +3136,225 @@ class QualifyingParser(BaseParser):
         df = df.rename(columns={'lap': 'lap_no'})
         df.lap_no = df.lap_no.astype(int)
         df.car_no = df.car_no.astype(int)
-        df = df.replace('', None)  # So empty cell will become NaN when casted to float
-        df = self._assign_session_to_lap(self.classification_df, df)
+        return df
 
-        # Check if any fastest laps are wrong
-        invalid_fastest_lap_drivers = set()
-        def is_fastest_lap_valid() -> bool:
-            """Check whether the fastest laps in lap times PDF match the ones in classification PDF
+    def _parse_sector_analysis(self) -> pd.DataFrame:
+        """Parse "Qualifying Session Sector Analysis" PDF
 
-            This function checks, for each driver in each quali. session, whether his fastest lap
-            time in lap times PDF is the same as the one in classification PDF. This is a necessary
-            and sufficient condition to ensure that the fastest lap times are correct. However, it
-            is necessary but not sufficient to guarantee that all lap times are correct/all laps
-            are correctly matched to their quali. sessions.
+        See `RaceParser._parse_sector_analysis` for details
+        """
+        doc = pymupdf.open(self.sector_analysis_file)
+        dfs = []
+        page: Page
+        for page in doc:
+            # Find "Sector Analysis"
+            page = Page(page, file=self.sector_analysis_file)  # noqa: PLW2901
+            page_no_str = f'p.{page.number} in {page.file}'
+            top_half = (page.w * 0.2, page.h * 0.1, page.w * 0.8, page.h * 0.3)
+            sector_analysis = page.search_for('Sector Analysis', clip=top_half, dpi=100)
+            if len(sector_analysis) != 1:
+                doc.close()
+                raise ParsingError(f'Find none or multiple "Sector Analysis" on {page_no_str}')
+            b_sector_analysis = sector_analysis[0].y1
+            sector_analysis_height = sector_analysis[0].bbox[3] - sector_analysis[0].bbox[1]
 
-            This partially fixes #51: when we get `False`here, there must be something wrong with
-            linking laps to quali. sessions. In such case, we will have to use the fastest lap time
-            from classification as fallback to ensure the fastest lap times are correct.
+            # Find all white strips below "Sector Analysis"
+            if not (white_strips := page.search_for_white_strips(
+                    clip=(0, b_sector_analysis, page.w, page.h)
+            )):
+                doc.close()
+                raise ParsingError(f'Expect at least a white strip below "Sector Analysis" on '
+                                   f'{page_no_str}. Found: {white_strips}')
+
+            # Between every two consecutive white strips, see if we can find a driver No. and name
             """
-            classification_df = self.classification_df[['NO', 'Q1', 'Q2', 'Q3']]
-            lap_times_df = df[['car_no', 'lap_no', 'Q', 'lap_time', 'is_fastest_lap']]
-            is_valid = True
-
-            # Whether there is at most one fastest lap for each given driver in each given session
+            The page layout is different from race sector analysis PDF. In quali., we may have a
+            two-column page, e.g. three rows-by-two columns, so six drivers in total.
             """
-            May have no fastest lap, e.g. a usual out lap, starting the flying lap, abort the lap,
-            into pit. Two laps in total, but neither of them is a fastest lap. So here we check if
-            #. of fastest laps per driver per session <= 1.
-            """
-            temp = (lap_times_df.groupby(['Q', 'car_no'])
-                    .is_fastest_lap
-                    .sum()
-                    .reset_index(name='n_fastest_laps'))
-            temp = temp[temp.n_fastest_laps > 1]
-            if not temp.empty:
-                is_valid = False
-                invalid_fastest_lap_drivers.update(temp.car_no.unique())
-                # TODO: should get a warning here
+            pat = re.compile(r"^(\d{1,2})\s+([A-Za-z'‘’ ]+)$")
+            drivers: list[TextBlock] = []
+            for i in range(len(white_strips) - 1):
+                for tab_border in [(0, page.w / 3), (page.w / 2, 5 * page.w / 6)]:
+                    if car_no_driver := page.get_text('blocks',
+                                                      clip=(tab_border[0],
+                                                            white_strips[i] + 1,
+                                                            tab_border[1],
+                                                            white_strips[i + 1] + 1)):
+                        # In case OCR breaks the text into multiple blocks
+                        if len(car_no_driver) >= 2:  # noqa: PLR2004
+                            driver_tb = TextBlock(text=' '.join(i.text for i in car_no_driver),
+                                                  bbox=(min(i.bbox[0] for i in car_no_driver),
+                                                        min(i.bbox[1] for i in car_no_driver),
+                                                        max(i.bbox[2] for i in car_no_driver),
+                                                        max(i.bbox[3] for i in car_no_driver)))
+                        else:
+                            driver_tb = car_no_driver[0]
+                        if pat.match(driver_tb.text.strip()):
+                            drivers.append(driver_tb)
 
-            # Compare the fastest lap times in lap times and classification PDFs
-            lap_times_df = lap_times_df[
-                lap_times_df.is_fastest_lap
-                & (~lap_times_df.car_no.isin(invalid_fastest_lap_drivers))
-            ]
-            for q in [1, 2, 3]:
-                temp = lap_times_df[lap_times_df.Q == q].merge(
-                    classification_df,
-                    left_on='car_no',
-                    right_on='NO',
-                    how='left',
-                    validate='1:1'
+            # Parse the tables for each driver
+            pat = re.compile(r'^SECTOR\s+1\s+SECTOR\s+2\s+SECTOR\s+3$')
+            for driver_tb in drivers:
+                car_no = int(driver_tb.text.split(maxsplit=1)[0])
+
+                # Check if the driver's table is on the left column or the right column
+                if driver_tb.x1 < page.w / 2:
+                    l_table = 0
+                    r_table = page.w / 2
+                else:
+                    l_table = page.w / 2
+                    r_table = page.w
+
+                # Below each driver's name, should have "SECTOR 1 SECTOR 2 SECTOR 3", unless he has
+                # no lap at all (e.g. DNS or crash before sector 1 finishes)
+                white_strips = page.search_for_white_strips(
+                    clip=(l_table, driver_tb.y1 + 1, r_table, page.h),
+                    height=sector_analysis_height / 3
                 )
-                temp = temp[temp.lap_time != temp[f'Q{q}']]
+                if len(white_strips) < 2:  # noqa: PLR2004
+                    raise ParsingError(f'Expected at least two white strips below the driver '
+                                       f'"{driver_tb.text}" on {page_no_str}. Found: '
+                                       f'{white_strips}')
+                sector_tbs = page.get_text(
+                    'blocks',
+                    clip=(l_table, white_strips[0] + 1, r_table, white_strips[1] + 1)
+                )
+                if len(sector_tbs) >= 2:  # noqa: PLR2004
+                    sector_tb = TextBlock(text=' '.join(i.text for i in sector_tbs),
+                                          bbox=(min(i.bbox[0] for i in sector_tbs),
+                                                min(i.bbox[1] for i in sector_tbs),
+                                                max(i.bbox[2] for i in sector_tbs),
+                                                max(i.bbox[3] for i in sector_tbs)))
+                elif len(sector_tbs) == 1:
+                    sector_tb = sector_tbs[0]
+                # Find nothing. Can be a DNS driver at the bottom of the page
+                else:
+                    warnings.warn(f'Found no "SECTOR 1 SECTOR 2 SECTOR 3" text below driver '
+                                  f'"{driver_tb.text}" on {page_no_str}. Skipping him. Please '
+                                  f'check if this is expected, e.g. DNS')
+                    continue
+                # Find something else. Can be a DNS driver and we find the next driver's text
+                if not pat.match(sector_tb.text.strip()):
+                    warnings.warn(f'Expected "SECTOR 1 SECTOR 2 SECTOR 3" text below driver '
+                                  f'{driver_tb.text} on {page_no_str}. Found: {sector_tb.text}. '
+                                  f'Skipping him. Please check if this is expected, e.g. DNS')
+                    continue
+
+                # Find the horizontal black line below "SECTOR 1 SECTOR 2 SECTOR 3", which
+                # separates the table's header and content
+                if black_lines := page.search_for_black_lines(
+                    clip=(l_table, sector_tb.y1 + 1, r_table, page.h),
+                    min_length=0.4
+                ):
+                    b_table_header = black_lines[0]
+                else:
+                    doc.close()
+                    raise ParsingError(f'Cannot find any black line below "SECTOR 1 SECTOR 2 '
+                                       f'SECTOR 3" for driver {driver_tb.text} on {page_no_str}')
+
+                # Find the next white strip below the black line, which is the end of the table
+                if white_strips := page.search_for_white_strips(
+                    clip=(l_table, b_table_header + 1, r_table, page.h)
+                ):
+                    b_table = white_strips[0] + 1
+                else:
+                    doc.close()
+                    raise ParsingError(f'Cannot find any white strip below the table for driver '
+                                       f'{driver_tb.text} on {page_no_str}')
+
+                # Cols.
+                cols = self._detect_cols(
+                    page,
+                    clip=(l_table, sector_tb.y1 + 1, r_table, b_table_header - 1),
+                    col_min_gap=2
+                )
+                if [i.text.lower() for i in cols] \
+                        != EXPECTED_COLS['quali_sector_analysis']['required']:
+                    doc.close()
+                    raise ParsingError(
+                        f'Expected cols. {EXPECTED_COLS["quali_sector_analysis"]["required"]} '
+                        f'in ({l_table:.1f}, {sector_tb.y1:.1f}, {r_table:.1f}, '
+                        f'{b_table_header:.1f}) on {page_no_str}. Found: {cols}'
+                    )
+                vlines = [l_table,
+                          (cols[0].r + cols[1].l) / 2,
+                          (cols[1].r + cols[2].l) / 2,
+                          (cols[2].r + cols[3].l) / 2,
+                          (cols[3].r + cols[4].l) / 2,
+                          (cols[4].r + cols[5].l) / 2,
+                          (cols[5].r + cols[6].l) / 2,  # Leave enough width for "TIME" col.,
+                          cols[6].r + 1,                # in case it is "INCOMPLETE"
+                          r_table]
+
+                # Rows are coloured in white and grey alternately
+                hlines = page.search_for_grey_white_rows(
+                    clip=(l_table, b_table_header + 1, r_table, b_table + 1),
+                    min_height=np.mean([i.b - i.t for i in cols]) / 2,
+                    min_width=0.5
+                )
+                if not hlines:
+                    warnings.warn(f'No lap found for {driver_tb.text} on {page_no_str}. '
+                                  f'Please check if this is expected, e.g. DNS')
+                    continue
+
+                # Parse the table
+                # TODO: probably shouldn't hardcode the indices
+                """
+                The "7" in `simple_extraction` and `allow_multiple_texts_per_cell` is mostly for
+                2025 Bahrain quali. Hamilton. His table is so long that the last row intersects
+                with "Page 5 of 7". Therefore, the parser mistakenly gets this "Page 5 of 7" as
+                the last row and it breaks the usual parsing. So we use these parameters to allow
+                for such case, and manually exclude this "Page 5 of 7" row later. 
+                """
+                check_strikeout = [len(cols) - 1]
+                to_parse = [0, len(cols) - 1]
+                df = page.parse_table_by_grid(vlines=vlines,
+                                              hlines=hlines,
+                                              header_included=False,
+                                              simple_extraction=[7],
+                                              allow_multiple_texts_per_cell=[0, 7],
+                                              parse_cols=to_parse,
+                                              check_strikeout=check_strikeout)
+                df.columns = ['lap', 'sector_1_time', 'sector_1_speed', 'sector_2_time',
+                              'sector_2_speed', 'sector_3_time', 'sector_3_speed', 'lap_time']
+                df = df[~df.lap_time.astype(str).str.lower().str.contains('page', regex=False)]
+                # Check if, after excluding the "Page 5 of 7"-like rows, everything in the lap time
+                # is the correct lap time
+                temp = df[df.lap_time.str.len() != 1]
                 if not temp.empty:
-                    is_valid = False
-                    invalid_fastest_lap_drivers.update(temp.car_no.unique())
-                # TODO: should get a warning here
-            return is_valid
+                    raise ParsingError(f'Unable to parse lap time column for driver {car_no} on '
+                                       f'{page_no_str}. Error rows are\n'
+                                       f'{temp.to_string(index=False)}')
+                df.lap_time = df.lap_time.str[0]
+                df['car_no'] = car_no
+                df['lap_time_deleted'] = df.lap_time.apply(lambda x: x.strikeout is True)
+                df = df.map(self._normalise_textblock)
+                dfs.append(df)
 
-        if not is_fastest_lap_valid():
-            df = self._apply_fallback_fastest_laps(df, invalid_fastest_lap_drivers)
+        # Clean up
+        """
+        Unlike race sector analysis, we are keeping all laps here, incl. "INCOMPLETE" laps. These
+        laps do provide additional info. to quali. lap times PDF, e.g. the in lap of a red flag lap
+        has an indicator "INCOMPLETE". See #51 for details.
+        
+        Moreover, the very last lap for each driver always has missing lap No. We keep them as is.
+        This is useful because sometimes lap times PDF doesn't have the final in lap's lap time.
+        """
+        df = pd.concat(dfs, ignore_index=True)
+        df['pit'] = df.lap.str.contains('P', regex=False)
+        df.lap = (df.lap.astype(str)
+                  .str.rstrip(' P')
+                  .str.removesuffix('.0')
+                  .replace({'None': None, '': None})
+                  .astype(float))  # Because the last lap has missing lap No., so float
 
-        # TODO: bad practice
-        df.to_json = partial(self._quali_lap_times_to_json,
-                             df=df, year=self.year, round_no=self.round_no, session=self.session)
+        # Make sure only the last in lap has missing lap No.
+        # For each driver, always `True` after the first missing lap No.
+        seen_missing_lap_no = df.lap.isna().groupby(df.car_no, sort=False).cummax()
+        # Whenever `True` above, must be missing lap No. Otherwise, we have some non-missing lap
+        # No. after a missing lap No., which is wrong
+        invalid = df.loc[seen_missing_lap_no & df.lap.notna(), 'car_no'].unique()
+        assert len(invalid) == 0, f'Found laps w/ missing lap No. for driver {invalid.tolist()}'
         return df
 
     def _apply_fallback_fastest_laps(
@@ -3119,45 +3400,6 @@ class QualifyingParser(BaseParser):
         if 'lap_no' not in all_laps.columns:  # In case all laps are invalid and thus `lap_no` col.
             all_laps['lap_no'] = None         # is dropped in the above concat, we add it back
         return all_laps
-
-    @staticmethod
-    def _quali_lap_times_to_json(df, year, round_no, session) -> list[dict]:
-        # TODO: Very bad. Why did I create this method???
-        lap_data = []
-        # TODO: first lap's lap time is calendar time, not lap time, so drop it
-        # Lap No. can be missing (e.g. #47)
-        df = df[(df.lap_no >= 2) | df.lap_no.isna()].copy()  # noqa: PLR2004
-        df.lap_time = df.lap_time.apply(duration_to_millisecond)
-        for q in [1, 2, 3]:
-            temp = df[df.Q == q].copy()
-            temp['lap'] = temp.apply(
-                lambda x: LapObject(
-                    number=x.lap_no,
-                    time=x.lap_time,
-                    is_deleted=x.lap_time_deleted,
-                    is_entry_fastest_lap=x.is_fastest_lap
-                ),
-                axis=1
-            )
-            temp = temp.groupby('car_no')[['lap']].agg(list).reset_index()
-            temp['session_entry'] = temp['car_no'].map(
-                lambda x: SessionEntryForeignKeys(
-                    year=year,
-                    round=round_no,
-                    session=f'Q{q}' if session == 'quali' else f'SQ{q}',
-                    car_number=x
-                )
-            )
-            temp['lap_data'] = temp.apply(
-                lambda x: LapImport(
-                    object_type="Lap",
-                    foreign_keys=x['session_entry'],
-                    objects=x['lap']
-                ).model_dump(exclude_unset=True),
-                axis=1
-            )
-            lap_data.extend(temp['lap_data'].tolist())
-        return lap_data
 
 
 class PitStopParser(BaseParser):

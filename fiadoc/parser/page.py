@@ -692,6 +692,7 @@ class Page:
             vlines: list[float],
             hlines: list[float],
             tol: float = 3,
+            simple_extraction: Optional[Sequence[int]] = None,
             allow_multiple_texts_per_cell: Optional[Sequence[int]] = None,
             header_included: bool = True,
             check_strikeout: Optional[Sequence[int]] | bool = None,
@@ -720,6 +721,11 @@ class Page:
                     inside the cell's bounding box. Default is 3 pixels, i.e. if text is within 3px
                     of the cell's boundary, it is considered to be inside the cell. If we find any
                     text more than 2px always from the cell's bbox, will raise an error. See #33
+        :param simple_extraction: Which cols. to use simple text extraction, i.e. `option=words` in
+                                  `.get_text()`. This is a list of col. indices. This solves some
+                                  weird PDFs like 2025 Bahrain quali. sector analysis Hulkenberg
+                                  lap 15, where PyMuPDF reads "1:43.689" as "1", "43", ".", and
+                                  "689" when specifying `option=dict`
         :param allow_multiple_texts_per_cell: Which cols. can have multiple texts per cell. By
                                               default, we only allow one textblock in one cell.
                                               However, some cases (e.g. reserve drivers in entry
@@ -761,8 +767,12 @@ class Page:
                 cell_bbox_str = f'({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f})'  # For error/warnings
 
                 # Get text inside the cell defined by (l, t, r, b)
+                if simple_extraction and j in simple_extraction:
+                    option = 'words'
+                else:
+                    option = 'dict'
                 textblocks = self.get_text(
-                    'dict',
+                    option,
                     clip=(l, t, r, b),
                     check_strikeout=(check_strikeout is not None) and (j in check_strikeout)
                 )
