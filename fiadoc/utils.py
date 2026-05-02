@@ -199,14 +199,27 @@ def download_pdf(url: str, out_path: str | os.PathLike, n_retries: int = 3) -> N
 
 def sort_json(j: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Sort a list of dicts by their keys and values, for comparison used in tests"""
+    def _sort_key(item: Any) -> tuple[int, int, str]:
+        """Sort by car No. and then lap No. if possible"""
+        if isinstance(item, dict):
+            foreign_keys = item.get('foreign_keys')
+            if isinstance(foreign_keys, dict) and ('car_number' in foreign_keys):
+                car_number = foreign_keys['car_number']
+                if isinstance(car_number, int):
+                    return 0, car_number, str(item)
+            if 'number' in item:
+                number = item['number']
+                if isinstance(number, int):
+                    return 1, number, str(item)
+        return 2, 0, str(item)
+
     def _sort_recursively(i: Any) -> Any:
-        """Helper function to sort lists/dicts recursively"""
         if isinstance(i, dict):
             return {k: _sort_recursively(v) for k, v in sorted(i.items())}
-        elif isinstance(i, list):
-            return sorted([_sort_recursively(k) for k in i], key=str)
-        else:
-            return i
+        if isinstance(i, list):
+            return sorted((_sort_recursively(x) for x in i), key=_sort_key)
+        return i
+
     return _sort_recursively(j)
 
 
