@@ -259,6 +259,22 @@ class Page:
                                       f'"blocks", or "dict". Got "{option}"')
         res = self._pymupdf_page.get_text(option=option, **kwargs)
 
+        def _has_strikeout(tb: TextBlock) -> bool:
+            l, t, r, b = tb.bbox
+            h = b - t
+            if self.search_for_black_lines(
+                    clip=(
+                            l,
+                            t + STRIKEOUT_LINE_MARGIN * h,
+                            r,
+                            b - STRIKEOUT_LINE_MARGIN * h
+                    ),
+                    min_length=0.9,  # We are using the text's bbox, so relative to it, the
+                    rgb=192          # strikeout line should span almost the entire width
+            ):
+                return True
+            return False
+
         textblocks: list[TextBlock]
         if option == 'text':
             if text := self._clean_get_text_result(res):
@@ -270,7 +286,10 @@ class Page:
             textblocks = []
             for i in res:
                 if text := self._clean_get_text_result(i[4]):
-                    textblocks.append(TextBlock(text=text, bbox=i[:4]))
+                    tb = TextBlock(text=text, bbox=i[:4])
+                    if check_strikeout:
+                        tb.strikeout = _has_strikeout(tb)
+                    textblocks.append(tb)
             return textblocks
 
         else:  # option == 'dict'
@@ -352,21 +371,9 @@ class Page:
                 case _:
                     raise ParsingError(error_message)
 
-            # When `option = dict` and `check_strikeout = True`, need to check for strikeout text
             if check_strikeout:
                 for textblock in textblocks:
-                    l, t, r, b = textblock.bbox
-                    h = b - t
-                    if self.search_for_black_lines(
-                            clip=(
-                                    l,
-                                    t + STRIKEOUT_LINE_MARGIN * h,
-                                    r,
-                                    b - STRIKEOUT_LINE_MARGIN * h
-                            ),
-                            min_length=0.9,  # We are using the text's bbox, so relative to it, the
-                            rgb=192          # strikeout line should span almost the entire width
-                    ):
+                    if _has_strikeout(textblock):
                         textblock.strikeout = True
             return textblocks
 

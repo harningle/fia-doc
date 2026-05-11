@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import logging
 import os
 import re
 import warnings
@@ -853,7 +854,7 @@ class PracticeParser(BaseParser):
                                                             height=lap_times_height / 3)
                 if len(white_strips) < 2:  # noqa: PLR2004
                     doc.close()
-                    raise ParsingError(f'Find one or no white strip above the black line at '
+                    raise ParsingError(f'Found one or no white strip above the black line at '
                                        f'{black_line} on {page_no_str}: {white_strips}. Expected '
                                        f'at least two')
                 t_driver = white_strips[-2] + 1
@@ -2307,14 +2308,107 @@ class QualifyingParser(BaseParser):
     def classification_df(self) -> pd.DataFrame:
         return self._parse_classification()
 
+    @staticmethod
+    def _is_session_laps_ok(classification: pd.DataFrame, lap_times: pd.DataFrame) \
+            -> tuple[list[int], list[int]]:
+        """
+        Check, for each driver, if lap times PDF has the same amount of laps as in classification
+        PDF, and return the drivers that pass and fail this check
+        """
+        passed = []
+        failed = []
+
+        # For drivers eliminated in Q1, only need to check if their total #. of laps in lap times
+        # PDF is the same as classification PDF
+        """
+        This is not trivial. Can have three cases:
+        
+        1. end with a pit lap (normal finish), or
+        2. end with a non-pit lap as the final lap in PDF, bc. his final pit lap starts after the
+           session ends, or he ends the session with crash (e.g. 2025 Azerbaijan Albon)
+        3. one or multiple laps are missing during the session (not at the end of the session).
+           This often happens if there is a red flag (e.g. 2025 Azerbaijan Colapinto)
+        
+        Case 1 can be identified by the last lap has "P", and if we have same #. of laps in both
+        PDFs, then good.
+        
+        Case 2 would have its actual final lap NOT in lap times PDF, but classification PDF always
+        has every lap (even if it's INCOMPLETE), so we should have the last lap in PDF without "P",
+        and classification PDF has one more lap than lap times PDF
+        
+        Whatever is not case 1 and 2 are case 3 and will be considered as fail.
+        """
+        q1_drivers = classification[classification.Q2_LAPS.isna()][['NO', 'Q1_LAPS']]
+        q1_passed = []
+        q1_failed = []
+        q1_lap_times = (lap_times[lap_times.car_no.isin(q1_drivers.NO)].groupby('car_no')
+                        .agg(n_laps=('lap_no', 'count'),
+                             last_pit=('pit', 'last'))
+                        .reset_index())
+        q1_drivers = q1_drivers.merge(q1_lap_times, left_on='NO', right_on='car_no', how='left',
+                                      validate='1:1', indicator=True)
+        temp = q1_drivers[q1_drivers._merge == 'right_only']
+        if not temp.empty:
+            raise ValidationError(f'Found drivers only in lap times PDF but not in classification '
+                                  f'PDF: {temp.NO.to_list()}')
+        temp = q1_drivers[q1_drivers._merge == 'left_only']
+        if not temp.empty:
+            warnings.warn(f'Found drivers only in classification PDF but not in lap times PDF. '
+                          f'Assuming they are DNS or crash on out lap: {temp.NO.to_list()}')
+            q1_passed.extend(temp.NO.to_list())
+        q1_drivers = q1_drivers[q1_drivers._merge == 'both']
+        case_1 = (q1_drivers.n_laps == q1_drivers.Q1_LAPS) & (q1_drivers.last_pit == True)
+        case_2 = (q1_drivers.n_laps == q1_drivers.Q1_LAPS - 1) & (q1_drivers.last_pit == False)
+        q1_passed.extend(q1_drivers[case_1 | case_2].NO.astype(int).to_list())
+        q1_failed.extend(q1_drivers[~(case_1 | case_2)].NO.astype(int).to_list())
+        logging.debug(f'Q1 drivers that pass the lap count check: {q1_passed}')
+
+        # For all drivers in Q2, their final lap in Q1 should be a pit lap
+        # TODO: theoretically he can crash in Q1, has his car fixed, and still participates in Q2,
+        #       but I don't think it can happen
+        q2_drivers = classification[classification.Q2_LAPS.notna()] \
+            .rename(columns={'Q1_LAPS': 'final_lap_no'})
+
+        # For all drivers in Q3, additionally, their final laps in Q2 should be a pit lap
+        q3_drivers = classification[classification.Q3_LAPS.notna()].copy()
+        q3_drivers['final_lap_no'] = q3_drivers.Q1_LAPS + q3_drivers.Q2_LAPS
+
+        # Check if their final laps in each session are pit laps
+        drivers_to_check = pd.concat([q2_drivers[['NO', 'final_lap_no']],
+                                      q3_drivers[['NO', 'final_lap_no']]], ignore_index=True)
+        drivers_to_check = drivers_to_check.merge(
+            lap_times[['car_no', 'lap_no', 'pit']],
+            left_on=['NO', 'final_lap_no'],
+            right_on=['car_no', 'lap_no'],
+            how='left',
+            validate='1:1',
+            indicator=True
+        )
+        temp = drivers_to_check[drivers_to_check._merge == 'left_only']
+        if not temp.empty:
+            warnings.warn(f'Found Q2 and/or Q3 drivers only in classification PDF but not in lap '
+                          f'times PDF. Assuming the lap numbering in lap times PDF is wrong: '
+                          f'{temp.NO.to_list()}')
+            failed.extend(temp.NO.to_list())
+        temp = drivers_to_check[drivers_to_check._merge == 'right_only']
+        if not temp.empty:
+            raise ValidationError(f'Found drivers only in lap times PDF but not in classification '
+                                  f'PDF: {temp.NO.to_list()}')
+        drivers_to_check = drivers_to_check.groupby('NO', as_index=False).pit.all()
+        passed += drivers_to_check[drivers_to_check.pit == True].NO.to_list() + q1_passed
+        failed += drivers_to_check[drivers_to_check.pit == False].NO.to_list() + q1_failed
+        return passed, failed
+
     @cached_property
     def lap_times_df(self) -> pd.DataFrame:
         def to_json(df: pd.DataFrame) -> list[dict]:
             # TODO: Very bad
+            # Skip if lap 1 is a calendar time lap
+            df = df[~((df.lap_no == 1)
+                      & df.lap_time.str.match(re.compile(r'^\d{2}:\d{2}:\d{2}$')))
+                    & ((df.lap_no >= 1) | (df.lap_no.isna()))]
+
             lap_data = []
-            # TODO: first lap's lap time is calendar time, not lap time, so drop it
-            # Lap No. can be missing (e.g. #47)
-            df = df[(df.lap_no >= 2) | df.lap_no.isna()].copy()  # noqa: PLR2004
             df.lap_time = df.lap_time.apply(duration_to_millisecond)
             for q in [1, 2, 3]:
                 temp = df[df.Q == q].copy()
@@ -2442,87 +2536,59 @@ class QualifyingParser(BaseParser):
             return df
 
         # If lap times PDF is available
+        passed_drivers = None                           # List of drivers that have and don't have
+        classification = self.classification_df.copy()  # the same amount of laps in laps times PDF
+        failed_drivers = classification.NO.to_list()    # and classification PDF
         if self.lap_times_file:
-            lap_times = self._parse_lap_times()
+            lap_times = self._sanitise_lap_times_df(self._parse_lap_times())
 
             # Check if it has the same amount of laps as the classification PDF. If yes, then no
             # need to look at sector analysis PDF (#51)
-            classification = self.classification_df.copy()
-            classification['total_laps'] = (classification.Q1_LAPS.fillna(0)
-                                            + classification.Q2_LAPS.fillna(0)
-                                            + classification.Q3_LAPS.fillna(0))
-            total_laps = (lap_times.groupby('car_no', as_index=False)
-                          .lap_no
-                          .count()
-                          .rename(columns={'lap_no': 'total_laps_lap_times_pdf'}))
-            total_laps = total_laps.merge(classification[['NO', 'total_laps']],
-                                          left_on='car_no', right_on='NO',
-                                          how='outer', validate='1:1', indicator=True)
-            if (total_laps.total_laps_lap_times_pdf == total_laps.total_laps).all():
+            passed_drivers, failed_drivers = self._is_session_laps_ok(classification, lap_times)
+            if not failed_drivers:
                 lap_times = _assign_session_to_lap(classification, lap_times)
                 lap_times.to_json = partial(to_json, lap_times)
                 return lap_times
 
         # If we reach here, either we don't have lap times PDF, or the lap times PDF doesn't have
-        # all laps, so need to use the sector analysis PDF. If no sector analysis PDF available,
-        # then again fallback to the classification PDF for the fastest laps only. No per-lap data
-        # available
+        # the same amount of laps as the classification PDF
         if not self.sector_analysis_file:
-            warnings.warn("Total lap numbers in lap times PDF don't agree with classification "
-                          "PDF, and sector analysis PDF is provided. Can get fastest laps only "
-                          "from the classification PDF. No per-lap data available")
-            df = self._apply_fallback_fastest_laps(pd.DataFrame(columns=['car_no'], data=[]),
-                                                   self.classification_df.NO.unique())
+            warnings.warn(f"Total lap numbers in lap times PDF don't agree with classification "
+                          f"PDF for drivers {failed_drivers}, and sector analysis PDF is not "
+                          f"provided. Can get fastest laps only from classification PDF. No "
+                          f"per-lap data available in general")
+            # For some drivers, we may still be able to use data from lap times PDF (if the PDF is
+            # available). E.g., a driver eliminated in Q1 has all his laps in Q1, so no confusion
+            # at all; simply assign all his laps to Q1
+            if passed_drivers:
+                usable_laps = _assign_session_to_lap(
+                    classification[classification.NO.isin(passed_drivers)],
+                    lap_times[lap_times.car_no.isin(passed_drivers)]
+                )
+            else:
+                usable_laps = pd.DataFrame(columns=['car_no'], data=[])
+            df = self._apply_fallback_fastest_laps(usable_laps, failed_drivers)
             df.to_json = partial(to_json, df)
             return df
 
         # If reaches here, then can use sector analysis PDF to get lap time data
         warnings.warn("Total lap numbers in lap times PDF don't agree with classification "
                       "PDF. Proceed with sector analysis PDF to get per-lap data")
-        sector_analysis = self._parse_sector_analysis().drop(columns=[
-            'sector_1_time', 'sector_1_speed', 'sector_2_time', 'sector_2_speed', 'sector_3_time',
-            'sector_3_speed'
-        ]).rename(columns={'lap': 'lap_no'})
-        sector_analysis.lap_no = (sector_analysis.lap_no.ffill()
-                                  + sector_analysis.lap_no.isna()
-                                    .groupby(sector_analysis.lap_no  # Groups separated by
-                                             .notna()                # missing's
-                                             .cumsum())
-                                    .cumsum()).astype(int)
-
-        # Drop the first lap
-        """
-        In 2025 (e.g., 2025 Bahrain), we have two "first lap" in sector analysis PDF (see #51),
-        which are the calendar time of the start time of the first out lap and the lap after the
-        out lap. We don't need any of them, as the time is calendar time rather than lap time.
-        However in 2026 (e.g., 2026 Australian), sector analysis PDF has the same lap numbering as
-        lap times PDF: only one "first lap" which is the calendar time of the first out lap. So to
-        make it consistent, we drop all leading calendar time laps and only keep the last one, so
-        that every driver starts with the out lap, w/ only calendar time but on lap time.
-        """
-        calendar_time_pat = re.compile(r'\d{2}:\d{2}:\d{2}')
-        sector_analysis['is_calendar_time'] = sector_analysis.lap_time.str.match(calendar_time_pat)
-        assert (
-            sector_analysis.groupby('car_no')
-            .is_calendar_time
-            .apply(lambda x: x.is_monotonic_decreasing)
-            .all()
-        ), (
-            'Found calendar time as lap time in the middle of a session. Expect calendar time '
-            'should only appear for the first out lap'
-        )
-        sector_analysis = sector_analysis[~(
-            sector_analysis.is_calendar_time  # Drop only if is calendar time
-            & sector_analysis.groupby('car_no').is_calendar_time.transform(
-                lambda x: x[::-1].cummax()[::-1].shift(-1, fill_value=False)  # `shift(-1) excl.
-            )                                                                 # the last one
-        )]
-        sector_analysis.lap_no = sector_analysis.groupby('car_no').cumcount() + 1
+        sector_analysis = self._sanitise_sector_analysis_df(self._parse_sector_analysis())
 
         # Assign session to laps
         sector_analysis.lap_time = sector_analysis.lap_time.replace('INCOMPLETE', '0:00.000')
         sector_analysis = _assign_session_to_lap(self.classification_df, sector_analysis)
-        sector_analysis.loc[sector_analysis.lap_time == '0:00.000', 'is_fastest_lap'] = False
+
+        # Every session should end with a pit lap or an INCOMPLETE lap
+        temp = sector_analysis.groupby(['car_no', 'Q'], as_index=False).last(skipna=False)
+        temp = temp[(temp.lap_time != '0:00.000') & (temp.pit != True)]
+        if not temp.empty:
+            raise ParsingError(f'Found sessions not ending with a pit lap or an incomplete lap:\n'
+                               f'{temp.to_string(index=False)}')
+
+        # Only one (or no) fastest lap in each session
+        sector_analysis = sector_analysis[sector_analysis.lap_time != '0:00.000']
         temp = sector_analysis.groupby(['car_no', 'Q'], as_index=False).is_fastest_lap.sum()
         temp = temp[temp.is_fastest_lap >= 2]
         if not temp.empty:
@@ -3070,7 +3136,7 @@ class QualifyingParser(BaseParser):
                         else:
                             doc.close()
                             raise ParsingError(
-                                f'Cannot find any white strip below the table in ('
+                                f'Could not find any white strip below the table in ('
                                 f'{l_table:.1f}, {b_table_header:.1f}, {r_table:.1f}, '
                                 f'{b_tables:.1f}) on {page_no_str}'
                             )
@@ -3136,6 +3202,47 @@ class QualifyingParser(BaseParser):
         df = df.rename(columns={'lap': 'lap_no'})
         df.lap_no = df.lap_no.astype(int)
         df.car_no = df.car_no.astype(int)
+        return df
+
+    def _sanitise_lap_times_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        """See #87 for details
+
+        This checks which case we are in now:
+
+        1. lap 1 in PDF = calendar time of start of the second lap (flying lap), and lap 2 in PDF =
+           lap time of the second lap
+        2. lap 1 in PDF = calendar time of start of the first lap (out lap) and has "P", and lap 2
+           in PDF = lap time of the first lap
+
+        For case 1, we don't need to do anything; just return the table as in the PDF. For case 2,
+        we assign lap No. = original lap No. - 1, so that lap No. in the PDF always corresponds to
+        the true lap numbering. However, there is an exception to case 2: out lap and directly into
+        the pit (no flying lap after the out lap). In this case, he can have lap 1 w/ "P" but we
+        are in case 1 (e.g. 2024 Las Vegas Russell). For this reason, we try `_is_session_laps_ok`
+        before clean up case 2.
+        """
+        lap_1_pit_cars = df[(df.lap_no == 1) & (df.pit == True)].car_no.to_list()
+        if not lap_1_pit_cars:
+            logging.debug(f"No driver pits on lap 1. Assuming all lap 1's in PDF are calendar "
+                          f"time of start of the second lap")
+            return df
+
+        # Check if lap 1 w/ "P" is case 2, or case 1 w/o a following flying lap
+        classification_df = self.classification_df
+        passed, failed = self._is_session_laps_ok(
+            classification_df[classification_df.NO.isin(lap_1_pit_cars)],
+            df[df.car_no.isin(lap_1_pit_cars)]
+        )
+        if passed:
+            warnings.warn(f'Found cars with lap 1 with "P", but total amount of laps in lap times '
+                          f'PDF is the same as classification PDF. Assuming such lap 1 in PDF is '
+                          f'calendar time of start of the second lap: {passed}')
+            lap_1_pit_cars = failed
+        if lap_1_pit_cars:
+            warnings.warn(f'Found cars with lap 1 with "P". Assuming such laps are calendar time '
+                          f'of the start of the first lap (out lap): {lap_1_pit_cars}')
+            df = df.copy()
+            df.loc[df.car_no.isin(lap_1_pit_cars), 'lap_no'] -= 1
         return df
 
     def _parse_sector_analysis(self) -> pd.DataFrame:
@@ -3304,7 +3411,7 @@ class QualifyingParser(BaseParser):
                 2025 Bahrain quali. Hamilton. His table is so long that the last row intersects
                 with "Page 5 of 7". Therefore, the parser mistakenly gets this "Page 5 of 7" as
                 the last row and it breaks the usual parsing. So we use these parameters to allow
-                for such case, and manually exclude this "Page 5 of 7" row later. 
+                for such case, and manually exclude this "Page 5 of 7" row later.
                 """
                 check_strikeout = [len(cols) - 1]
                 to_parse = [0, len(cols) - 1]
@@ -3315,6 +3422,7 @@ class QualifyingParser(BaseParser):
                                               allow_multiple_texts_per_cell=[0, 7],
                                               parse_cols=to_parse,
                                               check_strikeout=check_strikeout)
+
                 df.columns = ['lap', 'sector_1_time', 'sector_1_speed', 'sector_2_time',
                               'sector_2_speed', 'sector_3_time', 'sector_3_speed', 'lap_time']
                 df = df[~df.lap_time.astype(str).str.lower().str.contains('page', regex=False)]
@@ -3336,7 +3444,7 @@ class QualifyingParser(BaseParser):
         Unlike race sector analysis, we are keeping all laps here, incl. "INCOMPLETE" laps. These
         laps do provide additional info. to quali. lap times PDF, e.g. the in lap of a red flag lap
         has an indicator "INCOMPLETE". See #51 for details.
-        
+
         Moreover, the very last lap for each driver always has missing lap No. We keep them as is.
         This is useful because sometimes lap times PDF doesn't have the final in lap's lap time.
         """
@@ -3355,6 +3463,77 @@ class QualifyingParser(BaseParser):
         # No. after a missing lap No., which is wrong
         invalid = df.loc[seen_missing_lap_no & df.lap.notna(), 'car_no'].unique()
         assert len(invalid) == 0, f'Found laps w/ missing lap No. for driver {invalid.tolist()}'
+
+        df = df.rename(columns={'lap': 'lap_no'})
+        return df
+
+    @staticmethod
+    def _sanitise_sector_analysis_df(df: pd.DataFrame) -> pd.DataFrame:
+        """See #51 and #87"""
+        # Fill in the missing last lap No.
+        """
+        Drivers can have their final lap into the pit "INCOMPLETE" w/ missing lap No. We fill it
+        with the previous lap No. + 1. After this step, all laps should be numbered.
+        """
+        df = df.drop(columns=['sector_1_time', 'sector_1_speed', 'sector_2_time', 'sector_2_speed',
+                              'sector_3_time', 'sector_3_speed'])
+        df['row_no'] = df.groupby('car_no').cumcount() + 1
+        df['total_laps'] = df.groupby('car_no').transform('size')
+        temp = df[df.lap_no.isna() & (df.row_no != df.total_laps)]
+        if not temp.empty:
+            raise ValidationError(f'Found laps with missing lap No. that are not the last lap for '
+                                  f'drivers {temp.car_no.to_list()}')
+        df.lap_no = df.lap_no.fillna(df.total_laps).astype(int)
+        del df['total_laps']
+
+        # Calendar time, if any, should appear as the first rows
+        df['is_calendar_time'] = df.lap_time.str.match(re.compile(r'^\d{2}:\d{2}:\d{2}$'))
+        assert (
+            df.groupby('car_no')
+            .is_calendar_time
+            .apply(lambda x: x.is_monotonic_decreasing)
+            .all()
+        ), (
+            'Found calendar time as lap time in the middle of a session. Expect calendar time '
+            'should only appear for the first out lap'
+        )
+
+        # Clean up the "first" lap
+        """
+        See #51 and #87. Sector analysis PDF can have the following cases:
+        
+        1. e.g. 2025 Bahrain. Lap 1 = calendar time of the start time of the first lap (out lap),
+           lap 2 = calendar time of the start of the second lap (flying lap), and lap 3 = lap time
+           of the second lap
+        2. e.g. 2025 Australian. Lap 1 = calendar time of the start time of the first lap and has
+           "P", lap 2 = lap time of the first lap, and lap 3 = lap time of the second lap
+        
+        So to make it consistent, we make the lap numbering the same as the true lap. That is, in
+        case 2, we will have lap 1 in PDF has new lap No. = 0, lap 2 in PDF has new lap No. = 1,
+        etc. In case 1, we will drop lap 1 and the original laps in PDF will have the new lap No.
+        subtracted by 1
+        """
+        lap_1_is_p = df[(df.row_no == 1) & (df.pit == True)].car_no.to_list()
+        lap_1_not_p = [i for i in df.car_no.unique() if i not in lap_1_is_p]
+
+        # Case 1 should have two calendar time laps. If not, then the driver should have an
+        # INCOMPLETE lap immediately after a calendar time lap (e.g. 2025 Bahrain Bearman)
+        temp = df[df.car_no.isin(lap_1_not_p)].copy()
+        temp['next_lap_time'] = df.groupby('car_no').lap_time.shift(-1)
+        temp = (temp[temp.is_calendar_time].groupby('car_no', as_index=False)
+                .agg({'is_calendar_time': 'sum',
+                      'next_lap_time': 'last'}))
+        temp = temp[~((temp.is_calendar_time == 2) | (temp.next_lap_time == 'INCOMPLETE'))]
+        if not temp.empty:
+            raise ParsingError(f'Found drivers w/ first lap not having "P" but not having two '
+                               f'calendar time laps: {temp.car_no.to_list()}')
+
+        # Case 1: drop first calendar time lap
+        df = df[~(df.car_no.isin(lap_1_not_p) & df.is_calendar_time & (df.row_no == 1))]
+
+        # Both case 1 and 2: minus 1 from the original lap No. in PDF
+        df.lap_no -= 1
+        del df['row_no']
         return df
 
     def _apply_fallback_fastest_laps(
@@ -3548,6 +3727,10 @@ class PitStopParser(BaseParser):
         # TODO: bad practice
         df.to_json = to_json
         return df
+
+
+class ValidationError(Exception):
+    pass
 
 
 if __name__ == '__main__':
