@@ -17,7 +17,7 @@ dependencies = [
   "opencv-python>=4.10.0,<5.0.0",
   "paddleocr==3.2.0",
   "paddlepaddle==3.2.0",
-  "pandas>=2.0.0,<3.0.0",
+  "pandas>=3.0.0",  # Copy-on-Write so no annoying warnings
   "pydantic>=2.0.0,<3.0.0",
   "pymupdf==1.26.0",
   "requests>=2.28.0,<3.0.0",
