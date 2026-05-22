@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import logging
 import os
 import re
 import warnings
@@ -2398,7 +2397,7 @@ class QualifyingParser(BaseParser):
             for q in [1, 2, 3]:
                 check = df[df.Q == q].groupby('car_no', as_index=False)[['incomplete', 'pit']] \
                     .last()
-                check = check[(check.pit != True) & ~check.incomplete]
+                check = check[(check.pit != True) & ~check.incomplete]  # noqa: E712
                 if not check.empty:
                     raise ValidationError(f'Found drivers ending Q{q} not with a pit lap or an '
                                           f'INCOMPLETE lap:\n{check.to_string(index=False)}')
@@ -2411,10 +2410,10 @@ class QualifyingParser(BaseParser):
             def _try_duration_to_millisecond(s: str) -> float:
                 try:
                     return duration_to_millisecond(s)['milliseconds']
-                except:
+                except:  # noqa: E722
                     return np.inf
             df['lap_time_ms'] = df.lap_time.apply(_try_duration_to_millisecond)
-            fastest_lap = (df[(df.lap_time_deleted == False)
+            fastest_lap = (df[(df.lap_time_deleted == False)  # noqa: E712
                               & ~np.isinf(df.lap_time_ms)
                               & ~df.incomplete]
                            .groupby(['car_no', 'Q'], as_index=False).
@@ -2425,7 +2424,7 @@ class QualifyingParser(BaseParser):
             df = df.merge(fastest_lap, on=['car_no', 'Q'], validate='m:1', how='left',
                           suffixes=('', '_fastest'))
             df['is_fastest_lap'] = ((df.lap_time_ms == df.lap_time_ms_fastest)
-                                    & (df.lap_time_deleted == False))
+                                    & (df.lap_time_deleted == False))  # noqa: E712
             del df['lap_time_ms'], df['lap_time_ms_fastest']
             fastest_lap = df[df.is_fastest_lap][['car_no', 'Q', 'lap_time']]
 
@@ -2446,7 +2445,7 @@ class QualifyingParser(BaseParser):
                                             how='outer',
                                             indicator=True)
             temp = fastest_lap[fastest_lap._merge != 'both']
-            dsq_drivers = classification[classification.finishing_status == 20].NO.to_list()
+            dsq_drivers = classification[classification.finishing_status == 20].NO.to_list()  # noqa: PLR2004
             temp = temp[~temp.car_no.isin(dsq_drivers)]  # OK if DSQ drivers have laps (#61, #90)
             if not temp.empty:
                 raise ValidationError(f'Fastest laps in sector analysis PDF (left) are different '
@@ -2463,7 +2462,7 @@ class QualifyingParser(BaseParser):
 
             # Only one (or no) fastest lap in each session
             temp = df.groupby(['car_no', 'Q'], as_index=False).is_fastest_lap.sum()
-            temp = temp[temp.is_fastest_lap >= 2]
+            temp = temp[temp.is_fastest_lap >= 2]  # noqa: PLR2004
             if not temp.empty:
                 raise ParsingError(f'Found multiple fastest laps within a session:\n'
                                    f'{temp.to_string(index=False)}')
@@ -2482,7 +2481,7 @@ class QualifyingParser(BaseParser):
             ceil, and not to the nearest... Therefore, we allow one second difference. For a given
             driver, it's impossible to have two different laps finishing within one calendar
             second, so one second error in calendar time is ok to identify a lap.
-            
+
             However, in very rare cases, the calendar time in sector analysis PDF can be wrong...
             See #88
             """
@@ -3198,20 +3197,20 @@ class QualifyingParser(BaseParser):
         # Clean up the "first" lap
         """
         See #51 and #87. Sector analysis PDF can have the following cases:
-        
+
         1. e.g. 2025 Bahrain. Lap 1 = calendar time of the start time of the first lap (out lap),
            lap 2 = calendar time of the start of the second lap, and lap 3 = lap time of the second
            lap. Here lap 3 in PDF is actual lap 2, and we don't have lap time for lap 1 (out lap)
         2. e.g. 2025 Australian. Lap 1 = calendar time of the start time of the first lap and has
            "P", lap 2 = lap time of the first lap, and lap 3 = lap time of the second lap. Here lap
            2 in PDF is actual lap 1, lap 3 in PDF is actual lap 2, ...
-        
+
         So to make it consistent, we make the lap numbering the same as the actual lap. That is, in
         case 2, we will have lap 1 in PDF has new lap No. = 0, lap 2 in PDF has new lap No. = 1,
         etc. In case 1, we will drop lap 1 and the original laps in PDF will have the new lap No.
         subtracted by 1
         """
-        lap_1_is_p = df[(df.row_no == 1) & (df.pit == True)].car_no.to_list()
+        lap_1_is_p = df[(df.row_no == 1) & (df.pit == True)].car_no.to_list()  # noqa: E712
         lap_1_not_p = [i for i in df.car_no.unique() if i not in lap_1_is_p]
 
         # Check: case 1 should have two calendar time laps. If not, then the driver should have an
@@ -3222,7 +3221,8 @@ class QualifyingParser(BaseParser):
             temp = (temp[temp.is_calendar_time].groupby('car_no', as_index=False)
                     .agg({'is_calendar_time': 'sum',
                           'next_lap_time': 'last'}))
-            temp = temp[~((temp.is_calendar_time == 2) | (temp.next_lap_time == 'INCOMPLETE'))]
+            temp = temp[~((temp.is_calendar_time == 2)  # noqa: PLR2004
+                          | (temp.next_lap_time == 'INCOMPLETE'))]
             if not temp.empty:
                 raise ParsingError(f'Found drivers w/ first lap not having "P" but not having two '
                                    f'calendar time laps: {temp.car_no.to_list()}')
