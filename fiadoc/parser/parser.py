@@ -2492,40 +2492,40 @@ class QualifyingParser(BaseParser):
             df.calendar_time = df.groupby('car_no')['calendar_time'].cumsum()
             df['is_fastest_lap_classification'] = False
             for q in [1, 2, 3]:
-                # Round to the floor
-                # TODO: rewrite. What we need is Timedelta('0 days 16:07:13.470000') --> "16:07:13"
-                df['temp'] = df.calendar_time.apply(lambda x: str(x).split('.')[0].split(' ')[-1])
-                df = df.merge(classification[['NO', f'Q{q}_TIME']],
-                              left_on=['car_no', 'temp'],
-                              right_on=['NO', f'Q{q}_TIME'],
-                              how='left')
-                del df['NO']
-                # Plus one to the floor, i.e. allow one second error in the merge, and update the
-                # previously non-matched cells using the new merge
-                # TODO: rewrite as well. See above
-                df.temp = df.calendar_time.apply(
-                    lambda x: str(x + pd.Timedelta(seconds=1)).split('.')[0].split(' ')[-1]
-                )
-                df = df.merge(classification[['NO', f'Q{q}_TIME']],
-                              left_on=['car_no', 'temp'],
-                              right_on=['NO', f'Q{q}_TIME'],
-                              how='left',
-                              suffixes=('', '_y'))
-                del df['NO'], df['temp']
-                df = df.fillna({f'Q{q}_TIME': df[f'Q{q}_TIME_y']})
-                del df[f'Q{q}_TIME_y']
+                temp = classification[['NO', f'Q{q}_TIME']].dropna(subset=f'Q{q}_TIME')
+                temp['calendar_time'] = temp[f'Q{q}_TIME'].apply(time_to_timedelta)
+                temp = temp.rename(columns={'NO': 'car_no'}).sort_values('calendar_time')
+                df = df.sort_values('calendar_time')
+                df = pd.merge_asof(df,
+                                   temp,
+                                   on='calendar_time',
+                                   by='car_no',
+                                   direction='nearest',
+                                   tolerance=pd.Timedelta(seconds=5))
 
                 # Check if all drivers in the final classification are merged
-                temp = classification[['NO', f'Q{q}_TIME']].merge(
-                    df[df[f'Q{q}_TIME'].notna()][['car_no']],
+                """
+                But not vice versa. E.g., a DSQ driver can have many laps in sector analysis PDF,
+                but has nothing in classification PDF, e.g. Ocon in 2025 Azerbaijan quali. So we
+                allow for sector analysis-only drivers. However, there shouldn't by any
+                classification-only drivers.
+                """
+                temp = classification[['NO', f'Q{q}_TIME']].dropna(subset=f'Q{q}_TIME').merge(
+                    df[df.Q == q][['car_no']].drop_duplicates(),
                     left_on='NO',
                     right_on='car_no',
+                    how='outer',
                     indicator=True
                 )
-                temp = temp.dropna(subset=f'Q{q}_TIME')
-                assert (temp['_merge'] == 'both').all(), \
-                    f"Some drivers' fastest laps in Q{q} cannot be found in lap times PDF: " \
-                    f"{', '.join([str(i) for i in temp[temp._merge != 'both']['NO']])}"
+                classification_only = temp[temp._merge == 'left_only']
+                assert classification_only.empty, \
+                    f"Some drivers' fastest laps in Q{q} cannot be found in sector analysis " \
+                    f"PDF: {classification_only.NO.to_list()}"
+                sector_analysis_only = temp[temp._merge == 'right_only']
+                if not sector_analysis_only.empty:
+                    warnings.warn(f'Found drivers in Q{q} in sector analysis PDF but not in '
+                                  f'classification PDF: {sector_analysis_only.car_no.to_list()}. '
+                                  f'Assuming they are DSQ-ed or DNF or DNS')
                 df.loc[df[f'Q{q}_TIME'].notna(), 'is_fastest_lap_classification'] = True
                 del df[f'Q{q}_TIME']
             df.loc[df.lap_time == 'INCOMPLETE', 'is_fastest_lap_classification'] = False
@@ -2533,9 +2533,9 @@ class QualifyingParser(BaseParser):
             if not temp.empty:
                 temp = temp[['lap_no', 'car_no', 'Q', 'lap_time', 'calendar_time',
                              'is_fastest_lap', 'is_fastest_lap_classification']]
-                warnings.warn(f'Fastest lap numbering in sector analysis PDF is different from '
-                              f'that in classification PDF. Will proceed with the numbering in '
-                              f'sector analysis PDF:\n{temp.to_string(index=False)}')
+                warnings.warn(f'Fastest lap numbering/calendar time in sector analysis PDF is '
+                              f'different from that in classification PDF. Will proceed with the '
+                              f'numbering in sector analysis PDF:\n{temp.to_string(index=False)}')
             del df['is_fastest_lap_classification']
             return df
 
