@@ -1,13 +1,13 @@
 import json
 import os
 import warnings
-from contextlib import nullcontext
 
 import pytest
 import requests_mock
 
 from fiadoc.drivers import BASE_URL
 from fiadoc.parser import EntryListParser
+from fiadoc.tests._warnings import assert_warnings
 from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
@@ -17,7 +17,7 @@ race_list = [
         2024,
         21,
         '2024_21_entry_list.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 1: Has multiple reserve drivers who are not in the 20 usual drivers (#49)
@@ -25,7 +25,7 @@ race_list = [
         2024,
         20,
         '2024_20_entry_list.json',
-        pytest.warns(UserWarning, match='New drivers found in entry list PDF')
+        assert_warnings(required=['New drivers found in entry list PDF'])
     ),
     (
         # 2: Has only one reserve driver (#55)
@@ -33,7 +33,7 @@ race_list = [
         2024,
         4,
         '2024_4_entry_list.json',
-        pytest.warns(UserWarning, match='New drivers found in entry list PDF')
+        assert_warnings(required=['New drivers found in entry list PDF'])
     ),
     (
         # 3: Has a driver (Ricciardo) incorrectly indicated as having a reserve driver (looks like
@@ -42,8 +42,9 @@ race_list = [
         2024,
         5,
         '2024_5_entry_list.json',
-        pytest.warns(UserWarning,
-                     match='Found reserve drivers in the main table, but no reserve driver table')
+        assert_warnings(
+            required=['Found reserve drivers in the main table, but no reserve driver table']
+        )
     ),
     (
         # 4: Weird PDF page margin (#33)
@@ -51,7 +52,7 @@ race_list = [
         2025,
         1,
         '2025_1_entry_list.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 5: Weird PDF page margin (#33)
@@ -59,7 +60,11 @@ race_list = [
         2025,
         3,
         '2025_3_entry_list.json',
-        pytest.warns(UserWarning, match='New drivers found in entry list PDF')
+        assert_warnings(required=['New drivers found in entry list PDF',
+                                  'Text found outside the cell bbox'])
+        # The cell bbox warning is due to the reserve driver superscript in the next line. PyMuPDF
+        # mistakenly takes the superscript of the next line as the text of the current line, and we
+        # should exclude it, and emit a warning. Same for test case 6 below
     ),
     (
         # 6: Car No. superscript shown as regular text w/ smaller font size, rather than a proper
@@ -68,7 +73,8 @@ race_list = [
         2025,
         4,
         '2025_4_entry_list.json',
-        pytest.warns(UserWarning, match='New drivers found in entry list PDF')
+        assert_warnings(required=['New drivers found in entry list PDF',
+                                  'Text found outside the cell bbox'])
     ),
     (
         # 7: Two and only two reserve drivers (#55)
@@ -76,7 +82,7 @@ race_list = [
         2025,
         9,
         '2025_9_entry_list.json',
-        pytest.warns(UserWarning, match='New drivers found in entry list PDF')
+        assert_warnings(required=['New drivers found in entry list PDF'])
     ),
     (
         # 8: Has optional cols. like "TLA" (#76)
@@ -84,7 +90,7 @@ race_list = [
         2026,
         1,
         '2026_1_entry_list.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 9: Cols. not vertically aligned
@@ -92,7 +98,7 @@ race_list = [
         2026,
         3,
         '2026_3_entry_list.json',
-        nullcontext()
+        assert_warnings()
     )
 ]
 # Not going to test year 2023 for entry list, as their PDF format is different, and we are not

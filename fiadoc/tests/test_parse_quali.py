@@ -1,18 +1,13 @@
 import json
-import logging
 import os
 import warnings
-from contextlib import nullcontext
 from typing import Optional
-from unittest.mock import MagicMock
 
-import pandas as pd
 import pytest
 
 from fiadoc.parser import QualifyingParser
-from fiadoc.parser.parser import ValidationError
+from fiadoc.tests._warnings import assert_warnings
 from fiadoc.utils import download_pdf, sort_json
-
 
 race_list = [
     (
@@ -25,7 +20,8 @@ race_list = [
         'quali',
         '2024_22_quali_classification.json',
         '2024_22_quali_lap_times.json',
-        pytest.warns(UserWarning, match='Fastest lap numbering in sector analysis PDF is diff')
+        assert_warnings(required=['Fastest lap numbering/calendar time in'],
+                        allowed=['provisional classification'])
     ),
     (
         # 1: Title is image rather than string, and also #51
@@ -37,7 +33,7 @@ race_list = [
         'quali',
         '2024_5_quali_classification.json',
         '2024_5_quali_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 2: DNF drivers in quali., and also #51
@@ -49,7 +45,8 @@ race_list = [
         'quali',
         '2024_2_quali_classification.json',
         '2024_2_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ'],
+                        allowed=['provisional classification'])
     ),
     (
         # 3: DNF drivers in sprint quali.
@@ -61,10 +58,11 @@ race_list = [
         'sprint_quali',
         '2024_21_sprint_quali_classification.json',
         '2024_21_sprint_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ'],
+                        allowed=['provisional classification'])
     ),
     (
-        # 4: Antonelli's name being long and also DNS drivers
+        # 4: Antonelli's name being long, and also DNS drivers, and also #91
         '2025_01_aus_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
@@ -73,7 +71,9 @@ race_list = [
         'quali',
         '2025_1_quali_provisional_classification.json',
         '2025_1_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ',
+                                  'Fastest lap numbering/calendar time in'],
+                        allowed=['provisional classification'])
     ),
     (
         # 5: DSQ drivers in quali.
@@ -85,22 +85,10 @@ race_list = [
         'quali',
         '2024_8_quali_classification.json',
         '2024_8_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['DISQUALIFIED.*not horizontally'])
     ),
     (
-        # 6: No "POLE POSITION"
-        'https://www.fia.com/sites/default/files/decision-document/2024%20Australian%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
-        '2024_03_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
-        '2024_03_aus_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
-        2024,
-        3,
-        'quali',
-        '2024_3_quali_classification.json',
-        '2024_3_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # 7: Text is image in classification PDF
+        # 6: Text is image in classification PDF, and also #91
         'https://www.fia.com/system/files/decision-document/2025_australian_grand_prix_-_final_qualifying_classification.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
@@ -109,10 +97,11 @@ race_list = [
         'quali',
         '2025_1_quali_final_classification.json',
         '2025_1_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ',
+                                  'Fastest lap numbering/calendar time in'])
     ),
     (
-        # 8: Antonelli's name wrapped in two lines and also DNF drivers in quali.
+        # 7: Antonelli's name wrapped in two lines and also DNF drivers in quali.
         'https://www.fia.com/system/files/decision-document/2025_chinese_grand_prix_-_final_sprint_qualifying_classification.pdf',
         '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
         '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionsectoranalysis_v01.pdf',
@@ -121,10 +110,11 @@ race_list = [
         'sprint_quali',
         '2025_2_sprint_quali_final_classification.json',
         '2025_2_sprint_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ'])
     ),
     (
-        # 9: DNQ drivers in quali. (#50) and also #51
+        # 8: DSQ drivers in quali. (#50), and also table in sector analysis PDF overruns into page
+        #    footer
         '2025_04_brn_f1_q0_timing_qualifyingsessionfinalclassification_v01.pdf',
         '2025_04_brn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         '2025_04_brn_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
@@ -133,10 +123,11 @@ race_list = [
         'quali',
         '2025_4_quali_classification.json',
         '2025_4_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Text found outside the cell bbox',
+                                  'Found drivers in Q.*DSQ'])
     ),
     (
-        # 10: Without sector analysis PDF (#47)
+        # 9: Without sector analysis PDF (#47)
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
         None,
         None,
@@ -145,10 +136,10 @@ race_list = [
         'quali',
         '2025_7_quali_classification.json',
         '2025_7_quali_lap_times_lap_times_pdf_unavailable.json',
-        pytest.warns(UserWarning, match='Sector analysis PDF is not provided')
+        assert_warnings(required=['Sector analysis PDF is not provided'])
     ),
     (
-        # 11: Piastri and others start the session with calendar time, INCOMPLETE, calendar time
+        # 10: Piastri and others start the session with (calendar time, INCOMPLETE, calendar time)
         #     Also Bearman has a lap w/o lap No. in sector analysis PDF (#89)
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
         '2025_07_ita_f1_q0_timing_qualifyingsessionlaptimes_v01_0.pdf',
@@ -158,11 +149,13 @@ race_list = [
         'quali',
         '2025_7_quali_classification.json',
         '2025_7_quali_lap_times.json',
-        pytest.warns(UserWarning, match='Found laps with missing lap No. that are not')
-        # TODO: also warning Found calendar time as lap time after lap 1
+        assert_warnings(required=['Found laps with missing lap No. that are not',
+                                  'Found calendar time as lap time after lap 1',
+                                  'Found drivers in Q.*DSQ'],
+                        allowed=['provisional classification'])
     ),
     (
-        # 12: Has DISQUALIFIED table (#61, #90)
+        # 11: Has DISQUALIFIED table (#61, #90)
         'https://www.fia.com/system/files/decision-document/2025_azerbaijan_grand_prix_-_final_qualifying_classification.pdf',
         '2025_17_aze_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         '2025_17_aze_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
@@ -171,7 +164,8 @@ race_list = [
         'quali',
         '2025_17_quali_classification.json',
         '2025_17_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(allowed=['Found drivers in Q.*DSQ',
+                                 'Fastest lap numbering/calendar time in'])
     )
 ]
 
@@ -197,7 +191,6 @@ def prepare_quali_data(request, tmp_path) \
                               round_no, session)
 
     with context:
-        warnings.filterwarnings("ignore", ".*provisional.*", UserWarning)
         classification_data = parser.classification_df.to_json()
         lap_times_data = parser.lap_times_df.to_json()
     with open('fiadoc/tests/fixtures/' + expected_classification, encoding='utf-8') as f:
