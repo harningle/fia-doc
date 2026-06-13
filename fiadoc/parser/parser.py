@@ -2435,16 +2435,25 @@ class QualifyingParser(BaseParser):
             del df['lap_time_ms'], df['lap_time_ms_fastest']
 
             """
-            A driver who set no valid time in a session (classification PDF shows "DNS"/"DNF" for
-            that session) has no official fastest lap. In such case, even if he completed several
-            laps, such as an out lap then a pit lap, we label all laps as `is_fastest_lap = False`.
-            E.g. 2025 Monaco Q2 Russell did an out lap in Q2 then DNF on his flying lap. His out
-            lap will have `is_fastest_lap = False`, even though it's his only (and thus
-            mathematically fastest) lap.
+            A driver who set no valid time in a session (classification PDF shows "DNS"/"DNF"/"DSQ"
+            for him, or is blank) has no official fastest lap. In such case, even if he completed
+            several laps, such as an out lap then a pit lap, we label all laps as
+            `is_fastest_lap = False`. E.g. 2025 Monaco Q2 Russell did an out lap in Q2 then engine
+            problem and DNS on his flying lap. His out lap will have `is_fastest_lap = False`, even
+            though it's his only (and thus mathematically fastest) lap.
+
+            This also handles post-session DSQ issues. E.g., 2026 Miami sprint quali. Albon's
+            fastest lap in SQ1 was deleted AFTER he already made some laps in SQ2. Classification
+            PDF is blank for his SQ2, and here we would correctly mark all his laps as
+            `is_fastest_lap = False`.
             """
+            # DSQ drivers may appear as "DSQ" in the regular classification table, or in a separate
+            # "DISQUALIFIED" table (e.g. 2025 Azerbaijan quali. Ocon), so need to handle both
+            dsq_drivers = classification[classification.finishing_status == 20].NO  # noqa: PLR2004
             no_time = (classification[['NO', 'Q1', 'Q2', 'Q3']]
                        .melt(id_vars='NO', var_name='Q', value_name='_v'))
-            no_time = no_time[no_time._v.isin(['DNS', 'DNF'])]
+            no_time = no_time[no_time._v.isin(['DNS', 'DNF', 'DSQ'])
+                              | (no_time._v.isna() & ~no_time.NO.isin(dsq_drivers))]
             no_time.Q = no_time.Q.str.lstrip('Q').astype(int)
             no_time_pairs = list(zip(no_time.NO, no_time.Q))
             df.loc[pd.MultiIndex.from_arrays([df.car_no, df.Q]).isin(no_time_pairs),
@@ -2457,7 +2466,7 @@ class QualifyingParser(BaseParser):
             label all their laps as `is_fastest_lap = False`.
             """
             missing_in_classification = df[~df.car_no.isin(classification.NO)].car_no.unique()
-            if missing_in_classification:
+            if missing_in_classification.size > 0:
                 warnings.warn(f'Found drivers {missing_in_classification} in sector analysis PDF '
                               f'but not in classification PDF. Assuming they are not classified, '
                               f'e.g. set no valid lap time')
