@@ -178,6 +178,20 @@ race_list = [
         '2025_10_quali_classification.json',
         '2025_10_quali_lap_times.json',
         assert_warnings(required=['Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 13: One driver has two tables side by side in sector analysis PDF, rather than usual two
+        #     drivers side by side
+        'https://www.fia.com/system/files/decision-document/2025_monaco_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2025_08_mon_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2025,
+        8,
+        'quali',
+        '2025_8_quali_classification.json',
+        '2025_8_quali_lap_times.json',
+        assert_warnings(required=['Found drivers in Q.*in sector analysis PDF but not in '
+                                  'classification PDF'])
     )
 ]
 

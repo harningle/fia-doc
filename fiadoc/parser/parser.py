@@ -2964,13 +2964,21 @@ class QualifyingParser(BaseParser):
 
             # Between every two consecutive white strips, see if we can find a driver No. and name
             """
-            The page layout is different from race sector analysis PDF. In quali., we may have a
-            two-column page, e.g. three rows-by-two columns, so six drivers in total.
+            We have two potential page layouts:
+
+            1. most cases have one driver in a row, and two short tables side by side for him, e.g.
+               2025 Singapore
+            2. a few exceptions have two drivers side by side, each of whom has one tall table,
+               e.g. 2025 Monaco
+
+            Below we detect if there is only one driver or two in a row.
             """
             pat = re.compile(r"^(\d{1,2})\s+([A-Za-z'‘’ ]+)$")
-            drivers: list[TextBlock] = []
-            for i in range(len(white_strips) - 1):
-                for tab_border in [(0, page.w / 3), (page.w / 2, 5 * page.w / 6)]:
+            driver_tasks: list[tuple[TextBlock, bool]] = []  # (Driver textblock, whether it has
+            for i in range(len(white_strips) - 1):           #  two tables side by side)
+                band_drivers: dict[str, TextBlock] = {}  # Left/right -> driver textblock
+                for side, tab_border in [('left', (0, page.w / 3)),
+                                         ('right', (page.w / 2, 5 * page.w / 6))]:
                     if car_no_driver := page.get_text('blocks',
                                                       clip=(tab_border[0],
                                                             white_strips[i] + 1,
@@ -2986,20 +2994,24 @@ class QualifyingParser(BaseParser):
                         else:
                             driver_tb = car_no_driver[0]
                         if pat.match(driver_tb.text.strip()):
-                            drivers.append(driver_tb)
+                            band_drivers[side] = driver_tb
+                if 'left' in band_drivers:
+                    # The driver has two side by side tables only if we find no driver on the right
+                    driver_tasks.append((band_drivers['left'], 'right' not in band_drivers))
+                if 'right' in band_drivers:
+                    driver_tasks.append((band_drivers['right'], False))
 
-            # Parse the tables for each driver
+            # Parse the table(s) for each driver
             pat = re.compile(r'^SECTOR\s+1\s+SECTOR\s+2\s+SECTOR\s+3$')
-            for driver_tb in drivers:
-                car_no = int(driver_tb.text.split(maxsplit=1)[0])
 
-                # Check if the driver's table is on the left column or the right column
-                if driver_tb.x1 < page.w / 2:
-                    l_table = 0
-                    r_table = page.w / 2
-                else:
-                    l_table = page.w / 2
-                    r_table = page.w
+            def parse_subtable(driver_tb: TextBlock, l_table: float, r_table: float) \
+                    -> Optional[pd.DataFrame]:
+                """
+                Parse one table in sector analysis PDF for the driver `driver_tb` in the area
+                vertically bounded by `l_table` and `r_table`. Returns `None` if no table is found
+                (e.g. DNS so nothing for this driver).
+                """
+                car_no = int(driver_tb.text.split(maxsplit=1)[0])
 
                 # Below each driver's name, should have "SECTOR 1 SECTOR 2 SECTOR 3", unless he has
                 # no lap at all (e.g. DNS or crash before sector 1 finishes)
@@ -3028,13 +3040,13 @@ class QualifyingParser(BaseParser):
                     warnings.warn(f'Found no "SECTOR 1 SECTOR 2 SECTOR 3" text below driver '
                                   f'"{driver_tb.text}" on {page_no_str}. Skipping him. Please '
                                   f'check if this is expected, e.g. DNS')
-                    continue
-                # Find something else. Can be a DNS driver and we find the next driver's text
+                    return None
+                # Find something else. Can be a DNS driver and we find the next driver's textblock
                 if not pat.match(sector_tb.text.strip()):
                     warnings.warn(f'Expected "SECTOR 1 SECTOR 2 SECTOR 3" text below driver '
                                   f'{driver_tb.text} on {page_no_str}. Found: {sector_tb.text}. '
                                   f'Skipping him. Please check if this is expected, e.g. DNS')
-                    continue
+                    return None
 
                 # Find the horizontal black line below "SECTOR 1 SECTOR 2 SECTOR 3", which
                 # separates the table's header and content
@@ -3091,7 +3103,7 @@ class QualifyingParser(BaseParser):
                 if not hlines:
                     warnings.warn(f'No lap found for {driver_tb.text} on {page_no_str}. '
                                   f'Please check if this is expected, e.g. DNS')
-                    continue
+                    return None
 
                 # Parse the table
                 # TODO: probably shouldn't hardcode the indices
@@ -3124,7 +3136,23 @@ class QualifyingParser(BaseParser):
                 df['car_no'] = car_no
                 df['lap_time_deleted'] = df.lap_time.apply(lambda x: x.strikeout is True)
                 df = df.map(self._normalise_textblock)
-                dfs.append(df)
+                return df
+
+            for driver_tb, spans_both in driver_tasks:
+                # The driver's own table is on the left col. and/or the right col., based on where
+                # his name is located and the page layout. If he spans both cols, parse the other
+                # col. too as a continuation of his laps
+                if driver_tb.x1 < page.w / 2:
+                    halves = [(0, page.w / 2)]
+                    if spans_both:
+                        halves.append((page.w / 2, page.w))
+                else:
+                    halves = [(page.w / 2, page.w)]
+
+                for l_table, r_table in halves:
+                    sub_df = parse_subtable(driver_tb, l_table, r_table)
+                    if sub_df is not None:
+                        dfs.append(sub_df)
 
         # Clean up
         """
