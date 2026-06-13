@@ -231,6 +231,64 @@ class BaseParser:
             return ' '.join([tb.text for tb in tbs if tb.text])
         raise ParsingError(f'Expected only one normal textblock. Found multiple: {tbs}')
 
+    @staticmethod
+    def _parse_penalties(file: str | os.PathLike) -> list[str]:
+        """Return the raw text of each row in the "PENALTIES" table of classification PDF
+
+        The PENALTIES table starts centred "PENALTIES" header, a black line directly below it, then
+        one grey/white row. This is the same layout used by the "FASTEST LAP"/"NOT CLASSIFIED"
+        tables, and it works on all classification PDFs alike.
+
+        :param file: Path to the classification PDF
+        :return: One verbatim string per penalty row. Empty list if there is no PENALTIES table
+                 (the common case)
+        """
+        doc = pymupdf.open(file)
+        try:
+            # We assume PENALTIES table can appear on only one page, so when we find it, we don't
+            # read the PDF any further
+            for i in range(len(doc)):
+                page = Page(doc[i], file=file)  # noqa: PLW2901
+                penalties = page.search_for(
+                    'PENALT',
+                    clip=(page.w * 0.3, page.h * 0.3, page.w * 0.7, page.h)
+                )
+                if penalties:
+                    break
+            else:
+                return []
+
+            # First black line below "PENALTIES" separates the header from the penalty rows
+            black_lines = page.search_for_black_lines(clip=(0, penalties[0].y1, page.w, page.h))
+            if not black_lines:
+                raise ParsingError('Expected at least one black line below "PENALTIES". Found '
+                                   'none')
+            t_body = black_lines[0]
+
+            # The penalty rows end with a white strip below them
+            white_strips = page.search_for_white_strips(clip=(0, t_body, page.w, page.h))
+            if not white_strips:
+                raise ParsingError('Expected at least one white strip below "PENALTIES". Found '
+                                   'none')
+            b_body = white_strips[0]
+
+            # Each penalty is one grey/white row; read its text verbatim
+            rows = page.search_for_grey_white_rows(clip=(0, t_body + 1, page.w, b_body + 1))
+            if not rows:
+                raise ParsingError('Expected at least one row in "PENALTIES" table. Found none')
+            penalties = []
+            for t, b in zip(rows[:-1], rows[1:]):
+                tbs = page.get_text(clip=(0, t, page.w, b))
+                text = ' '.join(tb.text for tb in tbs).strip()
+                if text:
+                    penalties.append(text)
+                else:
+                    raise ParsingError(f'Found no text in the row vertically between {t:.2f} and '
+                                       f'{b:.2f} inside "PENALTIES" table')
+            return penalties
+        finally:
+            doc.close()
+
 
 class EntryListParser(BaseParser):
     def __init__(
