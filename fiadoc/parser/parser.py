@@ -2433,6 +2433,22 @@ class QualifyingParser(BaseParser):
             first = df[tied].sort_values('lap_no').groupby(['car_no', 'Q']).head(1).index
             df.loc[first, 'is_fastest_lap'] = True
             del df['lap_time_ms'], df['lap_time_ms_fastest']
+
+            """
+            A driver who set no valid time in a session (classification PDF shows "DNS"/"DNF" for
+            that session) has no official fastest lap. In such case, even if he completed several
+            laps, such as an out lap then a pit lap, we label all laps as `is_fastest_lap = False`.
+            E.g. 2025 Monaco Q2 Russell did an out lap in Q2 then DNF on his flying lap. His out
+            lap will have `is_fastest_lap = False`, even though it's his only (and thus
+            mathematically fastest) lap.
+            """
+            no_time = (classification[['NO', 'Q1', 'Q2', 'Q3']]
+                       .melt(id_vars='NO', var_name='Q', value_name='_v'))
+            no_time = no_time[no_time._v.isin(['DNS', 'DNF'])]
+            no_time.Q = no_time.Q.str.lstrip('Q').astype(int)
+            no_time_pairs = list(zip(no_time.NO, no_time.Q))
+            df.loc[pd.MultiIndex.from_arrays([df.car_no, df.Q]).isin(no_time_pairs),
+                   'is_fastest_lap'] = False
             fastest_lap = df[df.is_fastest_lap][['car_no', 'Q', 'lap_time']]
 
             # Cross-validate fastest lap time with classification PDF
