@@ -1,0 +1,706 @@
+[
+  {
+    "foreign_keys": {
+      "car_number": 1,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 16,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 4,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 1,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 4,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 1,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 4,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 1,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 9,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 9,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 5,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 2,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 6,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 9,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 14,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 3,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 2,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 14,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 12,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 14,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 11,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 5,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 4,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 3,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 18,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 8,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 18,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 14,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 22,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 19,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 23,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 11,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 23,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 12,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 27,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 15,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 27,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 10,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 27,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 10,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 30,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 10,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 30,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 8,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 30,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 7,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 31,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 17,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 43,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 18,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 7,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 13,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 55,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 13,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 55,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 15,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 6,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 7,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 6,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 4,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 5,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 4,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 87,
+      "round": 21,
+      "session": "Q1",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 3,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 87,
+      "round": 21,
+      "session": "Q2",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 2,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 87,
+      "round": 21,
+      "session": "Q3",
+      "year": 2025
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 8,
+        "status": 0
+      }
+    ]
+  }
+]

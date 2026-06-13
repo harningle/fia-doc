@@ -3141,6 +3141,27 @@ class QualifyingParser(BaseParser):
                 df.columns = ['lap', 'sector_1_time', 'sector_1_speed', 'sector_2_time',
                               'sector_2_speed', 'sector_3_time', 'sector_3_speed', 'lap_time']
                 df = df[~df.lap_time.astype(str).str.lower().str.contains('page', regex=False)]
+
+                # A driver who set no lap at all (e.g. crashed before completing any lap, e.g. 2025
+                # Brazilian Q1 Bortoleto) may still have a table in PDF, but only with a single
+                # empty row (every cell parsed as an empty `TextBlock` above). Detect such a
+                # fully-empty table and skip the driver
+                def is_empty_cell(x: object) -> bool:
+                    return isinstance(x, TextBlock) and x.text == ''
+                if df.apply(lambda row: all(is_empty_cell(v) for v in row), axis=1).all():
+                    # Safety net: cell-by-cell extraction may miss faint text or text split across
+                    # a cell boundary. Re-read the whole table body in one shot (native first, then
+                    # OCR). Only treat the table as genuinely empty if this finds nothing too
+                    leftover = page.get_text('words',
+                                             clip=(l_table, hlines[0], r_table, hlines[-1]))
+                    if leftover:
+                        raise ParsingError(f'Driver {car_no} on {page_no_str} parsed as an empty'
+                                           f'sector analysis table cell by cell, but a whole-row'
+                                           f're-read found text: {leftover}. Please check')
+                    warnings.warn(f'No lap found for {driver_tb.text} on {page_no_str}. '
+                                  f'Please check if this is expected, e.g. DNS')
+                    return None
+
                 # Check if, after excluding the "Page 5 of 7"-like rows, everything in the lap time
                 # is the correct lap time
                 temp = df[df.lap_time.str.len() != 1]

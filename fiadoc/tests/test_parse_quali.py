@@ -192,6 +192,20 @@ race_list = [
         '2025_8_quali_lap_times.json',
         assert_warnings(required=['Found drivers in Q.*in sector analysis PDF but not in '
                                   'classification PDF'])
+    ),
+    (
+        # 14: A driver crashed before making any laps, but still has an empty table in sector
+        #     analysis PDF
+        'https://www.fia.com/system/files/decision-document/2025_sao_paulo_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2025_21_bra_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2025,
+        21,
+        'quali',
+        '2025_21_quali_classification.json',
+        '2025_21_quali_lap_times.json',
+        assert_warnings(required=['No lap found',
+                                  'Fastest lap numbering/calendar time in'])
     )
 ]
 
