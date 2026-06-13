@@ -206,6 +206,24 @@ race_list = [
         '2025_21_quali_lap_times.json',
         assert_warnings(required=['No lap found',
                                   'Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 15: A driver made an out lap and then crashed in the following lap, and is entirely
+        #     absent from classification PDF
+        'https://www.fia.com/system/files/decision-document/2026_australian_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2026_01_aus_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2026,
+        1,
+        'quali',
+        '2026_1_quali_classification.json',
+        '2026_1_quali_lap_times.json',
+        assert_warnings(required=['in sector analysis PDF but not in classification PDF. '
+                                  'Assuming they are not classified',
+                                  'Found drivers in Q.*in sector analysis PDF but not in '
+                                  'classification PDF'],
+                        allowed=['No lap found',
+                                 'Fastest lap numbering/calendar time in'])
     )
 ]
 

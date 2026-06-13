@@ -2449,6 +2449,19 @@ class QualifyingParser(BaseParser):
             no_time_pairs = list(zip(no_time.NO, no_time.Q))
             df.loc[pd.MultiIndex.from_arrays([df.car_no, df.Q]).isin(no_time_pairs),
                    'is_fastest_lap'] = False
+
+            """
+            A driver can be present in the sector analysis PDF but entirely absent from the
+            classification PDF, e.g. 2026 Australian Q1 Verstappen did an out lap then crashed on
+            the following flying lap. Like DNS/DNF drivers, they have no official fastest lap, so
+            label all their laps as `is_fastest_lap = False`.
+            """
+            missing_in_classification = df[~df.car_no.isin(classification.NO)].car_no.unique()
+            if missing_in_classification:
+                warnings.warn(f'Found drivers {missing_in_classification} in sector analysis PDF '
+                              f'but not in classification PDF. Assuming they are not classified, '
+                              f'e.g. set no valid lap time')
+            df.loc[~df.car_no.isin(classification.NO), 'is_fastest_lap'] = False
             fastest_lap = df[df.is_fastest_lap][['car_no', 'Q', 'lap_time']]
 
             # Cross-validate fastest lap time with classification PDF
