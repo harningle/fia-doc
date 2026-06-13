@@ -2418,22 +2418,29 @@ class QualifyingParser(BaseParser):
                               & ~df.incomplete]
                            .groupby(['car_no', 'Q'], as_index=False).
                            lap_time_ms
-                           .min())  # TODO: can fail if multiple laps have identical lap times
+                           .min())
 
             # Generate fastest lap flag
             df = df.merge(fastest_lap, on=['car_no', 'Q'], validate='m:1', how='left',
                           suffixes=('', '_fastest'))
-            df['is_fastest_lap'] = ((df.lap_time_ms == df.lap_time_ms_fastest)
-                                    & (df.lap_time_deleted == False))  # noqa: E712
+            """
+            A driver can set the exact same lap time multiple times in a session (e.g. 2025
+            Canadian Q1 Stroll had 1:12.517 on lap 4 and 11). The tie-breaking rule is to pick the
+            earliest fastest lap as the fastest, same as FIA rules.
+            """
+            df['is_fastest_lap'] = False
+            tied = ((df.lap_time_ms == df.lap_time_ms_fastest) & (df.lap_time_deleted == False))  # noqa: E712
+            first = df[tied].sort_values('lap_no').groupby(['car_no', 'Q']).head(1).index
+            df.loc[first, 'is_fastest_lap'] = True
             del df['lap_time_ms'], df['lap_time_ms_fastest']
             fastest_lap = df[df.is_fastest_lap][['car_no', 'Q', 'lap_time']]
 
             # Cross-validate fastest lap time with classification PDF
             fl_classification = (classification[['NO', 'Q1', 'Q2', 'Q3']]
-                                          .melt(id_vars='NO',
-                                                var_name='Q',
-                                                value_name='fl_time_classification')
-                                          .dropna())
+                                 .melt(id_vars='NO',
+                                       var_name='Q',
+                                       value_name='fl_time_classification')
+                                 .dropna())
             fl_classification.Q = fl_classification.Q.str.lstrip('Q').astype(int)
             fl_classification = fl_classification[~fl_classification.fl_time_classification.isin(
                 ['DNS', 'DNF', 'DSQ']

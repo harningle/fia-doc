@@ -166,6 +166,18 @@ race_list = [
         '2025_17_quali_lap_times.json',
         assert_warnings(allowed=['Found drivers in Q.*DSQ',
                                  'Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 12: Multiple laps with identical lap time twice
+        'https://www.fia.com/system/files/decision-document/2025_canadian_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2025_10_can_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2025,
+        10,
+        'quali',
+        '2025_10_quali_classification.json',
+        '2025_10_quali_lap_times.json',
+        assert_warnings(required=['Fastest lap numbering/calendar time in'])
     )
 ]
 

@@ -170,3 +170,7 @@ training/labelling/static/
 
 # OCR debug output
 debug_ocr/
+
+# Claude
+.claude/
+claude.md
