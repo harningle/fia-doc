@@ -224,6 +224,22 @@ race_list = [
                                   'classification PDF'],
                         allowed=['No lap found',
                                  'Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 16: Post session lap time deletion, so fastest lap in sector analysis PDF is no longer
+        #     the legal/valid fastest lap
+        'https://www.fia.com/system/files/decision-document/2026_miami_grand_prix_-_final_sprint_qualifying_classification.pdf',
+        None,
+        '2026_04_usa_f1_sq0_timing_sprintqualifyingsessionsectoranalysis_v01.pdf',
+        2026,
+        4,
+        'sprint_quali',
+        '2026_4_sprint_quali_classification.json',
+        '2026_4_sprint_quali_lap_times.json',
+        assert_warnings(required=['in sector analysis PDF but not in classification PDF. '
+                                  'Assuming they are not classified',
+                                  'Found drivers in Q.*in sector analysis PDF but not in '
+                                  'classification PDF'])
     )
 ]
 

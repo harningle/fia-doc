@@ -2464,6 +2464,23 @@ class QualifyingParser(BaseParser):
             #       session, should be a pit lap. Or is it? Crashed? Red flag?
             del df['Q1_LAPS'], df['Q2_LAPS']
 
+            """
+            A lap time can be deleted by a post-session penalty (e.g. track limits) that is
+            recorded only in classification PDF's "PENALTIES" table, not struck through in sector
+            analysis PDF. E.g. 2026 Miami SQ1 Albon's 1:30.988 was deleted, so his (valid) fastest
+            lap is 1:31.322, not the (faster on paper) 1:30.988 in sector analysis PDF. If a
+            penalty names a car No. and contains its lap time, we delete that lap: flag it as
+            `is_deleted = True`.
+            """
+            for penalty in self._parse_penalties(self.classification_file):
+                deleted = df.apply(
+                    lambda r, p=penalty: bool(re.search(rf'\bCar {r.car_no}\b', p))
+                                         and (str(r.lap_time).replace(':', '.') in p
+                                              or (str(r.lap_time) in p)),
+                    axis=1
+                )
+                df.loc[deleted, 'lap_time_deleted'] = True
+
             # Flag which lap is the fastest lap
             def _try_duration_to_millisecond(s: str) -> float:
                 try:
