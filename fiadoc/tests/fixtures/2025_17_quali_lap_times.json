@@ -742,7 +742,7 @@
                     "_type": "timedelta",
                     "milliseconds": 103004
                 },
-                "is_entry_fastest_lap": true,
+                "is_entry_fastest_lap": false,
                 "is_deleted": false
             }
         ]

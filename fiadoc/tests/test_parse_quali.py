@@ -77,6 +77,7 @@ race_list = [
     ),
     (
         # 5: DSQ drivers in quali.
+        #    Also tests that DSQ drivers should have no lap w/ `is_entry_fastest_lap = True` (#90)
         'https://www.fia.com/sites/default/files/decision-document/2024%20Monaco%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
         '2024_08_mon_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         '2024_08_mon_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
@@ -155,7 +156,8 @@ race_list = [
                         allowed=['provisional classification'])
     ),
     (
-        # 11: Has DISQUALIFIED table (#61, #90)
+        # 11: Has DISQUALIFIED table (#61)
+        #     Also tests that DSQ drivers should have no lap w/ `is_entry_fastest_lap = True` (#90)
         'https://www.fia.com/system/files/decision-document/2025_azerbaijan_grand_prix_-_final_qualifying_classification.pdf',
         '2025_17_aze_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
         '2025_17_aze_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',

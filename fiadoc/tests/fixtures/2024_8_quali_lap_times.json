@@ -1085,7 +1085,7 @@
                     "_type": "timedelta",
                     "milliseconds": 71832
                 },
-                "is_entry_fastest_lap": true,
+                "is_entry_fastest_lap": false,
                 "is_deleted": false
             },
             {
@@ -1525,7 +1525,7 @@
                     "_type": "timedelta",
                     "milliseconds": 71876
                 },
-                "is_entry_fastest_lap": true,
+                "is_entry_fastest_lap": false,
                 "is_deleted": false
             },
             {
@@ -2784,7 +2784,7 @@
                     "_type": "timedelta",
                     "milliseconds": 71725
                 },
-                "is_entry_fastest_lap": true,
+                "is_entry_fastest_lap": false,
                 "is_deleted": false
             },
             {
@@ -3105,7 +3105,7 @@
                     "_type": "timedelta",
                     "milliseconds": 71440
                 },
-                "is_entry_fastest_lap": true,
+                "is_entry_fastest_lap": false,
                 "is_deleted": false
             }
         ]

@@ -2521,18 +2521,22 @@ class QualifyingParser(BaseParser):
             fastest lap in SQ1 was deleted AFTER he already made some laps in SQ2. Classification
             PDF is blank for his SQ2, and here we would correctly mark all his laps as
             `is_fastest_lap = False`.
+
+            In addition, DSQ drivers shouldn't have fastest lap in any session. He may appear as
+            "DQ" in the normal classification table with fastest lap time being non-missing (e.g.
+            2024 Monaco quali.), or in a separate "DISQUALIFIED" table w/o fastest lap time (e.g.
+            2025 Azerbaijan quali.) Anyways, we keep all laps, but none of them would get
+            `is_fastest_lap = True`.
             """
-            # DSQ drivers may appear as "DSQ" in the regular classification table, or in a separate
-            # "DISQUALIFIED" table (e.g. 2025 Azerbaijan quali. Ocon), so need to handle both
             dsq_drivers = classification[classification.finishing_status == 20].NO  # noqa: PLR2004
             no_time = (classification[['NO', 'Q1', 'Q2', 'Q3']]
                        .melt(id_vars='NO', var_name='Q', value_name='_v'))
-            no_time = no_time[no_time._v.isin(['DNS', 'DNF', 'DSQ'])
-                              | (no_time._v.isna() & ~no_time.NO.isin(dsq_drivers))]
+            no_time = no_time[no_time._v.isin(['DNS', 'DNF', 'DSQ']) | no_time._v.isna()]
             no_time.Q = no_time.Q.str.lstrip('Q').astype(int)
             no_time_pairs = list(zip(no_time.NO, no_time.Q))
             df.loc[pd.MultiIndex.from_arrays([df.car_no, df.Q]).isin(no_time_pairs),
                    'is_fastest_lap'] = False
+            df.loc[df.car_no.isin(dsq_drivers), 'is_fastest_lap'] = False
 
             """
             A driver can be present in the sector analysis PDF but entirely absent from the
@@ -2558,6 +2562,9 @@ class QualifyingParser(BaseParser):
             fl_classification = fl_classification[~fl_classification.fl_time_classification.isin(
                 ['DNS', 'DNF', 'DSQ']
             )]
+            # DSQ drivers have no fastest lap on either side: their laps are all unflagged above,
+            # and their times in classification PDF, if any, don't count (#61, #90)
+            fl_classification = fl_classification[~fl_classification.NO.isin(dsq_drivers)]
             fastest_lap = fastest_lap.merge(fl_classification,
                                             left_on=['car_no', 'Q'],
                                             right_on=['NO', 'Q'],
@@ -2565,15 +2572,12 @@ class QualifyingParser(BaseParser):
                                             how='outer',
                                             indicator=True)
             temp = fastest_lap[fastest_lap._merge != 'both']
-            dsq_drivers = classification[classification.finishing_status == 20].NO.to_list()  # noqa: PLR2004
-            temp = temp[~temp.car_no.isin(dsq_drivers)]  # OK if DSQ drivers have laps (#61, #90)
             if not temp.empty:
                 raise ValidationError(f'Fastest laps in sector analysis PDF (left) are different '
                                       f'from classification PDF (right) for drivers:\n'
                                       f'{temp[["car_no", "Q", "_merge"]].to_string(index=False)}')
             del fastest_lap['NO'], fastest_lap['_merge']
             temp = fastest_lap[fastest_lap.lap_time != fastest_lap.fl_time_classification]
-            temp = temp[~temp.car_no.isin(dsq_drivers)]  # #61, #90
             if not temp.empty:
                 raise ValidationError(f'Fastest lap times in sector analysis PDF are different '
                                       f'from classification PDF for drivers:\n'
@@ -2648,6 +2652,10 @@ class QualifyingParser(BaseParser):
                 df.loc[df[f'Q{q}_TIME'].notna(), 'is_fastest_lap_classification'] = True
                 del df[f'Q{q}_TIME']
             df.loc[df.lap_time == 'INCOMPLETE', 'is_fastest_lap_classification'] = False
+
+            # DSQ drivers shouldn't get any fastest lap, even if classification PDF (sometimes)
+            # still gives fastest lap time to them (#90)
+            df.loc[df.car_no.isin(dsq_drivers), 'is_fastest_lap_classification'] = False
             temp = df[df.is_fastest_lap != df.is_fastest_lap_classification]
             if not temp.empty:
                 temp = temp[['lap_no', 'car_no', 'Q', 'lap_time', 'calendar_time',
@@ -2985,6 +2993,34 @@ class QualifyingParser(BaseParser):
                 temp = pd.concat([df[df.original_order <= n_drivers],
                                   df[(df.original_order > n_drivers) & df[f'Q{q}_LAPS'].notna()]])
                 # Clean up DNS/DNF/DSQ drivers
+                """
+                Notes for some edge cases:
+                
+                1. made into Q2 **after** quali. because someone else got DSQ (e.g. Albon promoted
+                   to Q2 as Hulkenburg's Q1 fastest lap was deleted after quali. in 2025 Bahrain):
+                   `is_classified = True` as he got a valid in Q1, so his `is_classified` flag is
+                   always `True` throughout all quali. sessions. See the comment below for official
+                   definition for "classified". `status = DNS` because we define it in this way.
+                   There is no official rule for DNS for quali. sessions, so unless it's mechanical
+                   problem etc. so a driver can't take the start, we never say `status = DNS`. So
+                   this case doesn't need any special treatment: such driver won't has any of "DQ",
+                   "DNF", etc. in the PDF; all his cells for Q2 are blank, so `finishing_status` is
+                   default to normal finish. He is in the normal table, and `finishing_status` is
+                   normal, so he is classified. Our code handles this correctly.
+                2. made into Q2, but chose not to do any lap to save tyres or for whatever other
+                   reasons (e.g. Lawson had grid penalty in 2024 United States, so he did Q1 to
+                   test the overall pace and made into Q2, but didn't do any lap in Q2 because with
+                   that grid penalty he would start 20th anyway, so no point to do any laps in Q2):
+                   `is_classified = True` as he got a valid lap in Q1. `status` is normal for the
+                   same reason above. And our code handles this in the same way as above, correctly
+                3. crashed in Q1, but before the crash the fastest lap was fast enough for Q2 (e.g.
+                   2025 Monaco Antonelli): `is_classified = True` again. In this case, Antonelli
+                   should have `status = DNS`, because he car couldn't be repaired in time for Q2.
+                   However, there is not way to distinguish this from case 2 above in the PDF, and
+                   Ergast defines this as normal finishing. So for practical parsing reasons and
+                   also for backward compatibility, we say `status` is normal. So no special coding
+                   is needed.
+                """
                 temp.loc[temp[f'Q{q}'].isin(['DQ', 'DSQ']), 'finishing_status'] = 20
                 temp.loc[temp[f'Q{q}'] == 'DNF', 'finishing_status'] = 11
                 temp.loc[temp[f'Q{q}'] == 'DNS', 'finishing_status'] = 30
@@ -2993,18 +3029,18 @@ class QualifyingParser(BaseParser):
                 temp['is_dnq'] = (temp.original_order > n_drivers)
                 temp.loc[temp.is_dnq, 'finishing_status'] = 40
                 """
-                `is_classified` is defined following 2025 Formula 1 Sporting Regulations 39.4 b),
-                published on 2025/02/26, available at https://www.fia.com/system/files/documents.
+                `is_classified` is defined following 2026 Formula 1 Sporting Regulations B2.4.3),
+                published on 2026/06/25, available at https://www.fia.com/regulation/category/110.
                 A driver is not classified if any of the following is true:
 
                 1. 107% rule not met, i.e. he is in the "NOT CLASSIFIED" table
                 2. DSQ
-                3. no valid lap is done, e.g. all laps are deleted for exceeding track limits
+                3. no valid lap is done in Q1, e.g. all laps are deleted for exceeding track limits
 
                 1. is already done above when we parsing "NOT CLASSIFIED" table. 2. can be detected
                 by looking at the finishing status. 3. is done by checking if the driver has a
                 lap time in the table: if the lap time col. is not a time but something else, e.g.
-                DNF, the driver does not set a valid time so he is not classified.
+                "DNF", the driver does not set a valid time so he is not classified.
                 """
                 temp.loc[(temp.finishing_status != 0) & temp.is_classified,
                          'is_classified'] = False
@@ -3428,7 +3464,10 @@ class QualifyingParser(BaseParser):
         """
         valid_laps = lap_times_df[~lap_times_df.car_no.isin(drivers_with_invalid_fastest_laps)]
 
-        # Get fastest lap times from classification PDF for drivers with invalid fastest laps
+        # Get fastest lap times from classification PDF for drivers w/ invalid fastest laps. DSQ
+        # drivers keep these laps, but never get the fastest lap flag (#90)
+        is_dsq = self.classification_df.finishing_status == 20  # noqa: PLR2004
+        dsq_drivers = set(self.classification_df[is_dsq].NO)
         invalid_laps = []
         for car_no in drivers_with_invalid_fastest_laps:
             for q in [1, 2, 3]:
@@ -3445,7 +3484,7 @@ class QualifyingParser(BaseParser):
                     'lap_time': fastest_lap,
                     'lap_time_deleted': False,
                     'Q': q,
-                    'is_fastest_lap': True
+                    'is_fastest_lap': car_no not in dsq_drivers
                 })
 
         invalid_laps = pd.DataFrame(invalid_laps)
