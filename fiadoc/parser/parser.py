@@ -734,7 +734,7 @@ class PracticeParser(BaseParser):
         # The first white strip below the table header, which is the bottom of the table
         if white_strips := page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
                                                         height=col_row_height):
-            b_table = sorted(white_strips)[0]
+            b_table = min(white_strips)
         else:
             doc.close()
             raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
