@@ -2995,7 +2995,7 @@ class QualifyingParser(BaseParser):
                 # Clean up DNS/DNF/DSQ drivers
                 """
                 Notes for some edge cases:
-                
+
                 1. made into Q2 **after** quali. because someone else got DSQ (e.g. Albon promoted
                    to Q2 as Hulkenburg's Q1 fastest lap was deleted after quali. in 2025 Bahrain):
                    `is_classified = True` as he got a valid in Q1, so his `is_classified` flag is
