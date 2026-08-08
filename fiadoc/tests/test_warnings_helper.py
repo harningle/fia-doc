@@ -11,14 +11,14 @@ def test_required_pattern_matched():
 
 
 def test_required_pattern_missing_fails():
-    with pytest.raises(BaseException) as excinfo:
+    with pytest.raises(Exception) as excinfo:
         with assert_warnings(required=['never emitted']):
             pass
     assert 'never emitted' in str(excinfo.value)
 
 
 def test_unexpected_warning_fails_with_location():
-    with pytest.raises(BaseException) as excinfo:
+    with pytest.raises(Exception) as excinfo:
         with assert_warnings():
             warnings.warn('surprise', UserWarning)
     msg = str(excinfo.value)
@@ -47,7 +47,7 @@ def test_required_and_allowed_combined():
 
 
 def test_unexpected_alongside_required_still_fails():
-    with pytest.raises(BaseException) as excinfo:
+    with pytest.raises(Exception) as excinfo:
         with assert_warnings(required=['must']):
             warnings.warn('must happen', UserWarning)
             warnings.warn('unexpected too', UserWarning)
