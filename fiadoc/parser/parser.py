@@ -676,7 +676,7 @@ class PracticeParser(BaseParser):
         # The first white strip below the table header, which is the bottom of the table
         if white_strips := page.search_for_white_strips(clip=(0, t_table_body, page.w, page.h),
                                                         height=col_row_height):
-            b_table = sorted(white_strips)[0]
+            b_table = min(white_strips)
         else:
             doc.close()
             raise ParsingError(f'Could not find table bottom by white strip on p.{page.number} in '
@@ -1791,7 +1791,11 @@ class RaceParser(BaseParser):
 
             # Find vertical white spaces separating the three side-by-side drivers. These white
             # strips should be relatively tall. We use half of the "Lap Analysis" height as the
-            # threshold here
+            # threshold here. The search area also covers the black line below the table
+            # header (hence `+ 1` rather than `- 1` below). A driver may have a table w/ a header
+            # but no row, e.g. Leclerc in 2026 Italian race. The white space of the empty table
+            # body would otherwise merge with the gap between two drivers. See also
+            # `PracticeParser._parse_lap_times`
             if len(black_lines) == 1:    # If only one row of drivers on the page, then the bottom
                 b_page_content = page.h  # of the search area is page bottom, excl. footnote
                 if bottom_black_line:
@@ -1801,9 +1805,9 @@ class RaceParser(BaseParser):
                             clip=(0, black_lines[-1], page.w, b_page_content)
                     ):
                         b_page_content = min(b_page_content, page_no_text[0].y0 - 1)
-                clip = (page.h - b_page_content, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - b_page_content, 0, page.h - black_lines[0] + 1, page.w)
             else:
-                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] + 1, page.w)
             page.set_rotation(90)
             driver_separators = page.search_for_white_strips(clip=clip,
                                                              height=lap_analysis_height * 0.5)
@@ -2086,10 +2090,13 @@ class RaceParser(BaseParser):
                                        f'{driver_tb.text} on {page_no_str}')
 
                 # Find the two side-by-side tables for the driver, which are separated by a
-                # vertical white strip
+                # vertical white strip. The search area also covers the black line below the table
+                # header (hence `+ 1` below). Otherwise, if a table has a single white row, e.g.
+                # Leclerc's "INCOMPLETE" lap in 2026 Italian race, the gaps between its cells would
+                # be mistaken for the gap between two tables
                 page.set_rotation(90)
                 table_separators = page.search_for_white_strips(
-                    clip=(page.h - b_tables, driver_tb.x0 - 1, page.h - b_table_header - 1, page.w),
+                    clip=(page.h - b_tables, driver_tb.x0 - 1, page.h - b_table_header + 1, page.w),
                     height=sector_analysis_height / 3
                 )
                 page.set_rotation(0)
@@ -2832,7 +2839,8 @@ class QualifyingParser(BaseParser):
 
             # Find vertical white spaces separating the three side-by-side drivers. These white
             # strips should be relatively tall. We use half of the "Lap Analysis" height as the
-            # threshold here
+            # threshold here. The search area also covers the black lines below the table headers.
+            # See also `PracticeParser._parse_lap_times`
             if len(black_lines) == 1:    # If only one row of drivers on the page, then the bottom
                 b_page_content = page.h  # of the search area is page bottom, excl. footnote
                 if bottom_black_line:
@@ -2842,9 +2850,9 @@ class QualifyingParser(BaseParser):
                             clip=(0, black_lines[-1], page.w, b_page_content)
                     ):
                         b_page_content = min(b_page_content, page_no_text[0].y0 - 1)
-                clip = (page.h - b_page_content, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - b_page_content, 0, page.h - black_lines[0] + 1, page.w)
             else:
-                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] + 1, page.w)
             page.set_rotation(90)
             driver_separators = page.search_for_white_strips(clip=clip,
                                                              height=lap_times_height * 0.5)

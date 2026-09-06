@@ -124,6 +124,21 @@ race_list = [
         '2026_1_race_classification.json',
         '2026_1_race_lap_times.json',
         nullcontext()
+    ),
+    (
+        # 8: A driver crashed before the end of lap 2, so his second table in lap analysis PDF has
+        # a header but no row
+        'https://www.fia.com/system/files/decision-document/2026_italian_grand_prix_-_final_race_classification.pdf',
+        '2026_13_ita_f1_r0_timing_racelapanalysis_v01.pdf',
+        '2026_13_ita_f1_r0_timing_racehistorychart_v01.pdf',
+        '2026_13_ita_f1_r0_timing_racelapchart_v01.pdf',
+        None,
+        2026,
+        13,
+        'race',
+        '2026_13_race_classification.json',
+        '2026_13_race_lap_times.json',
+        nullcontext()
     )
 ]
 
