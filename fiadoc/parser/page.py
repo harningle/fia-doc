@@ -259,6 +259,22 @@ class Page:
                                       f'"blocks", or "dict". Got "{option}"')
         res = self._pymupdf_page.get_text(option=option, **kwargs)
 
+        def _has_strikeout(tb: TextBlock) -> bool:
+            l, t, r, b = tb.bbox
+            h = b - t
+            if self.search_for_black_lines(
+                    clip=(
+                            l,
+                            t + STRIKEOUT_LINE_MARGIN * h,
+                            r,
+                            b - STRIKEOUT_LINE_MARGIN * h
+                    ),
+                    min_length=0.9,  # We are using the text's bbox, so relative to it, the
+                    rgb=192          # strikeout line should span almost the entire width
+            ):
+                return True
+            return False
+
         textblocks: list[TextBlock]
         if option == 'text':
             if text := self._clean_get_text_result(res):
@@ -270,7 +286,10 @@ class Page:
             textblocks = []
             for i in res:
                 if text := self._clean_get_text_result(i[4]):
-                    textblocks.append(TextBlock(text=text, bbox=i[:4]))
+                    tb = TextBlock(text=text, bbox=i[:4])
+                    if check_strikeout:
+                        tb.strikeout = _has_strikeout(tb)
+                    textblocks.append(tb)
             return textblocks
 
         else:  # option == 'dict'
@@ -352,21 +371,9 @@ class Page:
                 case _:
                     raise ParsingError(error_message)
 
-            # When `option = dict` and `check_strikeout = True`, need to check for strikeout text
             if check_strikeout:
                 for textblock in textblocks:
-                    l, t, r, b = textblock.bbox
-                    h = b - t
-                    if self.search_for_black_lines(
-                            clip=(
-                                    l,
-                                    t + STRIKEOUT_LINE_MARGIN * h,
-                                    r,
-                                    b - STRIKEOUT_LINE_MARGIN * h
-                            ),
-                            min_length=0.9,  # We are using the text's bbox, so relative to it, the
-                            rgb=192          # strikeout line should span almost the entire width
-                    ):
+                    if _has_strikeout(textblock):
                         textblock.strikeout = True
             return textblocks
 
@@ -692,6 +699,7 @@ class Page:
             vlines: list[float],
             hlines: list[float],
             tol: float = 3,
+            simple_extraction: Optional[Sequence[int]] = None,
             allow_multiple_texts_per_cell: Optional[Sequence[int]] = None,
             header_included: bool = True,
             check_strikeout: Optional[Sequence[int]] | bool = None,
@@ -720,6 +728,11 @@ class Page:
                     inside the cell's bounding box. Default is 3 pixels, i.e. if text is within 3px
                     of the cell's boundary, it is considered to be inside the cell. If we find any
                     text more than 2px always from the cell's bbox, will raise an error. See #33
+        :param simple_extraction: Which cols. to use simple text extraction, i.e. `option=words` in
+                                  `.get_text()`. This is a list of col. indices. This solves some
+                                  weird PDFs like 2025 Bahrain quali. sector analysis Hulkenberg
+                                  lap 15, where PyMuPDF reads "1:43.689" as "1", "43", ".", and
+                                  "689" when specifying `option=dict`
         :param allow_multiple_texts_per_cell: Which cols. can have multiple texts per cell. By
                                               default, we only allow one textblock in one cell.
                                               However, some cases (e.g. reserve drivers in entry
@@ -761,8 +774,12 @@ class Page:
                 cell_bbox_str = f'({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f})'  # For error/warnings
 
                 # Get text inside the cell defined by (l, t, r, b)
+                if simple_extraction and j in simple_extraction:
+                    option = 'words'
+                else:
+                    option = 'dict'
                 textblocks = self.get_text(
-                    'dict',
+                    option,
                     clip=(l, t, r, b),
                     check_strikeout=(check_strikeout is not None) and (j in check_strikeout)
                 )

@@ -1,0 +1,2366 @@
+[
+  {
+    "foreign_keys": {
+      "car_number": 1,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 99706
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 121158
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88723
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 132839
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88806
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123597
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 1,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 466014
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89366
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 121662
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 131217
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 105980
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 1,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 691824
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 14,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 87869
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 3,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89801
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 126357
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 3,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 779374
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89093
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 121497
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 125807
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89192
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 112048
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 3,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 717195
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88461
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 5,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90725
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124418
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 139939
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90561
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123500
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 5,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 373032
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89994
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 127568
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 214805
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90460
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 130141
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91055
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124682
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 117768
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90352
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 120636
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 428884
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89750
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124081
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 115532
+        }
+      },
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90013
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 117402
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 717507
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 14,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89422
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90183
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123746
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 131522
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89984
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124979
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 535059
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89973
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 125562
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124462
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90232
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 119957
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 669860
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 14,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89474
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 11,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91255
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 153640
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89312
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 131239
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 162561
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 116298
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 460180
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89242
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 132174
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 220532
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89209
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 114799
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 704540
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88091
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 14,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 101311
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123159
+        }
+      },
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 92490
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 131963
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 108220
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89290
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 120735
+        }
+      },
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123388
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88733
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 116499
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 520989
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88470
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123164
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 125751
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88333
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 125795
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 647414
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 14,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88239
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 18,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 129082
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 121708
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 23,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91322
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 133006
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 128427
+        }
+      },
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90988
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 121391
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 23,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 375137
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90216
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 126197
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 129425
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91003
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 120610
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 27,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91204
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 119596
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 122599
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90270
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 111434
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 27,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 408177
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90019
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 128429
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 212959
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90613
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 157335
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 30,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 115838
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 200135
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91043
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 119449
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 31,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91258
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 127387
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 211926
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91245
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123479
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 41,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 97819
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 119462
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 179045
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90872
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 115988
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 41,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 813823
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90573
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 160988
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 43,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 96665
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 129457
+        }
+      },
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124407
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90386
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 127459
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 43,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 534489
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89527
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 127707
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 126662
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90160
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 116402
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 43,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 652625
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 14,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89320
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89642
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 122770
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123918
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89255
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 117252
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 515206
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88841
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 123134
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 126647
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89101
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 120168
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 620449
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 14,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88618
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 55,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90987
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124529
+        }
+      },
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 132149
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91094
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 118603
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 55,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 455969
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90224
+        }
+      },
+      {
+        "is_deleted": true,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 125016
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 126603
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90262
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 122309
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90465
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 133201
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 137013
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89659
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 122257
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 401596
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88903
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 163703
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 213004
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 11,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89410
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 12,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 119905
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 13,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 549414
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 14,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88493
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 77,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 92317
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 155910
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 229489
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 91826
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 96377
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 126613
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 89169
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 163955
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 624248
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88506
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 1000912
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 129049
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 10,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 88108
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 87,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 2,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90843
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 3,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 137982
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 4,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 202639
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 5,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90614
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 6,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 124593
+        }
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 87,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "Lap",
+    "objects": [
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 7,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 820906
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": true,
+        "number": 8,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 90116
+        }
+      },
+      {
+        "is_deleted": false,
+        "is_entry_fastest_lap": false,
+        "number": 9,
+        "time": {
+          "_type": "timedelta",
+          "milliseconds": 126721
+        }
+      }
+    ]
+  }
+]

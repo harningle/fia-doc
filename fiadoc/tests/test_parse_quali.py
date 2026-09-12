@@ -1,157 +1,247 @@
 import json
 import os
 import warnings
-from contextlib import nullcontext
 from typing import Optional
 
 import pytest
 
 from fiadoc.parser import QualifyingParser
+from fiadoc.tests._warnings import assert_warnings
 from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
     (
-        # 0: Normal quali.
+        # 0: calendar time in sector analysis PDF is wrong (#88)
         '2024_22_usa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2024_22_usa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2024_22_usa_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2024,
         22,
         'quali',
         '2024_22_quali_classification.json',
         '2024_22_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Fastest lap numbering/calendar time in'],
+                        allowed=['provisional classification'])
     ),
     (
-        # 1: Title is image rather than string
+        # 1: Title is image rather than string, and also #51
         'doc_53_-_2024_chinese_grand_prix_-_final_qualifying_classification.pdf',
         '2024_05_chn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2024_05_chn_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2024,
         5,
         'quali',
         '2024_5_quali_classification.json',
         '2024_5_quali_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
-        # 2: DNF drivers in quali.
+        # 2: DNF drivers in quali., and also #51
         '2024_02_ksa_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2024_02_ksa_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2024_02_ksa_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2024,
         2,
         'quali',
         '2024_2_quali_classification.json',
         '2024_2_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ'],
+                        allowed=['provisional classification'])
     ),
     (
         # 3: DNF drivers in sprint quali.
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionprovisionalclassification_v01.pdf',
         '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
+        '2024_21_bra_f1_sq0_timing_sprintqualifyingsessionsectoranalysis_v01.pdf',
         2024,
         21,
         'sprint_quali',
         '2024_21_sprint_quali_classification.json',
         '2024_21_sprint_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ'],
+                        allowed=['provisional classification'])
     ),
     (
-        # 4: Antonelli's name being long and also DNS drivers
+        # 4: Antonelli's name being long, and also DNS drivers, and also #91
         '2025_01_aus_f1_q0_timing_qualifyingsessionprovisionalclassification_v01.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2025_01_aus_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2025,
         1,
         'quali',
         '2025_1_quali_provisional_classification.json',
         '2025_1_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ',
+                                  'Fastest lap numbering/calendar time in'],
+                        allowed=['provisional classification'])
     ),
     (
         # 5: DSQ drivers in quali.
+        #    Also tests that DSQ drivers should have no lap w/ `is_entry_fastest_lap = True` (#90)
         'https://www.fia.com/sites/default/files/decision-document/2024%20Monaco%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
         '2024_08_mon_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2024_08_mon_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2024,
         8,
         'quali',
         '2024_8_quali_classification.json',
         '2024_8_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['DISQUALIFIED.*not horizontally'])
     ),
     (
-        # 6: No "POLE POSITION"
-        'https://www.fia.com/sites/default/files/decision-document/2024%20Australian%20Grand%20Prix%20-%20Final%20Qualifying%20Classification.pdf',
-        '2024_03_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
-        2024,
-        3,
-        'quali',
-        '2024_3_quali_classification.json',
-        '2024_3_quali_lap_times.json',
-        nullcontext()
-    ),
-    (
-        # 7: Text is image in classification PDF
+        # 6: Text is image in classification PDF, and also #91
         'https://www.fia.com/system/files/decision-document/2025_australian_grand_prix_-_final_qualifying_classification.pdf',
         '2025_01_aus_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2025_01_aus_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2025,
         1,
         'quali',
         '2025_1_quali_final_classification.json',
         '2025_1_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ',
+                                  'Fastest lap numbering/calendar time in'])
     ),
     (
-        # 8: Antonelli's name wrapped in two lines and also DNF drivers in quali.
+        # 7: Antonelli's name wrapped in two lines and also DNF drivers in quali.
         'https://www.fia.com/system/files/decision-document/2025_chinese_grand_prix_-_final_sprint_qualifying_classification.pdf',
         '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionlaptimes_v01.pdf',
+        '2025_02_chn_f1_sq0_timing_sprintqualifyingsessionsectoranalysis_v01.pdf',
         2025,
         2,
         'sprint_quali',
         '2025_2_sprint_quali_final_classification.json',
         '2025_2_sprint_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found drivers in Q.*DSQ'])
     ),
     (
-        # 9: DNQ drivers in quali. (#50)
+        # 8: DSQ drivers in quali. (#50), and also table in sector analysis PDF overruns into page
+        #    footer
         '2025_04_brn_f1_q0_timing_qualifyingsessionfinalclassification_v01.pdf',
         '2025_04_brn_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2025_04_brn_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2025,
         4,
         'quali',
         '2025_4_quali_classification.json',
         '2025_4_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Text found outside the cell bbox',
+                                  'Found drivers in Q.*DSQ'])
     ),
     (
-        # 10: Without lap times PDF (#47)
+        # 9: Without sector analysis PDF (#47)
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
+        None,
         None,
         2025,
         7,
         'quali',
         '2025_7_quali_classification.json',
         '2025_7_quali_lap_times_lap_times_pdf_unavailable.json',
-        pytest.warns(UserWarning, match='Lap times PDF is missing')
+        assert_warnings(required=['Sector analysis PDF is not provided'])
     ),
     (
-        # 11: Lap times are incorrectly matched with quali. sessions (#51)
+        # 10: Piastri and others start the session with (calendar time, INCOMPLETE, calendar time)
+        #     Also Bearman has a lap w/o lap No. in sector analysis PDF (#89)
         'https://www.fia.com/system/files/decision-document/2025_emilia_romagna_grand_prix_-_final_qualifying_classification.pdf',
         '2025_07_ita_f1_q0_timing_qualifyingsessionlaptimes_v01_0.pdf',
+        '2025_07_ita_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2025,
         7,
         'quali',
         '2025_7_quali_classification.json',
-        '2025_7_quali_lap_times_fallback.json',
-        nullcontext()
+        '2025_7_quali_lap_times.json',
+        assert_warnings(required=['Found laps with missing lap No. that are not',
+                                  'Found calendar time as lap time after lap 1',
+                                  'Found drivers in Q.*DSQ'],
+                        allowed=['provisional classification'])
     ),
     (
-        # 12: Has DISQUALIFIED table (#61)
+        # 11: Has DISQUALIFIED table (#61)
+        #     Also tests that DSQ drivers should have no lap w/ `is_entry_fastest_lap = True` (#90)
         'https://www.fia.com/system/files/decision-document/2025_azerbaijan_grand_prix_-_final_qualifying_classification.pdf',
         '2025_17_aze_f1_q0_timing_qualifyingsessionlaptimes_v01.pdf',
+        '2025_17_aze_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
         2025,
         17,
         'quali',
         '2025_17_quali_classification.json',
         '2025_17_quali_lap_times.json',
-        nullcontext()
+        assert_warnings(allowed=['Found drivers in Q.*DSQ',
+                                 'Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 12: Multiple laps with identical lap time twice
+        'https://www.fia.com/system/files/decision-document/2025_canadian_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2025_10_can_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2025,
+        10,
+        'quali',
+        '2025_10_quali_classification.json',
+        '2025_10_quali_lap_times.json',
+        assert_warnings(required=['Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 13: One driver has two tables side by side in sector analysis PDF, rather than usual two
+        #     drivers side by side
+        'https://www.fia.com/system/files/decision-document/2025_monaco_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2025_08_mon_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2025,
+        8,
+        'quali',
+        '2025_8_quali_classification.json',
+        '2025_8_quali_lap_times.json',
+        assert_warnings(required=['Found drivers in Q.*in sector analysis PDF but not in '
+                                  'classification PDF'])
+    ),
+    (
+        # 14: A driver crashed before making any laps, but still has an empty table in sector
+        #     analysis PDF
+        'https://www.fia.com/system/files/decision-document/2025_sao_paulo_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2025_21_bra_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2025,
+        21,
+        'quali',
+        '2025_21_quali_classification.json',
+        '2025_21_quali_lap_times.json',
+        assert_warnings(required=['No lap found',
+                                  'Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 15: A driver made an out lap and then crashed in the following lap, and is entirely
+        #     absent from classification PDF
+        'https://www.fia.com/system/files/decision-document/2026_australian_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2026_01_aus_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2026,
+        1,
+        'quali',
+        '2026_1_quali_classification.json',
+        '2026_1_quali_lap_times.json',
+        assert_warnings(required=['in sector analysis PDF but not in classification PDF. '
+                                  'Assuming they are not classified',
+                                  'Found drivers in Q.*in sector analysis PDF but not in '
+                                  'classification PDF'],
+                        allowed=['No lap found',
+                                 'Fastest lap numbering/calendar time in'])
+    ),
+    (
+        # 16: Post session lap time deletion, so fastest lap in sector analysis PDF is no longer
+        #     the legal/valid fastest lap
+        'https://www.fia.com/system/files/decision-document/2026_miami_grand_prix_-_final_sprint_qualifying_classification.pdf',
+        None,
+        '2026_04_usa_f1_sq0_timing_sprintqualifyingsessionsectoranalysis_v01.pdf',
+        2026,
+        4,
+        'sprint_quali',
+        '2026_4_sprint_quali_classification.json',
+        '2026_4_sprint_quali_lap_times.json',
+        assert_warnings(required=['in sector analysis PDF but not in classification PDF. '
+                                  'Assuming they are not classified',
+                                  'Found drivers in Q.*in sector analysis PDF but not in '
+                                  'classification PDF'])
     )
 ]
 
@@ -160,18 +250,21 @@ race_list = [
 def prepare_quali_data(request, tmp_path) \
         -> tuple[list[dict], Optional[list[dict]], list[dict], Optional[list[dict]]]:
     # Download and parse quali. classification and lap times PDF
-    url_classification, url_lap_time, year, round_no, session, expected_classification, \
-        expected_lap_times, context = request.param
+    url_classification, url_lap_time, url_sector_analysis, year, round_no, session, \
+        expected_classification, expected_lap_times, context = request.param
     if 'https://' not in url_classification:  # TODO: clean this up
         url_classification = 'https://www.fia.com/sites/default/files/' + url_classification
     download_pdf(url_classification, tmp_path / 'classification.pdf')
-    if url_lap_time:  # Whether lap times PDF is provided
-        download_pdf('https://www.fia.com/sites/default/files/' + url_lap_time,
-                     tmp_path / 'lap_times.pdf')
-        parser = QualifyingParser(tmp_path / 'classification.pdf', tmp_path / 'lap_times.pdf',
-                                  year, round_no, session)
-    else:
-        parser = QualifyingParser(tmp_path / 'classification.pdf', None, year, round_no, session)
+    classification_file = tmp_path / 'classification.pdf'
+    lap_time_file = None
+    sector_analysis_file = None
+    if url_sector_analysis:
+        download_pdf('https://www.fia.com/sites/default/files/' + url_sector_analysis,
+                     tmp_path / 'sector_analysis.pdf')
+        sector_analysis_file = tmp_path / 'sector_analysis.pdf'
+
+    parser = QualifyingParser(classification_file, lap_time_file, sector_analysis_file, year,
+                              round_no, session)
 
     with context:
         classification_data = parser.classification_df.to_json()

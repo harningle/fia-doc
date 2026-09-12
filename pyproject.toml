@@ -17,7 +17,7 @@ dependencies = [
   "opencv-python>=4.10.0,<5.0.0",
   "paddleocr==3.2.0",
   "paddlepaddle==3.2.0",
-  "pandas>=2.0.0,<3.0.0",
+  "pandas>=3.0.0",  # Copy-on-Write so no annoying warnings
   "pydantic>=2.0.0,<3.0.0",
   "pymupdf==1.26.0",
   "requests>=2.28.0,<3.0.0",
@@ -93,9 +93,9 @@ ignore = [
   "PLR1711",  # I prefer explicit `return` even if returns nothing
   "PLR0911",  # I know too many `return`'s are not good, but...
   "PLR0912",  # TODO: skip too many branches or statements or func. args. for now. Need to refactor
-  "PLR0915",
   "PLR0913",
-  "PLR0917",
+  "PLR0915",
+  "PLR0917",  # TODO
   "PLR1714",  # Write out all comparisons for readability
   "PLW1641",  # No need hash for object
   "UP009",    # UTF-8 encoding

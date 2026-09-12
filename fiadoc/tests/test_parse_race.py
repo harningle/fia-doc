@@ -1,11 +1,11 @@
 import json
 import os
 import warnings
-from contextlib import nullcontext
 
 import pytest
 
 from fiadoc.parser import RaceParser
+from fiadoc.tests._warnings import assert_warnings
 from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
@@ -21,7 +21,7 @@ race_list = [
         'race',
         '2024_10_race_classification.json',
         '2024_10_race_lap_times.json',
-        nullcontext()
+        assert_warnings(allowed=['provisional classification'])
     ),
     (
         # 1: Normal race w/ some unclassified drivers
@@ -35,7 +35,8 @@ race_list = [
         'race',
         '2024_8_race_classification.json',
         '2024_8_race_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['No lap found for'],
+                        allowed=['provisional classification'])
     ),
     (
         # 2: DNF but classified, e.g., crashed in final lap, but finished 90%+ of the race
@@ -50,7 +51,7 @@ race_list = [
         'race',
         '2025_10_race_classification.json',
         '2025_10_race_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 3: Only classification PDF available, w/o some lap times PDF
@@ -79,7 +80,7 @@ race_list = [
         'race',
         '2025_11_race_classification.json',
         '2025_11_race_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['No lap found for'])
     ),
     (
         # 5: A car starts a few laps later (#60)
@@ -93,7 +94,7 @@ race_list = [
         'sprint',
         '2025_13_sprint_classification.json',
         '2025_13_sprint_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 6: DSQ drivers in a separate table, rather than in the normal table (#61)
@@ -107,7 +108,7 @@ race_list = [
         'race',
         '2025_22_race_classification.json',
         '2025_22_race_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['No lap found for'])
     ),
     (
         # 7: Use sector analysis PDF when lap analysis PDF is missing (#jolpica/jolpica-f1#331)
@@ -123,11 +124,11 @@ race_list = [
         'race',
         '2026_1_race_classification.json',
         '2026_1_race_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Expected "SECTOR 1 SECTOR 2 SECTOR 3"'])
     ),
     (
         # 8: A driver crashed before the end of lap 2, so his second table in lap analysis PDF has
-        # a header but no row
+        #    a header but no row
         'https://www.fia.com/system/files/decision-document/2026_italian_grand_prix_-_final_race_classification.pdf',
         '2026_13_ita_f1_r0_timing_racelapanalysis_v01.pdf',
         '2026_13_ita_f1_r0_timing_racehistorychart_v01.pdf',
@@ -138,7 +139,7 @@ race_list = [
         'race',
         '2026_13_race_classification.json',
         '2026_13_race_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['No lap found for 16 Charles'])
     )
 ]
 

@@ -1,9 +1,9 @@
-from contextlib import nullcontext
 import json
 
 import pytest
 
 from fiadoc.parser import PracticeParser
+from fiadoc.tests._warnings import assert_warnings
 from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
@@ -16,7 +16,7 @@ race_list = [
         'fp1',
         '2025_11_fp1_classification.json',
         '2025_11_fp1_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 1: Ocon fails to set a valid time, i.e. has a few laps but all deleted/invalid
@@ -27,7 +27,7 @@ race_list = [
         'fp1',
         '2024_17_fp1_classification.json',
         '2024_17_fp1_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 2: Lap times PDF unavailable
@@ -38,7 +38,7 @@ race_list = [
         'fp3',
         '2025_15_fp3_classification.json',
         '2025_15_fp3_lap_times_fallback.json',
-        pytest.warns(UserWarning, match='Lap times PDF is missing')
+        assert_warnings(required=['Lap times PDF is missing'])
     ),
     (
         # 3: Weird one-driver-a-row layout lap times PDF...
@@ -49,7 +49,7 @@ race_list = [
         'fp1',
         '2025_1_fp1_classification.json',
         '2025_1_fp1_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 4: A driver has no lap at all, i.e. DNS
@@ -60,7 +60,7 @@ race_list = [
         'fp1',
         '2026_1_fp1_classification.json',
         '2026_1_fp1_lap_times.json',
-        nullcontext()
+        assert_warnings()
     ),
     (
         # 5: Perez has no valid lap, and the lap times PDF doesn't mark pit laps correctly (#77)
@@ -73,7 +73,7 @@ race_list = [
         'fp2',
         '2026_1_fp2_classification.json',
         '2026_1_fp2_lap_times.json',
-        nullcontext()
+        assert_warnings(required=['Found some cars only appearing in one but not both'])
     ),
     (
         # 6: different PDF style in decision doc. (#78)
@@ -84,7 +84,7 @@ race_list = [
         'fp1',
         '2025_7_fp1_classification.json',
         '2025_7_fp1_lap_times_fallback.json',
-        pytest.warns(UserWarning, match='Lap times PDF is missing')
+        assert_warnings(required=['Lap times PDF is missing'])
     )
 ]
 

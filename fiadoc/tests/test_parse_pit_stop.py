@@ -6,6 +6,7 @@ import warnings
 import pytest
 
 from fiadoc.parser import PitStopParser
+from fiadoc.tests._warnings import assert_warnings
 from fiadoc.utils import download_pdf, sort_json
 
 race_list = [
@@ -15,7 +16,8 @@ race_list = [
         2023,
         13,
         'race',
-        '2023_13_race_pit_stop.json'
+        '2023_13_race_pit_stop.json',
+        assert_warnings()
     ),
     (
         # 1: Table very short (only one row)
@@ -23,7 +25,8 @@ race_list = [
         2025,
         2,
         'sprint',
-        '2025_2_sprint_pit_stop.json'
+        '2025_2_sprint_pit_stop.json',
+        assert_warnings()
     )
 ]
 
@@ -31,11 +34,12 @@ race_list = [
 @pytest.fixture(params=race_list)
 def prepare_pit_stop_data(request, tmp_path) -> tuple[list[dict], list[dict]]:
     # Download and parse quali. classification and lap times PDF
-    url, year, round_no, session, expected = request.param
+    url, year, round_no, session, expected, context = request.param
     download_pdf('https://www.fia.com/sites/default/files/' + url, tmp_path / 'pit_stop.pdf')
     parser = PitStopParser(tmp_path / 'pit_stop.pdf', year, round_no, session)
 
-    data = parser.df.to_json()
+    with context:
+        data = parser.df.to_json()
     with open('fiadoc/tests/fixtures/' + expected, encoding='utf-8') as f:
         expected = json.load(f)
 

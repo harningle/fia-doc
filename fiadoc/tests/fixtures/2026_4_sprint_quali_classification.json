@@ -1,0 +1,754 @@
+[
+  {
+    "foreign_keys": {
+      "car_number": 1,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 1,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 1,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 7,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 1,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 1,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 3,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 7,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 3,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 5,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 3,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 5,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 5,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 12,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 5,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 11,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 10,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 9,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 6,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 9,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 8,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 10,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 10,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 10,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 11,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 18,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 5,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 6,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 12,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 2,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 14,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": false,
+        "position": 21,
+        "status": 11
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 2,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 1,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 16,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 4,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 23,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 19,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 27,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 9,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 27,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 12,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 30,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 16,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 30,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 16,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 31,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 17,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 41,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 14,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 41,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 15,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 43,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 11,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 43,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 8,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 43,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 8,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 4,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 3,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 44,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 7,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 55,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 15,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 55,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 14,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 6,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 4,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 63,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 6,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 77,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 20,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 3,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 2,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 81,
+      "round": 4,
+      "session": "SQ3",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 3,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 87,
+      "round": 4,
+      "session": "SQ1",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 13,
+        "status": 0
+      }
+    ]
+  },
+  {
+    "foreign_keys": {
+      "car_number": 87,
+      "round": 4,
+      "session": "SQ2",
+      "year": 2026
+    },
+    "object_type": "SessionEntry",
+    "objects": [
+      {
+        "is_classified": true,
+        "position": 13,
+        "status": 0
+      }
+    ]
+  }
+]

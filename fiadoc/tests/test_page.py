@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from contextlib import nullcontext
+import logging
 
 import numpy as np
 import pandas as pd
@@ -113,6 +113,21 @@ def test_page_get_text(page, option, clip, small_area, expected):
     assert len(result) == len(expected)
     for res_block, exp_block in zip(result, expected):
         assert res_block == exp_block
+
+
+def test_page_get_text_logs_ocr_fallback(page, caplog):
+    # The area (100, 180, 200, 200) has no native text, so OCR fallback should fire
+    with caplog.at_level(logging.DEBUG):
+        page.get_text(option='blocks', clip=(100, 180, 200, 200))
+    assert any((r.levelno == logging.DEBUG)
+                   and ('No text found natively. Proceed with OCR' in r.getMessage())
+               for r in caplog.records)
+
+
+def test_page_get_text_no_ocr_log_when_native_succeeds(page, caplog):
+    with caplog.at_level(logging.DEBUG):
+        page.get_text(option='text', clip=(110, 210, 250, 250))
+    assert not any('No text found natively' in r.getMessage() for r in caplog.records)
 
 
 @pytest.mark.parametrize(
