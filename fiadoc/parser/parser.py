@@ -1050,6 +1050,7 @@ class PracticeParser(BaseParser):
 
         # Check if fastest lap here is the same as that in classification PDF
         classification_df = self.classification_df[['car_no', 'fastest_lap_time']]
+        # TODO: `True vs != False` below ??
         temp = (df[(df.lap_time_deleted == False) & (df.pit != True)]  # noqa: E712
                 .assign(lap_time_milliseconds=lambda x: x.lap_time.str['milliseconds'])
                 .sort_values(['car_no', 'lap_time_milliseconds'], ascending=True)
@@ -1847,9 +1848,14 @@ class RaceParser(BaseParser):
                 raise ParsingError(f'Cannot find any black line below "Lap Analysis" on '
                                    f'{page_no_str}')
 
-            # Find vertical white spaces separating the three side-by-side drivers. These white
-            # strips should be relatively tall. We use half of the "Lap Analysis" height as the
-            # threshold here
+            # Find vertical white spaces separating the three side-by-side drivers
+            """
+            These white strips should be relatively tall. We use half of the "Lap Analysis" height
+            as the threshold here. The search area also covers the black line below the table
+            header (hence `+ 1` rather than `- 1` below). A driver may have a table w/ a header
+            but no row, e.g. Leclerc in 2026 Italian race. The white space of the empty table
+            body would otherwise merge with the gap between two drivers.
+            """
             if len(black_lines) == 1:    # If only one row of drivers on the page, then the bottom
                 b_page_content = page.h  # of the search area is page bottom, excl. footnote
                 if bottom_black_line:
@@ -1859,9 +1865,9 @@ class RaceParser(BaseParser):
                             clip=(0, black_lines[-1], page.w, b_page_content)
                     ):
                         b_page_content = min(b_page_content, page_no_text[0].y0 - 1)
-                clip = (page.h - b_page_content, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - b_page_content, 0, page.h - black_lines[0] + 1, page.w)
             else:
-                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] - 1, page.w)
+                clip = (page.h - black_lines[-1] + 1, 0, page.h - black_lines[0] + 1, page.w)
             page.set_rotation(90)
             driver_separators = page.search_for_white_strips(clip=clip,
                                                              height=lap_analysis_height * 0.5)
@@ -2144,10 +2150,18 @@ class RaceParser(BaseParser):
                                        f'{driver_tb.text} on {page_no_str}')
 
                 # Find the two side-by-side tables for the driver, which are separated by a
-                # vertical white strip
+                # vertical white strip. The search area also covers the black line below the table
+                # header (hence `+ 1` for `clip` bottom below). Otherwise, if a table has a single
+                # white row, e.g. Leclerc's "INCOMPLETE" lap in 2026 Italian race, the gaps between
+                # its cells would be mistaken for the gap between two tables
                 page.set_rotation(90)
                 table_separators = page.search_for_white_strips(
-                    clip=(page.h - b_tables, driver_tb.x0 - 1, page.h - b_table_header - 1, page.w),
+                    clip=(
+                        page.h - b_tables,
+                        driver_tb.x0 - 1,
+                        page.h - b_table_header + 1,
+                        page.w
+                    ),
                     height=sector_analysis_height / 3
                 )
                 page.set_rotation(0)
