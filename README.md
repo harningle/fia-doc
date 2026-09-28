@@ -82,6 +82,7 @@ parser = RaceParser(
 )
 race_classification = parser.classification_df.to_json()
 race_lap_times = parser.lap_times_df.to_json()
+race_session = parser.session_df.to_json()  # #. of laps and dist. completed
 
 # Pit stops
 parser = PitStopParser('2025_10_race_pit_stop_summary.pdf', 2025, 10, 'race')

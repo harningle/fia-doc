@@ -26,10 +26,12 @@ from ..models.foreign_key import (
     PitStopForeignKeys,
     RoundEntryForeignKeys,
     SessionEntryForeignKeys,
+    SessionForeignKeys,
     TeamDriverForeignKeys,
 )
 from ..models.lap import LapImport, LapObject
 from ..models.pit_stop import PitStopData, PitStopObject
+from ..models.session import SessionImport, SessionObject
 from ..utils import _pd_concat, duration_to_millisecond, time_to_timedelta
 from .page import BBox, Page, ParsingError, TextBlock
 
@@ -1203,7 +1205,7 @@ class RaceParser(BaseParser):
         return self._parse_lap_times()
 
     @cached_property
-    def race_distance(self) -> tuple[int, float]:
+    def session_df(self) -> pd.DataFrame:
         return self._parse_race_distance()
 
     def _check_session(self) -> None:
@@ -1500,14 +1502,15 @@ class RaceParser(BaseParser):
         df.to_json = to_json
         return df
 
-    def _parse_race_distance(self) -> tuple[int, float]:
+    def _parse_race_distance(self) -> pd.DataFrame:
         """Get the #. of laps and race distance from classification PDF
 
         They are in the grey rect. above the table, e.g. "Race Final Classification after 53 Laps
         - 306.720 km". The distance is the actual distance covered, which is not necessarily #. of
         laps times the circuit length, as the start line and finish line can be different
 
-        :return: (#. of laps, race distance in km), e.g. (53, 306.72)
+        :return: One-row df. with cols. [n_laps_completed, dist_completed (in km)], e.g.
+                 [53, 306.72]
         """
         # Find the page with "Final/Provisional Classification", in the same way as
         # `._parse_classification`
@@ -1547,9 +1550,29 @@ class RaceParser(BaseParser):
             if (len(laps) != 1) or (len(distance) != 1):
                 raise ParsingError(f'Expected exactly one #. of laps and one race distance in the '
                                    f'grey rect. on {page_no_str}. Found: {text}')
-            return int(laps[0]), float(distance[0])
         finally:
             doc.close()
+        df = pd.DataFrame({'n_laps_completed': [int(laps[0])],
+                           'dist_completed': [float(distance[0])]})
+
+        def to_json() -> list[dict]:
+            return df.apply(
+                lambda x: SessionImport(
+                    object_type='Session',
+                    foreign_keys=SessionForeignKeys(year=self.year, round=self.round_no),
+                    objects=[
+                        SessionObject(
+                            type='R' if self.session == 'race' else 'SR',
+                            completed_laps=x.n_laps_completed,
+                            completed_distance=x.dist_completed
+                        )
+                    ]
+                ).model_dump(exclude_none=True, exclude_unset=True),
+                axis=1
+            ).tolist()
+
+        df.to_json = to_json
+        return df
 
     def _parse_history_chart(self) -> pd.DataFrame:
         doc = pymupdf.open(self.history_chart_file)

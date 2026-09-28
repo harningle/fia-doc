@@ -283,7 +283,13 @@ def test_parse_race_distance(url, year, round_no, session, expected, tmp_path):
     download_pdf(url, tmp_path / 'classification.pdf')
     parser = RaceParser(tmp_path / 'classification.pdf', None, None, None, None, year, round_no,
                         session)
-    assert parser.race_distance == expected
+    assert parser.session_df.to_json() == [{
+        'object_type': 'Session',
+        'foreign_keys': {'year': year, 'round': round_no},
+        'objects': [{'type': 'R' if session == 'race' else 'SR',
+                     'completed_laps': expected[0],
+                     'completed_distance': expected[1]}]
+    }]
 
 
 @pytest.mark.full

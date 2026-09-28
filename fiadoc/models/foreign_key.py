@@ -34,6 +34,10 @@ class PitStopForeignKeys(data_import.PitStopForeignKeys, SessionValidatorMixin):
     model_config = ConfigDict(extra='forbid')
 
 
+class SessionForeignKeys(data_import.SessionForeignKeys):
+    model_config = ConfigDict(extra='forbid')
+
+
 class TeamReferenceValidatorMixin:
     @model_validator(mode='before')
     @classmethod
