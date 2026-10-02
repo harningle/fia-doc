@@ -26,10 +26,12 @@ from ..models.foreign_key import (
     PitStopForeignKeys,
     RoundEntryForeignKeys,
     SessionEntryForeignKeys,
+    SessionForeignKeys,
     TeamDriverForeignKeys,
 )
 from ..models.lap import LapImport, LapObject
 from ..models.pit_stop import PitStopData, PitStopObject
+from ..models.session import SessionImport, SessionObject
 from ..utils import _pd_concat, duration_to_millisecond, time_to_timedelta
 from .page import BBox, Page, ParsingError, TextBlock
 
@@ -1202,6 +1204,10 @@ class RaceParser(BaseParser):
         self.starting_grid = None
         return self._parse_lap_times()
 
+    @cached_property
+    def session_df(self) -> pd.DataFrame:
+        return self._parse_race_distance()
+
     def _check_session(self) -> None:
         """Check that the input session is valid. Raise an error otherwise"""
         if self.session not in get_args(RaceSessionT):
@@ -1487,6 +1493,78 @@ class RaceParser(BaseParser):
                                              else None,
                             grid=x.starting_grid
                             # TODO: replace the rank with missing or -1 in self.classification_df
+                        )
+                    ]
+                ).model_dump(exclude_none=True, exclude_unset=True),
+                axis=1
+            ).tolist()
+
+        df.to_json = to_json
+        return df
+
+    def _parse_race_distance(self) -> pd.DataFrame:
+        """Get the #. of laps and race distance from classification PDF
+
+        They are in the grey rect. above the table, e.g. "Race Final Classification after 53 Laps
+        - 306.720 km". The distance is the actual distance covered, which is not necessarily #. of
+        laps times the circuit length, as the start line and finish line can be different
+
+        :return: One-row df. with cols. [n_laps_completed, dist_completed (in km)], e.g.
+                 [53, 306.72]
+        """
+        # Find the page with "Final/Provisional Classification", in the same way as
+        # `._parse_classification`
+        doc = pymupdf.open(self.classification_file)
+        try:
+            page: Page
+            classification: Optional[list[TextBlock]] = None
+            for page in doc:
+                page = Page(page, file=self.classification_file)  # noqa: PLW2901
+                top_half = (page.w * 0.1, page.h * 0.1, page.w * 0.9, page.h * 0.3)
+                if '.pdf' in page.get_text()[0].text:
+                    continue
+                classification = page.search_for('Final Classification', clip=top_half, dpi=100)
+                if classification:
+                    break
+                classification = page.search_for('Provisional Classification', clip=top_half,
+                                                  dpi=100)
+                if classification:
+                    break
+            if not classification:
+                raise ParsingError(f'"Final Classification" or "Provisional Classification" not '
+                                   f'found on any page in {self.classification_file}')
+            page_no_str = f'p.{page.number} in {page.file}'
+
+            # Get the text of the entire line where "Final Classification" is
+            """
+            If the PDF is an image, we need OCR here. OCR is sensitive to the clip area and DPI.
+            E.g. for 2025 Austrian race, 2pt vertical margin or 600 DPI gives "7o Laps" or out of
+            order words. 1pt margin and 300 DPI work for all PDFs we have tested
+            """
+            clip = (0, classification[0].y0 - 1, page.w, classification[0].y1 + 1)
+            text = ' '.join(tb.text for tb in page.get_text('text', clip=clip, dpi=300))
+
+            # Get #. of laps and distance
+            laps = re.findall(r'(\d+)\s*Laps?\b', text, flags=re.IGNORECASE)
+            distance = re.findall(r'(\d+\.\d+)\s*km\b', text, flags=re.IGNORECASE)
+            if (len(laps) != 1) or (len(distance) != 1):
+                raise ParsingError(f'Expected exactly one #. of laps and one race distance in the '
+                                   f'grey rect. on {page_no_str}. Found: {text}')
+        finally:
+            doc.close()
+        df = pd.DataFrame({'n_laps_completed': [int(laps[0])],
+                           'dist_completed': [float(distance[0])]})
+
+        def to_json() -> list[dict]:
+            return df.apply(
+                lambda x: SessionImport(
+                    object_type='Session',
+                    foreign_keys=SessionForeignKeys(year=self.year, round=self.round_no),
+                    objects=[
+                        SessionObject(
+                            type='R' if self.session == 'race' else 'SR',
+                            completed_laps=x.n_laps_completed,
+                            completed_distance=x.dist_completed
                         )
                     ]
                 ).model_dump(exclude_none=True, exclude_unset=True),

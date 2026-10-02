@@ -19,7 +19,7 @@
     ]
 }
 """
-from jolpica.schemas import data_import
+from jolpica_schemas import data_import
 from pydantic import ConfigDict
 
 from .foreign_key import PitStopForeignKeys

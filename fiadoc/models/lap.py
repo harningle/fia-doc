@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-from jolpica.schemas import data_import
+from jolpica_schemas import data_import
 from pydantic import ConfigDict, field_validator
 
 from .foreign_key import SessionEntryForeignKeys

@@ -253,6 +253,45 @@ def test_parse_race(prepare_race_data):
                         f"{expected_lap['time']['milliseconds']}"
 
 
+@pytest.mark.parametrize('url, year, round_no, session, expected', [
+    (
+        # Normal race
+        'https://www.fia.com/sites/default/files/2024_10_esp_f1_r0_timing_raceprovisionalclassification_v01_1.pdf',
+        2024,
+        10,
+        'race',
+        (66, 307.236)
+    ),
+    (
+        # Sprint, whose header is at a (slightly) different position
+        'https://www.fia.com/system/files/decision-document/2025_belgian_grand_prix_-_final_sprint_classification.pdf',
+        2025,
+        13,
+        'sprint',
+        (15, 104.936)
+    ),
+    (
+        # Entire PDF is an image, so need OCR
+        'https://www.fia.com/system/files/decision-document/2025_austrian_grand_prix_-_final_race_classification.pdf',
+        2025,
+        11,
+        'race',
+        (70, 302.692)
+    )
+])
+def test_parse_race_distance(url, year, round_no, session, expected, tmp_path):
+    download_pdf(url, tmp_path / 'classification.pdf')
+    parser = RaceParser(tmp_path / 'classification.pdf', None, None, None, None, year, round_no,
+                        session)
+    assert parser.session_df.to_json() == [{
+        'object_type': 'Session',
+        'foreign_keys': {'year': year, 'round': round_no},
+        'objects': [{'type': 'R' if session == 'race' else 'SR',
+                     'completed_laps': expected[0],
+                     'completed_distance': expected[1]}]
+    }]
+
+
 @pytest.mark.full
 @pytest.mark.parametrize('year, round_no',
                          [(2024, i) for i in range(1, 25)]
