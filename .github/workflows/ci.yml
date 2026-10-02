@@ -26,6 +26,7 @@ jobs:
           cache-dependency-path: "requirements-dev.txt"
 
       - name: Restore FIA PDFs cache
+        id: restore-cache
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.FIADOC_CACHE_DIR }}
@@ -35,9 +36,17 @@ jobs:
 
       - name: Hash PDFs already in cache
         id: hash-before
+        env:
+          RESTORED_KEY: ${{ steps.restore-cache.outputs.cache-matched-key }}
         run: |
           HASH=$(ls -1 "$FIADOC_CACHE_DIR/downloads" 2>/dev/null | sort | sha256sum | cut -d' ' -f1 || echo "empty")
           echo "before=$HASH" >> "$GITHUB_OUTPUT"
+          ls -1 "$FIADOC_CACHE_DIR/downloads" 2>/dev/null | sort > "$RUNNER_TEMP/pdfs-before.txt"
+          if [ -n "$RESTORED_KEY" ]; then
+            echo "::group::Re-using cache $RESTORED_KEY with $(wc -l < "$RUNNER_TEMP/pdfs-before.txt") PDFs"
+            cat "$RUNNER_TEMP/pdfs-before.txt"
+            echo "::endgroup::"
+          fi
 
       - name: Install fia-doc
         run: |
@@ -57,9 +66,16 @@ jobs:
       - name: Hash PDFs after tests
         if: always()
         id: hash-after
+        env:
+          HASH_BEFORE: ${{ steps.hash-before.outputs.before }}
         run: |
           HASH=$(ls -1 "$FIADOC_CACHE_DIR/downloads" 2>/dev/null | sort | sha256sum | cut -d' ' -f1 || echo "empty")
           echo "after=$HASH" >> "$GITHUB_OUTPUT"
+          if [ "$HASH" != "$HASH_BEFORE" ]; then
+            ls -1 "$FIADOC_CACHE_DIR/downloads" 2>/dev/null | sort > "$RUNNER_TEMP/pdfs-after.txt"
+            echo "Cache changed, now $(wc -l < "$RUNNER_TEMP/pdfs-after.txt") PDFs (< removed, > added):"
+            diff "$RUNNER_TEMP/pdfs-before.txt" "$RUNNER_TEMP/pdfs-after.txt" || true
+          fi
 
       - name: Save FIA PDFs cache
         if: always() && github.event_name == 'push' && steps.hash-before.outputs.before != steps.hash-after.outputs.after
