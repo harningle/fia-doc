@@ -1536,24 +1536,25 @@ class RaceParser(BaseParser):
             page_no_str = f'p.{page.number} in {page.file}'
 
             # Get the text of the entire line where "Final Classification" is
-            """
-            If the PDF is an image, we need OCR here. OCR is sensitive to the clip area and DPI.
-            E.g. for 2025 Austrian race, 2pt vertical margin or 600 DPI gives "7o Laps" or out of
-            order words. 1pt margin and 300 DPI work for all PDFs we have tested
-            """
             clip = (0, classification[0].y0 - 1, page.w, classification[0].y1 + 1)
             text = ' '.join(tb.text for tb in page.get_text('text', clip=clip, dpi=300))
 
             # Get #. of laps and distance
-            laps = re.findall(r'(\d+)\s*Laps?\b', text, flags=re.IGNORECASE)
-            distance = re.findall(r'(\d+\.\d+)\s*km\b', text, flags=re.IGNORECASE)
+            """
+            Some PDFs are images to we have to OCR them. This involves some mistakes like
+            misreading "0" as "O" (#99, or 2025 Austrian). Thus we allow all digits as well as "o"
+            and "O" below, from the second digit onwards, as the first digit is always non-zero.
+            """
+            laps = re.findall(r'(\d[\dOo]*)\s*Laps?\b', text, flags=re.IGNORECASE)
+            distance = re.findall(r'(\d[\dOo]*\.[\dOo]+)\s*km\b', text, flags=re.IGNORECASE)
             if (len(laps) != 1) or (len(distance) != 1):
                 raise ParsingError(f'Expected exactly one #. of laps and one race distance in the '
                                    f'grey rect. on {page_no_str}. Found: {text}')
         finally:
             doc.close()
-        df = pd.DataFrame({'n_laps_completed': [int(laps[0])],
-                           'dist_completed': [float(distance[0])]})
+        o_to_zero = str.maketrans('Oo', '00')
+        df = pd.DataFrame({'n_laps_completed': [int(laps[0].translate(o_to_zero))],
+                           'dist_completed': [float(distance[0].translate(o_to_zero))]})
 
         def to_json() -> list[dict]:
             return df.apply(

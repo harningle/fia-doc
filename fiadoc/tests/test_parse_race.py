@@ -255,7 +255,7 @@ def test_parse_race(prepare_race_data):
 
 @pytest.mark.parametrize('url, year, round_no, session, expected', [
     (
-        # Normal race
+        # 0: Normal race
         'https://www.fia.com/sites/default/files/2024_10_esp_f1_r0_timing_raceprovisionalclassification_v01_1.pdf',
         2024,
         10,
@@ -263,7 +263,7 @@ def test_parse_race(prepare_race_data):
         (66, 307.236)
     ),
     (
-        # Sprint, whose header is at a (slightly) different position
+        # 1: Sprint, whose header is at a (slightly) different position
         'https://www.fia.com/system/files/decision-document/2025_belgian_grand_prix_-_final_sprint_classification.pdf',
         2025,
         13,
@@ -271,12 +271,20 @@ def test_parse_race(prepare_race_data):
         (15, 104.936)
     ),
     (
-        # Entire PDF is an image, so need OCR
+        # 2: Entire PDF is an image, so need OCR (#99)
         'https://www.fia.com/system/files/decision-document/2025_austrian_grand_prix_-_final_race_classification.pdf',
         2025,
         11,
         'race',
         (70, 302.692)
+    ),
+    (
+        # 3: OCR reads the distance "100.013 km" as "100.O13 km" (#99)
+        'https://www.fia.com/system/files/decision-document/2026_british_grand_prix_-_final_sprint_classification.pdf',
+        2026,
+        9,
+        'sprint',
+        (17, 100.013)
     )
 ])
 def test_parse_race_distance(url, year, round_no, session, expected, tmp_path):
