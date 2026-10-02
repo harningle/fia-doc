@@ -29,7 +29,7 @@ Some PDFs, or parts of them, are images rather than text. These are read with [P
 
 ## Usage
 
-Each parser takes the path(s) to the PDF(s), the year, the round number, and the session. The parsed data are exposed as pandas DataFrames, and `.to_json()` on each DataFrame converts them to a list of dicts in the [jolpica-schemas](https://github.com/jolpica/jolpica-f1/tree/schemaslibrary/libraries/jolpica-schemas) format.
+Each parser takes the path(s) to the PDF(s), the year, the round number, and the session. The parsed data are exposed as pandas DataFrames, and `.to_json()` on each DataFrame converts them to a list of dicts in the [jolpica-schemas](https://github.com/jolpica/jolpica-f1/tree/main/libraries/jolpica-schemas) format.
 
 ```python
 import json

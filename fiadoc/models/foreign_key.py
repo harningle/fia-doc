@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Frequently used foreign key models for the data objects"""
-from jolpica.schemas import data_import
+from jolpica_schemas import data_import
 from pydantic import ConfigDict, field_validator, model_validator
 
 from .._constants import TEAMS
