@@ -407,6 +407,7 @@ class Page:
             expected: Optional[re.Pattern] = None,
             dpi: Optional[int] = DPI,
             check_strikeout: bool = True,
+            invert: bool = False,
             **kwargs
     ) -> list['TextBlock']:
         r"""This is `pymupdf.Page.get_text` w/ OCR functionality
@@ -436,6 +437,11 @@ class Page:
                                 a pixmap. Set to `False` to skip this (e.g. entry list PDFs never
                                 have strikeout text). Default is `True`. This flag is ignored if
                                 `option != 'dict'`
+        :param invert: Whether to invert the colours of the `clip` area before OCR, i.e. white
+                       pixels to black and black converted to white. Set to `True` for light text
+                       on a dark background, e.g. the white grid position inside a black square in
+                       starting grid PDFs. Will be ignored if we find text without OCR. Default is
+                       `False`
         :param kwargs: Other keyword arguments to pass to `pymupdf.Page.get_text`
         :return: A list of `TextBlock`s
         """
@@ -473,6 +479,8 @@ class Page:
                                                                   dpi=dpi,
                                                                   annots=False,
                                                                   copy=True)
+        if invert:  # Light text on dark background --> dark text on light background
+            pixmap_arr = 255 - pixmap_arr
         pix_h, pix_w = pixmap_arr.shape[:2]
 
         # Remove table border lines

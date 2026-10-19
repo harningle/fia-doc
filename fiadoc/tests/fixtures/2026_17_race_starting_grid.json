@@ -1,0 +1,310 @@
+[
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 3,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 1
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 16,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 2
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 44,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 3
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 12,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 4
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 1,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 5
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 81,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 6
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 10,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 7
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 30,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 8
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 41,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 9
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 27,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 10
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 87,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 11
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 31,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 12
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 55,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 13
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 5,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 14
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 43,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 15
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 23,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 16
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 11,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 17
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 77,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 18
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 63,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 19
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 14,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 20
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 18,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 21
+            }
+        ]
+    },
+    {
+        "object_type": "SessionEntry",
+        "foreign_keys": {
+            "year": 2026,
+            "round": 17,
+            "car_number": 6,
+            "session": "R"
+        },
+        "objects": [
+            {
+                "grid": 22
+            }
+        ]
+    }
+]

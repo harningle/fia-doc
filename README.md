@@ -12,6 +12,7 @@ PDF parsers to extract structured data from FIA F1 documents. The output is read
 | `QualifyingParser` | `'quali'`, `'sprint_quali'` | Qualifying Session Classification, Qualifying Session Sector Analysis | `SessionEntry`, `Lap` (for Q1/Q2/Q3 or SQ1/SQ2/SQ3) |
 | `RaceParser` | `'race'`, `'sprint'` | Race Classification, Race Lap Analysis, Race History Chart, Race Lap Chart, Race Sector Analysis | `SessionEntry`, `Lap` |
 | `PitStopParser` | `'race'`, `'sprint'` | Race Pit Stop Summary | `PitStop` |
+| `StartingGridParser` | `'race'`, `'sprint'` | Starting Grid | `SessionEntry` (grid position only) |
 
 The PDFs can be found on at FIA website, e.g. [Event&Timing Information](https://www.fia.com/events/fia-formula-one-world-championship/season-2026/miami-grand-prix/eventtiming-information) or [Decision documents](https://www.fia.com/documents/championships/fia-formula-one-world-championship-14/season/season-2026-2072/event/Miami%20Grand%20Prix). The parsers are tested against documents from year 2025 onwards, and *may* also work for earlier years (though not very well tested).
 
@@ -40,6 +41,7 @@ from fiadoc.parser import (
     PracticeParser,
     QualifyingParser,
     RaceParser,
+    StartingGridParser,
 )
 
 # Entry list
@@ -88,6 +90,10 @@ race_session = parser.session_df.to_json()  # #. of laps and dist. completed
 parser = PitStopParser('2025_10_race_pit_stop_summary.pdf', 2025, 10, 'race')
 race_pit_stops = parser.df.to_json()
 
+# Starting grid (use `session='sprint'` for sprint race)
+parser = StartingGridParser('2025_10_race_starting_grid.pdf', 2025, 10, 'race')
+race_starting_grid = parser.df.to_json()
+
 with open('2025_10_race_lap_times.json', 'w', encoding='utf-8') as f:
     json.dump(race_lap_times, f, indent=4)
 ```
@@ -127,6 +133,10 @@ Not every PDF is published for every session. When an optional PDF is missing (i
 * **Race** without lap analysis PDF: lap times are taken from the sector analysis PDF instead. If both are missing, `lap_times_df` raises `FileNotFoundError`, while `classification_df` still works
 * **Race** without history chart PDF: lap 1 is dropped from the lap times
 * **Race** without lap chart PDF: positions on each lap and the starting grid are set to `None`
+
+### Starting grid
+
+`StartingGridParser` reads the starting grid from the Starting Grid decision document, independently of `RaceParser`. Besides the grid position, its DataFrame has the driver, team, qualifying time, whether the driver has a penalty, and whether the driver starts from the pit lane. Drivers starting from the pit lane have no grid position in the PDF, so they are placed behind the last driver on the grid, in the order they are listed in the PDF.
 
 ### Cache
 

@@ -44,6 +44,11 @@ DRIVERS = Drivers(cache_dir=os.environ.get('FIADOC_CACHE_DIR', None))
 WHITE_STRIP_MIN_HEIGHT = 10  # A table should end with a white strip with at least 10px height
 LINE_MIN_VGAP = 5  # If two horizontal lines are vertically separated by less than 5px, they are
                    # considered to be the same line
+STARTING_GRID_DPI = 300  # Enough to see the thin lines in starting grid PDFs. Higher DPI gives the
+                         # same results, but is much slower
+VLINE_MIN_LENGTH = 3     # In starting grid PDFs, a vertical black run of at least 3pt going down
+                         # from a slot's line is the tick or the black square, not noise
+                         # TODO: very bad. Shouldn't use pt as unit
 
 
 class BaseParser:
@@ -3727,6 +3732,263 @@ class PitStopParser(BaseParser):
                     foreign_keys=x.entry,
                     objects=[x.pit_stop]
                 ).model_dump(exclude_unset=True),
+                axis=1
+            ).tolist()
+
+        # TODO: bad practice
+        df.to_json = to_json
+        return df
+
+
+class StartingGridParser(BaseParser):
+    def __init__(self, file: str | os.PathLike, year: int, round_no: int, session: RaceSessionT):
+        self.file = file
+        self.year = year
+        self.round_no = round_no
+        self.session = session
+        self._check_session()
+        self.df = self._parse()
+
+    def _check_session(self) -> None:
+        if self.session not in get_args(RaceSessionT):
+            raise ValueError(f'Invalid session: {self.session}. Valid sessions are '
+                             f'{get_args(RaceSessionT)}')
+        return
+
+    @staticmethod
+    def _detect_slots(page: Page) -> list[tuple[BBox, Optional[BBox]]]:
+        """Locate the slots on a page of starting grid PDF. One slot is one driver.
+
+        The starting grid is not a table. Each driver has a slot, which looks like:
+
+            +---+--------------------------------+       --------------------------------+
+            | 2 | 16 Charles LECLERC    1:31.427 |        14 Fernando ALONSO *  1:34.223 |
+            +---+    Scuderia Ferrari HP         |           Aston Martin Aramco F1 Team |
+
+        A driver starting normally (e.g. Leclerc above) has a thin horizontal line on top, a short
+        vertical line ("tick") going down from the right end of the line, and a black square at
+        the left end of the line, w/ the grid position inside in white. A driver starting from the
+        pit lane (e.g. Alonso above) has no black square. We locate the slots in the following way:
+
+        1. only search below the grey rectangle, i.e. below title like "Final Starting Grid"
+        2. locate horizontal black lines that are roughly 25% to 50% of the page width. Other
+           longer lines are something else, e.g. the line below "NOTES" or "PENALTIES"
+        3. locate the short vertical black line that goes down from the rightmost 1% of the above
+           horizontal line
+        4. locate the black square by search vertical black lines going down from the leftmost 15%
+           of the horizontal line. The black square has a width of approx. 10% of the horizontal
+           line, so 15% is enough. Some black lines can stop short or be missed, due to grey pixels
+           on the edges (because of anti-aliasing or noise), or the white grid position inside, but
+           all lines together still give the black square
+
+        :return: A list of (bbox of the text in the slot, bbox of the black square), sorted from
+                 top to bottom. The latter is `None` for a driver starting from the pit lane. Empty
+                 list if the page has no slot, i.e. it's not the page of starting grid
+        """
+        page_no_str = f'p.{page.number} in {page.file}'
+        arr: npt.NDArray[np.uint8] = page.get_pixmap_array(dpi=STARTING_GRID_DPI)
+        n_cols: int = arr.shape[1]
+        scale: float = n_cols / page.w
+        min_len: int = round(VLINE_MIN_LENGTH * scale)
+
+        # Locate the grey rectangle at the top of the page, which is the title "Final Starting
+        # Grid" or similar
+        grey = 183  # TODO: probably make this into some config file later
+        # Title should appear in top half of the page, so only search this part to save time
+        is_grey: npt.NDArray[np.bool_] = np.all(
+            np.abs(arr[:arr.shape[0] // 3].astype(np.int16) - grey) <= 10,  # noqa: PLR2004
+            axis=2
+        )
+        grey_rows: npt.NDArray[np.intp] = np.where(is_grey.mean(axis=1) >= 0.8)[0]  # noqa: PLR2004
+        if len(grey_rows) == 0:  # No title bar, so not the page of starting grid
+            return []
+        top: int = grey_rows[0]
+        is_black: npt.NDArray[np.bool_] = np.all(arr[top:] < 128, axis=2)  # noqa: PLR2004
+
+        def black_run_down(block: npt.NDArray[np.bool_]) -> npt.NDArray[np.intp]:
+            """Length of the black run going down from the top of each col. of `block`"""
+            return np.where(block.all(axis=0), block.shape[0], block.argmin(axis=0))
+
+        # Find horizontal black lines w/ a length of 25-50% of the page width, in the same way as
+        # in `Page.search_for_black_lines`, but here we also need their left and right ends, so
+        # can't use the method directly
+        # TODO: move into a shared method
+        padded: npt.NDArray[np.bool_] = np.pad(is_black,
+                                               ((0, 0), (1, 1)),
+                                               mode='constant',
+                                               constant_values=False)
+        diff: npt.NDArray[np.int8] = np.diff(padded.astype(np.int8), axis=1)
+        run_starts: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]] = np.where(diff == 1)
+        run_ends: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]] = np.where(diff == -1)
+        run_lengths: npt.NDArray[np.intp] = run_ends[1] - run_starts[1]
+        is_line: npt.NDArray[np.bool_] = ((run_lengths > n_cols * 0.25)
+                                          & (run_lengths < n_cols * 0.5))
+
+        # A line can be several pixels thick, i.e. runs in consecutive rows. Merge them into one
+        lines: list[list[int]] = []  # [top, bottom, left, right]
+        for row, l, r in zip(run_starts[0][is_line], run_starts[1][is_line], run_ends[1][is_line]):
+            for line in lines:
+                if line[1] == row and l < line[3] and r > line[2]:
+                    line[1], line[2], line[3] = row + 1, min(line[2], l), max(line[3], r)
+                    break
+            else:
+                lines.append([row, row + 1, l, r])
+        if not lines:
+            return []
+        lengths = np.array([r - l for _, _, l, r in lines])
+        if not np.all(np.isclose(lengths, np.median(lengths), rtol=0.2)):
+            raise ParsingError(f'Expected horizontal black lines of all slots to have similar'
+                               f'lengths on {page_no_str}. Got '
+                               f'{(lengths / scale).round(1).tolist()}')
+
+        # Locate the slots by the lines we found above
+        slots: list[tuple[BBox, Optional[BBox]]] = []
+        for t, b, l, r in sorted(lines):
+            line_str = f'the line at y = {(t + top) / scale:.1f} on {page_no_str}'
+
+            # Left coord. of the text in slot. If no black square, it's the left end of the
+            # horizontal line
+            text_l: int = l
+
+            # The short vertical black line at the right end of the horizontal line tells how tall
+            # the slot is
+            black_line: int = black_run_down(
+                is_black[b:, r - max(round((r - l) * 0.01), 1):r]
+            ).max()
+            if black_line < min_len:
+                raise ParsingError(f'Expected a short vertical black line going down from the '
+                                   f'right end of {line_str}')
+            b_slot: int = b + black_line
+
+            # The black square below the left end of the horizontal line, if any
+            # Length of black vertical lines
+            sq_runs = black_run_down(is_black[b:, l:l + round((r - l) * 0.15)])
+            # Only keep long enough lines, because only they are part of the black square
+            sq_cols = np.where(sq_runs >= min_len)[0]
+            square: Optional[BBox] = None
+            if len(sq_cols) > 0:
+                sq_l, sq_r, sq_b = l + sq_cols[0], l + sq_cols[-1] + 1, b + sq_runs.max()
+                if not 0.8 < (sq_r - sq_l) / (sq_b - t) < 1.2:  # noqa: PLR2004
+                    raise ParsingError(f'Found something black under the left end of {line_str}, '
+                                       f'but it is not a square')
+                square = (sq_l / scale, (t + top) / scale, sq_r / scale, (sq_b + top) / scale)
+                text_l = sq_r
+
+            # Text is right to the square, left to the tick, and vertically between the line and
+            # the bottom of the short black vertical line
+            slots.append((
+                (
+                    text_l / scale,
+                    (t + top) / scale,
+                    r / scale,
+                    (b_slot + (b_slot - t) * 0.2 + top) / scale  # Add a bit margins below the slot
+                ),
+                square
+            ))
+        return slots
+
+    def _parse(self) -> pd.DataFrame:
+        """Parse "Final Starting Grid" PDF
+
+        :return: Df. with cols. [car_no, starting_grid, pit_lane, driver, team, time, has_penalty],
+                 one row per driver, sorted by `starting_grid`. Drivers starting from the pit lane
+                 have no grid position in the PDF, so their `starting_grid` continue from the last
+                 grid position, in the order they are listed in the PDF
+        """
+        doc = pymupdf.open(self.file)
+        try:
+            # Find the page with the starting grid, i.e. the only page that has slots
+            grid_pages: list[tuple[Page, list[tuple[BBox, Optional[BBox]]]]] = []
+            for page in doc:
+                page = Page(page, file=self.file)  # noqa: PLW2901
+                if slots := self._detect_slots(page):
+                    grid_pages.append((page, slots))
+            if len(grid_pages) != 1:
+                raise ParsingError(f'Expected exactly one page with starting grid in {self.file}. '
+                                   f'Found {len(grid_pages)}')
+            page, slots = grid_pages[0]
+            page_no_str = f'p.{page.number} in {self.file}'
+
+            rows: list[dict] = []
+            for text_area, square in slots:
+                l, t, r, b = text_area
+                slot_str = f'the slot inside ({l:.1f}, {t:.1f}, {r:.1f}, {b:.1f}) on {page_no_str}'
+
+                # Grid position is the white number inside the black square
+                position: Optional[int] = None
+                if square:
+                    tbs = page.get_text('words', clip=square, small_area=True,
+                                        check_strikeout=False, invert=True)
+                    text = ''.join(''.join(tb.text.split()) for tb in tbs)
+                    if not text.isdigit():
+                        raise ParsingError(f'Expected a grid position in the black square of '
+                                           f'{slot_str}. Got "{text}"')
+                    position = int(text)
+
+                # Two lines of text in a slot: car No., driver, penalty flag (*), and time in the
+                # first line, and team in the second. The latter two in the first line are optional
+                tbs = [tb for tb in page.get_text('words', clip=text_area, check_strikeout=False)
+                       if (l <= (tb.l + tb.r) / 2 <= r) and (t <= (tb.t + tb.b) / 2 <= b)]
+                tbs.sort(key=lambda tb: ((tb.t + tb.b) / 2, tb.l))
+                text_lines: list[list[TextBlock]] = []
+                for tb in tbs:
+                    # Same line if vertically close to the first word of the line
+                    if text_lines \
+                            and (abs((tb.t + tb.b) / 2
+                                     - (text_lines[-1][0].t + text_lines[-1][0].b) / 2)
+                                 < (tb.b - tb.t) / 2):
+                        text_lines[-1].append(tb)
+                    else:
+                        text_lines.append([tb])
+                if len(text_lines) != 2:  # noqa: PLR2004
+                    raise ParsingError(f'Expected two lines of text in {slot_str}. Got '
+                                       f'{text_lines}')
+                first, second = (' '.join(tb.text for tb in sorted(line, key=lambda tb: tb.l))
+                                 for line in text_lines)
+                m = re.fullmatch(r'(?P<car_no>\d{1,2})\s+(?P<driver>\D+?)\s*(?P<asterisk>\*)?'
+                                 r'(\s+(?P<time>\d+:\d{2}\.\d{3}))?', first)
+                if not m:
+                    raise ParsingError(f'Expected car No., driver, and optionally "*" and time '
+                                       f'in the first line of {slot_str}. Got "{first}"')
+                rows.append({
+                    'car_no': int(m['car_no']),
+                    'starting_grid': position,
+                    'pit_lane': square is None,
+                    'driver': m['driver'],
+                    'team': second,
+                    'time': m['time'],
+                    'has_penalty': m['asterisk'] is not None
+                })
+        finally:
+            doc.close()
+
+        # Slots are sorted from top to bottom, so the grid positions should be 1, 2, 3, ...
+        positions = [row['starting_grid'] for row in rows if not row['pit_lane']]
+        if positions != list(range(1, len(positions) + 1)):
+            raise ParsingError(f'Expected grid positions to be 1, 2, 3, ... from top to bottom on '
+                               f'{page_no_str}. Got {positions}')
+
+        # Drivers starting from the pit lane are behind all drivers on the grid, and we manually
+        # assign them grid positions in the order they are listed in the PDF, from top to bottom
+        for i, row in enumerate([row for row in rows if row['pit_lane']], start=1):
+            row['starting_grid'] = len(positions) + i
+
+        df = pd.DataFrame(rows).sort_values('starting_grid', ignore_index=True)
+        if df.car_no.duplicated().any():
+            raise ParsingError(f'Found duplicated car No. on {page_no_str}: {df.car_no.tolist()}')
+
+        def to_json() -> list[dict]:
+            return df.apply(
+                lambda x: SessionEntryImport(
+                    object_type='SessionEntry',
+                    foreign_keys=SessionEntryForeignKeys(
+                        year=self.year,
+                        round=self.round_no,
+                        session=self.session,
+                        car_number=x.car_no
+                    ),
+                    objects=[SessionEntryObject(grid=x.starting_grid)]
+                ).model_dump(exclude_none=True, exclude_unset=True),
                 axis=1
             ).tolist()
 

@@ -10,6 +10,7 @@ from .parser import (
     QualiSessionT,
     RaceParser,
     RaceSessionT,
+    StartingGridParser,
 )
 
 __all__ = [
@@ -24,5 +25,6 @@ __all__ = [
     'RaceParser',
     'RaceSessionT',
     'QualifyingParser',
-    'QualiSessionT'
+    'QualiSessionT',
+    'StartingGridParser'
 ]
