@@ -2700,12 +2700,19 @@ class QualifyingParser(BaseParser):
             second, so one second error in calendar time is ok to identify a lap.
 
             However, in very rare cases, the calendar time in sector analysis PDF can be wrong...
-            See #88
+            See #88.
+
+            We can have multiple calendar time rows, e.g. 2026 Brazilian. These often happen when a
+            driver returns to pit early, e.g. out lap and immediately into the pit, without even
+            starting a flying lap. Need to collect all of them.
             """
             df['calendar_time'] = (df.lap_time
                                    .replace('INCOMPLETE', '0:00.000')
                                    .apply(time_to_timedelta))
-            df.calendar_time = df.groupby('car_no')['calendar_time'].cumsum()
+            clock_group = (df.lap_time.str.fullmatch(r'\d{2}:\d{2}:\d{2}')
+                           .groupby(df.car_no)
+                           .cumsum())
+            df.calendar_time = df.groupby([df.car_no, clock_group]).calendar_time.cumsum()
             df['is_fastest_lap_classification'] = False
             for q in [1, 2, 3]:
                 temp = classification[['NO', f'Q{q}_TIME']].dropna(subset=f'Q{q}_TIME')
@@ -3494,7 +3501,7 @@ class QualifyingParser(BaseParser):
 
         # Clean up the "first" lap
         """
-        See #51 and #87. Sector analysis PDF can have the following cases:
+        See #51, #87, and #102. Sector analysis PDF can have the following cases:
 
         1. e.g. 2025 Bahrain. Lap 1 = calendar time of the start time of the first lap (out lap),
            lap 2 = calendar time of the start of the second lap, and lap 3 = lap time of the second
@@ -3502,6 +3509,7 @@ class QualifyingParser(BaseParser):
         2. e.g. 2025 Australian. Lap 1 = calendar time of the start time of the first lap and has
            "P", lap 2 = lap time of the first lap, and lap 3 = lap time of the second lap. Here lap
            2 in PDF is actual lap 1, lap 3 in PDF is actual lap 2, ...
+        3. and some other cases, like 2026 Brazilian
 
         So to make it consistent, we make the lap numbering the same as the actual lap. That is, in
         case 2, we will have lap 1 in PDF has new lap No. = 0, lap 2 in PDF has new lap No. = 1,
@@ -3511,7 +3519,32 @@ class QualifyingParser(BaseParser):
         lap_1_is_p = df[(df.row_no == 1) & (df.pit == True)].car_no.to_list()  # noqa: E712
         lap_1_not_p = [i for i in df.car_no.unique() if i not in lap_1_is_p]
 
-        # Check: case 1 should have two calendar time laps. If not, then the driver should have an
+        # Case 1 normally has two calendar time rows. Warn otherwise, even if handled below, so
+        # unusual openings get a manual check. Case 2 (one calendar time row w/ "P") is routine
+        clock_counts = df[df.car_no.isin(lap_1_not_p)].groupby('car_no').is_calendar_time.sum()
+        unusual_clock_counts = clock_counts[clock_counts != 2]  # noqa: PLR2004
+        if not unusual_clock_counts.empty:
+            warnings.warn('Expected two opening calendar time rows for drivers w/ first lap not '
+                          'having "P" in sector analysis PDF. Found different counts (car No.: '
+                          f'count): {unusual_clock_counts.to_dict()}')
+
+
+        """
+        Handle outlier cases like 2026 Brazilian: calendar time, calendar time w/ pit, calendar
+        time, then normal lap times. Only the first row is a start marker; the next two are actual
+        laps w/o lap times (e.g. pit in the out lap so doesn't cross the start finishing line).
+        Keep those rows for numbering/session assignment and calendar time anchoring. As in case 1,
+        drop only the start marker and subtract one from the PDF lap numbers. Require the observed
+        opening pattern rather than accepting arbitrary extra clocks.
+        """
+        opening = df[df.row_no <= 3].groupby('car_no')  # noqa: PLR2004
+        three_clock_drivers = [
+            car_no for car_no, laps in opening
+            if laps.is_calendar_time.all()
+            and (laps.pit.eq(True).to_list() == [False, True, False])
+        ]
+
+        # Check: case 1 should have two calendar time laps, the three-clock pattern above, or an
         # INCOMPLETE lap immediately after a calendar time lap (e.g. 2025 Bahrain quali. Bearman)
         if lap_1_not_p:
             temp = df[df.car_no.isin(lap_1_not_p)].copy()
@@ -3519,7 +3552,9 @@ class QualifyingParser(BaseParser):
             temp = (temp[temp.is_calendar_time].groupby('car_no', as_index=False)
                     .agg({'is_calendar_time': 'sum',
                           'next_lap_time': 'last'}))
-            temp = temp[~((temp.is_calendar_time == 2)  # noqa: PLR2004
+            temp = temp[~((temp.is_calendar_time == 2)     # noqa: PLR2004
+                          | ((temp.is_calendar_time == 3)  # noqa: PLR2004
+                             & temp.car_no.isin(three_clock_drivers))
                           | (temp.next_lap_time == 'INCOMPLETE'))]
             if not temp.empty:
                 raise ParsingError(f'Found drivers w/ first lap not having "P" but not having two '

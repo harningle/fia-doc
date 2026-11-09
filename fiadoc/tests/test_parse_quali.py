@@ -72,7 +72,8 @@ race_list = [
         '2025_1_quali_provisional_classification.json',
         '2025_1_quali_lap_times.json',
         assert_warnings(required=['Found drivers in Q.*DSQ',
-                                  'Fastest lap numbering/calendar time in'],
+                                  'Fastest lap numbering/calendar time in',
+                                  'Expected two opening calendar time rows.*87: 1'],
                         allowed=['provisional classification'])
     ),
     (
@@ -99,7 +100,8 @@ race_list = [
         '2025_1_quali_final_classification.json',
         '2025_1_quali_lap_times.json',
         assert_warnings(required=['Found drivers in Q.*DSQ',
-                                  'Fastest lap numbering/calendar time in'])
+                                  'Fastest lap numbering/calendar time in',
+                                  'Expected two opening calendar time rows.*87: 1'])
     ),
     (
         # 7: Antonelli's name wrapped in two lines and also DNF drivers in quali.
@@ -242,6 +244,20 @@ race_list = [
                                   'Assuming they are not classified',
                                   'Found drivers in Q.*in sector analysis PDF but not in '
                                   'classification PDF'])
+    ),
+    (
+        # 17: Three opening clock rows for Colapinto/Bottas, including a pit return. Keep their lap
+        #     numbering and restart clock accumulation at the subsequent out lap (#102)
+        'https://www.fia.com/system/files/decision-document/2026_sao_paulo_grand_prix_-_final_qualifying_classification.pdf',
+        None,
+        '2026_20_bra_f1_q0_timing_qualifyingsessionsectoranalysis_v01.pdf',
+        2026,
+        20,
+        'quali',
+        '2026_20_quali_classification.json',
+        '2026_20_quali_lap_times.json',
+        assert_warnings(required=['Expected two opening calendar time rows.*43: 3, 77: 3',
+                                  'Found calendar time as lap time after lap 1'])
     )
 ]
 
