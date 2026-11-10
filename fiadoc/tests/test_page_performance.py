@@ -2,6 +2,7 @@
 import subprocess
 import sys
 
+import numpy as np
 import pymupdf
 import pytest
 
@@ -53,6 +54,14 @@ def test_supplied_textpage_keeps_pymupdf_clipping_semantics():
         expected = native.get_text(clip=clip, textpage=textpage)
         assert expected != native.get_text(clip=clip)
         assert page._get_native_text('text', clip=clip, textpage=textpage) == expected
+
+
+def test_white_strips_preserve_empty_width_clips(monkeypatch):
+    with pymupdf.open('fiadoc/tests/fixtures/page.pdf') as document:
+        page = Page(document[0], 'page.pdf')
+        monkeypatch.setattr(page, 'get_pixmap_array',
+                            lambda **kwargs: np.empty((10, 0, 3), dtype=np.uint8))
+        assert page.search_for_white_strips(clip=(0, 0, 0, 10)) == [0.0]
 
 
 def test_native_parsing_does_not_import_ocr_and_factory_is_a_singleton():

@@ -910,7 +910,9 @@ class Page:
         pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip)
 
         # Find all white rows, i.e. strictly all pixels in the row are white (RGB = 255)
-        is_white: npt.NDArray[np.bool_] = (np.min(pixmap_arr, axis=(1, 2)) == 255)  # noqa: PLR2004
+        is_white: npt.NDArray[np.bool_] = (
+            np.min(pixmap_arr, axis=(1, 2), initial=255) == 255  # noqa: PLR2004
+        )
 
         # Pad with a black row on top and bottom to simplify. diff calculation later
         padded: npt.NDArray[np.bool_] = np.concatenate([[False], is_white, [False]])

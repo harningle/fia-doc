@@ -1,0 +1,2267 @@
+{
+  "date": "2026-11-10",
+  "validation": {
+    "final_local_passed": 257,
+    "final_local_skipped_full_cases": 192,
+    "implementation_ci_passed": 256,
+    "implementation_ci_skipped_full_cases": 192,
+    "hosted_output_and_warning_sets_match": true,
+    "ruff_passed": true
+  },
+  "baseline_commit": "8faa946",
+  "measured_implementation_commit": "183f60b",
+  "hosted_run": "https://github.com/harningle/fia-doc/actions/runs/42873362417",
+  "ci_run": "https://github.com/harningle/fia-doc/actions/runs/42873361893",
+  "hosted": {
+    "practice": {
+      "before": {
+        "total_s": {
+          "mean": 5.113471399600002,
+          "std": 0.07657368733964323,
+          "samples": [
+            5.244656087999999,
+            5.087485274000002,
+            5.110683205000001,
+            5.049662617000024,
+            5.074869813999982
+          ]
+        },
+        "parsing_s": {
+          "mean": 5.1028238504,
+          "std": 0.07663214795659427,
+          "samples": [
+            5.234091571999997,
+            5.077183853999998,
+            5.099876473999998,
+            5.038814694000024,
+            5.064152657999983
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.01064754920000155,
+          "std": 0.0002219423051018746,
+          "samples": [
+            0.0105645160000023,
+            0.010301420000004669,
+            0.0108067310000024,
+            0.010847923000000037,
+            0.01071715599999834
+          ]
+        },
+        "peak_rss_bytes": 1681088512,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 17,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 1.9505157910000435,
+          "text_and_ocr_preparation": 0.20554564599989078,
+          "search_and_ocr_preparation": 0.011058048999984749,
+          "rendering": 0.6773637589999737,
+          "render_cache_and_copy": 0.22299579399992808,
+          "line_detection": 0.8089132919999855,
+          "connected_components": 0.1931945599999949,
+          "component_bounds": 0.0244344719999674,
+          "column_detection": 0.07542871600010415,
+          "white_strips": 0.20413630000012972,
+          "grey_rows": 0.06176938499993412,
+          "ocr_initialisation": 1.3314699200000035,
+          "ocr_inference": 0.7849623359999924
+        },
+        "phase_calls": {
+          "native_extraction": 1781,
+          "text_and_ocr_preparation": 1781,
+          "search_and_ocr_preparation": 5,
+          "rendering": 19,
+          "render_cache_and_copy": 1093,
+          "line_detection": 493,
+          "connected_components": 45,
+          "component_bounds": 45,
+          "column_detection": 45,
+          "white_strips": 99,
+          "grey_rows": 45,
+          "ocr_initialisation": 5,
+          "ocr_inference": 5
+        }
+      },
+      "after": {
+        "total_s": {
+          "mean": 3.4604763227999227,
+          "std": 0.08243530588617926,
+          "samples": [
+            3.43938723999986,
+            3.4963089289997242,
+            3.389835906999906,
+            3.391210330999911,
+            3.585639207000213
+          ]
+        },
+        "parsing_s": {
+          "mean": 3.4499538634000144,
+          "std": 0.08237170789527432,
+          "samples": [
+            3.428659381999978,
+            3.4855320279998523,
+            3.3794804950000525,
+            3.3808993459999783,
+            3.575198066000212
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.010522459399908257,
+          "std": 0.00021573597899791143,
+          "samples": [
+            0.010727857999881962,
+            0.010776900999871941,
+            0.010355411999853459,
+            0.01031098499993277,
+            0.010441141000001153
+          ]
+        },
+        "peak_rss_bytes": 1694269440,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 17,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 0.3598562179959117,
+          "text_and_ocr_preparation": 0.19786589700606783,
+          "search_and_ocr_preparation": 0.012555130999999164,
+          "rendering": 0.7231018810005025,
+          "render_cache_and_copy": 0.23927306899872747,
+          "line_detection": 0.8184115119970556,
+          "connected_components": 0.21024004000105379,
+          "component_bounds": 0.026633969000613433,
+          "column_detection": 0.07760415599977932,
+          "white_strips": 0.0944617460045265,
+          "grey_rows": 0.06396960700089949,
+          "ocr_initialisation": 6.736437989000024,
+          "ocr_inference": 0.7872160140002507
+        },
+        "phase_calls": {
+          "native_extraction": 1781,
+          "text_and_ocr_preparation": 1781,
+          "search_and_ocr_preparation": 5,
+          "rendering": 19,
+          "render_cache_and_copy": 1093,
+          "line_detection": 493,
+          "connected_components": 45,
+          "component_bounds": 45,
+          "column_detection": 45,
+          "white_strips": 99,
+          "grey_rows": 45,
+          "ocr_initialisation": 5,
+          "ocr_inference": 5
+        }
+      },
+      "inputs": {
+        "0.pdf": "349153e7b44f6493cbace21ce0515fd32e01cd5622cc0716f404197ceba584c7",
+        "1.pdf": "82fec36816dbbed999787ba98ac88efd13a69180ad510b29cd96002b8e77f873"
+      },
+      "output_sha256": "0804a57f67270c4b7389eff5e9e4d0c9f9112c67614f12effdf128c4a77ec323",
+      "warnings": [],
+      "reduction_percent": 32.326279891374455
+    },
+    "qualifying": {
+      "before": {
+        "total_s": {
+          "mean": 31.010294712199983,
+          "std": 0.575929578200392,
+          "samples": [
+            30.45673377199998,
+            30.624118229999993,
+            30.823684238,
+            31.255613138999934,
+            31.891324182000005
+          ]
+        },
+        "parsing_s": {
+          "mean": 30.979096588999994,
+          "std": 0.5751237387595983,
+          "samples": [
+            30.42650959299999,
+            30.593753230000004,
+            30.792126623,
+            31.224080819999983,
+            31.85901267899999
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.031198123199988003,
+          "std": 0.0008836285046882623,
+          "samples": [
+            0.03022417899998686,
+            0.030364999999989095,
+            0.031557614999996986,
+            0.03153231899995035,
+            0.03231150300001673
+          ]
+        },
+        "peak_rss_bytes": 5511798784,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 4.4246039469989284,
+          "text_and_ocr_preparation": 0.3444267230006801,
+          "search_and_ocr_preparation": 0.03742635700001529,
+          "rendering": 1.3570669789999101,
+          "render_cache_and_copy": 0.4119469040002741,
+          "line_detection": 1.173860503999748,
+          "connected_components": 0.29282152600015365,
+          "component_bounds": 0.04059522100004642,
+          "column_detection": 0.12402072799963548,
+          "white_strips": 0.3848236680001662,
+          "grey_rows": 0.15487798100011219,
+          "ocr_initialisation": 1.3235780600000169,
+          "ocr_inference": 22.077811837000013
+        },
+        "phase_calls": {
+          "native_extraction": 3867,
+          "text_and_ocr_preparation": 3867,
+          "search_and_ocr_preparation": 14,
+          "rendering": 34,
+          "render_cache_and_copy": 1518,
+          "line_detection": 992,
+          "connected_components": 24,
+          "component_bounds": 24,
+          "column_detection": 24,
+          "white_strips": 54,
+          "grey_rows": 23,
+          "ocr_initialisation": 4,
+          "ocr_inference": 4
+        }
+      },
+      "after": {
+        "total_s": {
+          "mean": 27.67119424499997,
+          "std": 0.2658291550390026,
+          "samples": [
+            28.115371374000006,
+            27.412657368000055,
+            27.65026250899996,
+            27.541282995999836,
+            27.636396977999993
+          ]
+        },
+        "parsing_s": {
+          "mean": 27.63887316260002,
+          "std": 0.2660213878865759,
+          "samples": [
+            28.08341477099998,
+            27.380484042000035,
+            27.61789670500002,
+            27.508296795999968,
+            27.6042734990001
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.03232108239994887,
+          "std": 0.0003994076030917875,
+          "samples": [
+            0.03195660300002601,
+            0.0321733260000201,
+            0.03236580399993727,
+            0.032986199999868404,
+            0.03212347899989254
+          ]
+        },
+        "peak_rss_bytes": 5538504704,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 0.8643844790069579,
+          "text_and_ocr_preparation": 0.3353418859899193,
+          "search_and_ocr_preparation": 0.03844950200027597,
+          "rendering": 1.4192996769988895,
+          "render_cache_and_copy": 0.42255903899331315,
+          "line_detection": 1.1889660600074876,
+          "connected_components": 0.3049607630002811,
+          "component_bounds": 0.04141515400010576,
+          "column_detection": 0.12478664999889588,
+          "white_strips": 0.12880142599897226,
+          "grey_rows": 0.16133984200041596,
+          "ocr_initialisation": 4.1084962749998795,
+          "ocr_inference": 22.947725381999817
+        },
+        "phase_calls": {
+          "native_extraction": 3867,
+          "text_and_ocr_preparation": 3867,
+          "search_and_ocr_preparation": 14,
+          "rendering": 34,
+          "render_cache_and_copy": 1518,
+          "line_detection": 992,
+          "connected_components": 24,
+          "component_bounds": 24,
+          "column_detection": 24,
+          "white_strips": 54,
+          "grey_rows": 23,
+          "ocr_initialisation": 4,
+          "ocr_inference": 4
+        }
+      },
+      "inputs": {
+        "0.pdf": "bcee017315239a87fc53b369f44289ab16380465ce4999047d64b5c45d9cdd41",
+        "2.pdf": "31a35ecc09913bc32908be8e1cce7d2fe577c980756be1f4085af56baee83101"
+      },
+      "output_sha256": "1ec11eaeb0188183adddf527c1ef9cfff8cb661a830dbd224cb410b4e766958f",
+      "warnings": [
+        "Expected two opening calendar time rows for drivers w/ first lap not having \"P\" in sector analysis PDF. Found different counts (car No.: count): {43: 3, 77: 3}",
+        "Found calendar time as lap time after lap 1 for drivers:\n lap_no  car_no lap_time\n      2      77 16:27:46\n      2      11 16:27:53\n      2      43 16:28:04\n      2      10 16:28:14\n      2      27 16:28:19\n      2      87 16:28:27\n      2       5 16:28:32\n      2      14 16:28:38\n      2      51 16:28:42\n      2      18 16:28:49\n      2      41 16:28:55\n      2      30 16:29:00\n      2      23 16:29:05\n      2      55 16:29:12\n      2      16 16:29:15\n      2       6 16:29:32\n      2      81 16:29:44\n      2       1 16:29:53\n      2      63 16:29:56\n      2      12 16:30:03"
+      ],
+      "reduction_percent": 10.767716005892558
+    },
+    "race": {
+      "before": {
+        "total_s": {
+          "mean": 23.10933025539997,
+          "std": 0.3394366687594212,
+          "samples": [
+            22.86990836399997,
+            22.82163977900001,
+            23.62479753399998,
+            23.280993139999964,
+            22.94931245999993
+          ]
+        },
+        "parsing_s": {
+          "mean": 23.072666516999995,
+          "std": 0.3396856868211801,
+          "samples": [
+            22.833090550999998,
+            22.784825038999998,
+            23.588984950999986,
+            23.243518447999975,
+            22.91291359600001
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.036663738399977316,
+          "std": 0.0006121295144152276,
+          "samples": [
+            0.036817812999970556,
+            0.03681474000001117,
+            0.0358125829999949,
+            0.03747469199998932,
+            0.03639886399992065
+          ]
+        },
+        "peak_rss_bytes": 2418180096,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 10.172948592998523,
+          "text_and_ocr_preparation": 0.7259364190018687,
+          "search_and_ocr_preparation": 0.06817384699974127,
+          "rendering": 3.3187686430000554,
+          "render_cache_and_copy": 1.0679570430010585,
+          "line_detection": 2.945912150999675,
+          "connected_components": 0.5965817590001166,
+          "component_bounds": 0.07837238300027138,
+          "column_detection": 0.25198052999860465,
+          "white_strips": 0.5889800509994529,
+          "grey_rows": 0.29087850399969284,
+          "ocr_initialisation": 1.3760276420000537,
+          "ocr_inference": 2.8754991590000714
+        },
+        "phase_calls": {
+          "native_extraction": 8262,
+          "text_and_ocr_preparation": 8262,
+          "search_and_ocr_preparation": 34,
+          "rendering": 89,
+          "render_cache_and_copy": 2757,
+          "line_detection": 1085,
+          "connected_components": 101,
+          "component_bounds": 101,
+          "column_detection": 101,
+          "white_strips": 186,
+          "grey_rows": 101,
+          "ocr_initialisation": 7,
+          "ocr_inference": 7
+        }
+      },
+      "after": {
+        "total_s": {
+          "mean": 12.4559135135999,
+          "std": 0.10884873254258597,
+          "samples": [
+            12.37383531599994,
+            12.403306952999856,
+            12.457163896999873,
+            12.402248027999804,
+            12.64301337400002
+          ]
+        },
+        "parsing_s": {
+          "mean": 12.432969366999941,
+          "std": 0.10897210060111735,
+          "samples": [
+            12.350674671999968,
+            12.380486697999913,
+            12.434535338999922,
+            12.378956370999958,
+            12.620193754999946
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.022944146599957093,
+          "std": 0.0002729867297068266,
+          "samples": [
+            0.023160643999972308,
+            0.022820254999942335,
+            0.022628557999951227,
+            0.023291656999845145,
+            0.022819619000074454
+          ]
+        },
+        "peak_rss_bytes": 2174386176,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 1.7628802439987794,
+          "text_and_ocr_preparation": 0.6301681280135654,
+          "search_and_ocr_preparation": 0.06426996500022142,
+          "rendering": 3.202875930997834,
+          "render_cache_and_copy": 1.0612764009940747,
+          "line_detection": 2.6526603070046804,
+          "connected_components": 0.5583562949998395,
+          "component_bounds": 0.07213950600043972,
+          "column_detection": 0.2312044079978932,
+          "white_strips": 0.2415891080026995,
+          "grey_rows": 0.2680382100022598,
+          "ocr_initialisation": 4.6724746039999445,
+          "ocr_inference": 1.7453406139995877
+        },
+        "phase_calls": {
+          "native_extraction": 8072,
+          "text_and_ocr_preparation": 8072,
+          "search_and_ocr_preparation": 31,
+          "rendering": 85,
+          "render_cache_and_copy": 2731,
+          "line_detection": 1083,
+          "connected_components": 100,
+          "component_bounds": 100,
+          "column_detection": 100,
+          "white_strips": 184,
+          "grey_rows": 99,
+          "ocr_initialisation": 6,
+          "ocr_inference": 6
+        }
+      },
+      "inputs": {
+        "0.pdf": "c0b983a54efb8ffc8573214080195f12f1347528fcefcf51abd2ac6bff9f6fe2",
+        "1.pdf": "54b7c5aea0b25350d5a2d080eed57e4921d16957c8a02d32587fc300a3559495",
+        "2.pdf": "1c8e85b5f657fe0c6dd351de3638decfff0e4537e8e88628f6684556be470e59",
+        "3.pdf": "2720cd7b0e3086c9890c7d1948d95ac2e7109080fc6825c418cfea2405fcfa84"
+      },
+      "output_sha256": "5fd34ca9d76ae1bbe8b42f90032dbceeff5d1ce59eb95f3282edb640bb25737d",
+      "warnings": [
+        "No lap found for 16 Charles LECLERC. Please check if this is correct, e.g. DNS"
+      ],
+      "reduction_percent": 46.10006704677511
+    },
+    "sprint": {
+      "before": {
+        "total_s": {
+          "mean": 8.97160457839998,
+          "std": 0.10781924456379831,
+          "samples": [
+            9.141453979999937,
+            8.906689911999933,
+            8.903875527999958,
+            8.889135199000066,
+            9.016868273
+          ]
+        },
+        "parsing_s": {
+          "mean": 8.957851434199984,
+          "std": 0.1079572307764227,
+          "samples": [
+            9.1276191259999,
+            8.893455339999946,
+            8.888530872000047,
+            8.875810490000049,
+            9.003841342999976
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.013753144199995404,
+          "std": 0.0009380094898422044,
+          "samples": [
+            0.013834854000037922,
+            0.013234571999987566,
+            0.015344655999911083,
+            0.01332470900001681,
+            0.01302693000002364
+          ]
+        },
+        "peak_rss_bytes": 2065383424,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 2.714189206998981,
+          "text_and_ocr_preparation": 0.2113324180007794,
+          "search_and_ocr_preparation": 0.03331773100001101,
+          "rendering": 1.3750828539998565,
+          "render_cache_and_copy": 0.4345088000020496,
+          "line_detection": 1.190396611998267,
+          "connected_components": 0.35019175500065103,
+          "component_bounds": 0.043738954999980706,
+          "column_detection": 0.1495083119972378,
+          "white_strips": 0.33660021699949993,
+          "grey_rows": 0.10414340000113498,
+          "ocr_initialisation": 1.4477387690000114,
+          "ocr_inference": 2.31322790899992
+        },
+        "phase_calls": {
+          "native_extraction": 2703,
+          "text_and_ocr_preparation": 2703,
+          "search_and_ocr_preparation": 14,
+          "rendering": 37,
+          "render_cache_and_copy": 898,
+          "line_detection": 312,
+          "connected_components": 59,
+          "component_bounds": 59,
+          "column_detection": 59,
+          "white_strips": 113,
+          "grey_rows": 59,
+          "ocr_initialisation": 2,
+          "ocr_inference": 2
+        }
+      },
+      "after": {
+        "total_s": {
+          "mean": 4.9989604316000165,
+          "std": 0.11383414836115906,
+          "samples": [
+            5.041656625999849,
+            4.933771147000243,
+            5.175530738999896,
+            4.958754401000078,
+            4.885089245000017
+          ]
+        },
+        "parsing_s": {
+          "mean": 4.990105015999961,
+          "std": 0.11389360566615118,
+          "samples": [
+            5.0325685359998715,
+            4.924886617000084,
+            5.166842524000003,
+            4.950120131999938,
+            4.87610727099991
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.008855415600055493,
+          "std": 0.00019226538471931357,
+          "samples": [
+            0.009088089999977456,
+            0.00888453000015943,
+            0.008688214999892807,
+            0.008634269000140193,
+            0.008981974000107584
+          ]
+        },
+        "peak_rss_bytes": 1857384448,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 0.4610081010052909,
+          "text_and_ocr_preparation": 0.17217831799575833,
+          "search_and_ocr_preparation": 0.028711698999586588,
+          "rendering": 1.1843425509998724,
+          "render_cache_and_copy": 0.39219702500327003,
+          "line_detection": 1.0313150470008168,
+          "connected_components": 0.3074824190007348,
+          "component_bounds": 0.03845119700008581,
+          "column_detection": 0.1277167320006356,
+          "white_strips": 0.10217155199870831,
+          "grey_rows": 0.08348373799958608,
+          "ocr_initialisation": 6.4805311540001185,
+          "ocr_inference": 1.2037721480000982
+        },
+        "phase_calls": {
+          "native_extraction": 2529,
+          "text_and_ocr_preparation": 2529,
+          "search_and_ocr_preparation": 11,
+          "rendering": 33,
+          "render_cache_and_copy": 876,
+          "line_detection": 310,
+          "connected_components": 58,
+          "component_bounds": 58,
+          "column_detection": 58,
+          "white_strips": 111,
+          "grey_rows": 57,
+          "ocr_initialisation": 1,
+          "ocr_inference": 1
+        }
+      },
+      "inputs": {
+        "0.pdf": "4d8d3162f63aaeca1d786fa63f496ee02e97cbfc109bf714780e124b941261b5",
+        "1.pdf": "0fe02bc46b063db9e4ded3f8dbd012bbf54bbcbf11c448de9be48761fcc0ef79",
+        "2.pdf": "a142a239e82d4bed42e78aabcf32d629a9031d46300fc82bc7cdf5a30286c697",
+        "3.pdf": "5084939a1eefb9f3c97c1c3a0aabd8e1b84cf16fc4cdebe266f9b67fba79a333"
+      },
+      "output_sha256": "068f8123ef297e8ce315f8aa3d54af8011c8a6c5485492858530840d3fba3fe8",
+      "warnings": [],
+      "reduction_percent": 44.280196614599966
+    },
+    "ocr": {
+      "before": {
+        "total_s": {
+          "mean": 62.23828622319998,
+          "std": 0.8993459319951778,
+          "samples": [
+            60.77094339600001,
+            62.056662494999955,
+            63.05301374699991,
+            62.792248625999946,
+            62.51856285200006
+          ]
+        },
+        "parsing_s": {
+          "mean": 62.20008807360002,
+          "std": 0.8984403868287921,
+          "samples": [
+            60.73427278200006,
+            62.01927279000006,
+            63.01412031999996,
+            62.75461421099999,
+            62.47816026500004
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.03819814959995256,
+          "std": 0.0014703485380710083,
+          "samples": [
+            0.03667061399994509,
+            0.03738970499989591,
+            0.03889342699994813,
+            0.03763441499995679,
+            0.040402587000016865
+          ]
+        },
+        "peak_rss_bytes": 3075510272,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 16.33304710300206,
+          "text_and_ocr_preparation": 1.6135127309972859,
+          "rendering": 4.127054969999904,
+          "render_cache_and_copy": 1.2020276000033618,
+          "ocr_initialisation": 1.488507307998475,
+          "ocr_inference": 32.78525849699952,
+          "search_and_ocr_preparation": 0.1681865169998673,
+          "line_detection": 3.1039373890006345,
+          "connected_components": 0.6966841330000761,
+          "component_bounds": 0.09044258900007662,
+          "column_detection": 0.29894755399993755,
+          "white_strips": 0.6765737169981776,
+          "grey_rows": 0.32300816799886434
+        },
+        "phase_calls": {
+          "native_extraction": 9010,
+          "text_and_ocr_preparation": 9010,
+          "rendering": 104,
+          "render_cache_and_copy": 3587,
+          "ocr_initialisation": 308,
+          "ocr_inference": 308,
+          "search_and_ocr_preparation": 36,
+          "line_detection": 1160,
+          "connected_components": 116,
+          "component_bounds": 116,
+          "column_detection": 116,
+          "white_strips": 199,
+          "grey_rows": 114
+        }
+      },
+      "after": {
+        "total_s": {
+          "mean": 28.721118092200005,
+          "std": 0.5105267736521553,
+          "samples": [
+            27.917504237000003,
+            29.041026283000065,
+            29.195134388000042,
+            28.539314073000014,
+            28.912611479999896
+          ]
+        },
+        "parsing_s": {
+          "mean": 28.673336258000017,
+          "std": 0.4926647018485897,
+          "samples": [
+            27.88059804799991,
+            29.016589105000094,
+            29.064649293000002,
+            28.515607345000035,
+            28.889237499000046
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.047781834199986405,
+          "std": 0.04657906185979285,
+          "samples": [
+            0.03690618900009213,
+            0.024437177999971027,
+            0.13048509500004002,
+            0.023706727999979194,
+            0.023373980999849664
+          ]
+        },
+        "peak_rss_bytes": 2843348992,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 18,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 1.7643619300033606,
+          "text_and_ocr_preparation": 1.1467568460132043,
+          "rendering": 3.6994764660018973,
+          "render_cache_and_copy": 1.135964703994432,
+          "ocr_initialisation": 4.169174043998964,
+          "ocr_inference": 15.547321364000481,
+          "search_and_ocr_preparation": 0.1221635419985887,
+          "line_detection": 2.8491580940051335,
+          "connected_components": 0.6624566559994491,
+          "component_bounds": 0.08737465800163591,
+          "column_detection": 0.2745994490001067,
+          "white_strips": 0.2602659620004033,
+          "grey_rows": 0.310209804001488
+        },
+        "phase_calls": {
+          "native_extraction": 8834,
+          "text_and_ocr_preparation": 8834,
+          "rendering": 99,
+          "render_cache_and_copy": 3403,
+          "ocr_initialisation": 155,
+          "ocr_inference": 155,
+          "search_and_ocr_preparation": 33,
+          "line_detection": 1158,
+          "connected_components": 115,
+          "component_bounds": 115,
+          "column_detection": 115,
+          "white_strips": 197,
+          "grey_rows": 112
+        }
+      },
+      "inputs": {
+        "0.pdf": "b224419d42721123b0a47f77143b3d04017341dcf4085f3184d60ee510860648",
+        "1.pdf": "a733a4911268073ad37b074a10e914c6f37c57d5bbc1bf61f35dc4c540817cb7",
+        "2.pdf": "10a02aa408fa05162cf81a50ec4dd3fddba4faf9042652d605017468b55a7793",
+        "3.pdf": "acfaa450f7ff89391a0e04ee8dc78d84fb82df38aacccaedad4369d679a9d89f"
+      },
+      "output_sha256": "911dfd385311c2e42b0c774e667113fad3ffd91cf193acd519a1d3d47423d19c",
+      "warnings": [
+        "No lap found for 1 Max VERSTAPPEN. Please check if this is correct, e.g. DNS",
+        "No lap found for 12 Kimi ANTONELLI. Please check if this is correct, e.g. DNS",
+        "No lap found for 55 Carlos SAINZ. Please check if this is correct, e.g. DNS"
+      ],
+      "reduction_percent": 53.852974053302404
+    },
+    "entry_list": {
+      "before": {
+        "total_s": {
+          "mean": 0.25056682460008234,
+          "std": 0.004424119948954575,
+          "samples": [
+            0.24983793100022922,
+            0.24319377599999825,
+            0.25399999800015394,
+            0.2534982169997875,
+            0.25230420100024276
+          ]
+        },
+        "parsing_s": {
+          "mean": 0.2498264210000798,
+          "std": 0.004404712572871344,
+          "samples": [
+            0.2490958750001937,
+            0.24248776400008865,
+            0.2532489280001755,
+            0.25274430299987216,
+            0.25155523500006893
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.0007404036000025372,
+          "std": 1.971757004401848e-05,
+          "samples": [
+            0.0007420560000355181,
+            0.000706011999909606,
+            0.0007510699999784265,
+            0.0007539139999153122,
+            0.000748966000173823
+          ]
+        },
+        "peak_rss_bytes": 593502208,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 3,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 0.05864649499812913,
+          "text_and_ocr_preparation": 0.0026204650039289845,
+          "rendering": 0.05627904300013142,
+          "render_cache_and_copy": 0.0201558290000321,
+          "line_detection": 0.05516716399961297,
+          "white_strips": 0.02180923699984305,
+          "connected_components": 0.027313847999948848,
+          "component_bounds": 0.0036150480000287644,
+          "column_detection": 0.011538786000073742
+        },
+        "phase_calls": {
+          "native_extraction": 141,
+          "text_and_ocr_preparation": 141,
+          "rendering": 2,
+          "render_cache_and_copy": 9,
+          "line_detection": 5,
+          "white_strips": 3,
+          "connected_components": 1,
+          "component_bounds": 1,
+          "column_detection": 1
+        },
+        "cold_import_s": {
+          "mean": 4.030540194199967,
+          "std": 0.35853742712856546,
+          "samples": [
+            4.3152998629998365,
+            3.734819407000032,
+            3.975857903999895,
+            3.6507405150000523,
+            4.475983282000016
+          ]
+        },
+        "cold_total_s": {
+          "mean": 4.302290296199999,
+          "std": 0.3538049163130581,
+          "samples": [
+            4.586470282999926,
+            4.010475363000069,
+            4.248349569999846,
+            3.9268810920000305,
+            4.739275173000124
+          ]
+        }
+      },
+      "after": {
+        "total_s": {
+          "mean": 0.2089185203999932,
+          "std": 0.024813946896332716,
+          "samples": [
+            0.19483996500002831,
+            0.2080021219999253,
+            0.25211279799987096,
+            0.19533644200009803,
+            0.19430127500004346
+          ]
+        },
+        "parsing_s": {
+          "mean": 0.2082556869999735,
+          "std": 0.02481578492419118,
+          "samples": [
+            0.19415873000002648,
+            0.20732890899989798,
+            0.2514551389999724,
+            0.19470701499994902,
+            0.1936286420000215
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.0006628334000197356,
+          "std": 2.0525283843099325e-05,
+          "samples": [
+            0.0006812350000018341,
+            0.0006732130000273173,
+            0.0006576589998985582,
+            0.0006294270001490077,
+            0.0006726330000219605
+          ]
+        },
+        "peak_rss_bytes": 463712256,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 3,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "native_extraction": 0.018522355001096003,
+          "text_and_ocr_preparation": 0.002166636998708782,
+          "rendering": 0.055231831000128295,
+          "render_cache_and_copy": 0.01967296699945109,
+          "line_detection": 0.05525402500052223,
+          "white_strips": 0.007065924000244195,
+          "connected_components": 0.026670182999851022,
+          "component_bounds": 0.0035004469998511922,
+          "column_detection": 0.011271042000544185
+        },
+        "phase_calls": {
+          "native_extraction": 141,
+          "text_and_ocr_preparation": 141,
+          "rendering": 2,
+          "render_cache_and_copy": 8,
+          "line_detection": 4,
+          "white_strips": 3,
+          "connected_components": 1,
+          "component_bounds": 1,
+          "column_detection": 1
+        },
+        "cold_import_s": {
+          "mean": 0.5628067256000122,
+          "std": 0.013095568047813958,
+          "samples": [
+            0.5597563310000169,
+            0.551701568999988,
+            0.5847076179998112,
+            0.5636085580001691,
+            0.5542595520000759
+          ]
+        },
+        "cold_total_s": {
+          "mean": 0.7676409655999124,
+          "std": 0.012843500228326143,
+          "samples": [
+            0.7616211679999196,
+            0.7531172309998055,
+            0.7879538399997728,
+            0.767702933999999,
+            0.7678096550000646
+          ]
+        }
+      },
+      "inputs": {
+        "0.pdf": "567f0cf78e882b70a18936a1aca157935f796c2013d0d3dbf1b6345e9f0f1e31"
+      },
+      "output_sha256": "3361fee1a50bec8a45a15d97ab4f7ed98def9d579f1330e51739cc9b08edef70",
+      "warnings": [],
+      "reduction_percent": 16.62163547251796
+    },
+    "pit_stop": {
+      "before": {
+        "total_s": {
+          "mean": 3.8875372602000424,
+          "std": 0.04989523158812161,
+          "samples": [
+            3.8324335820000215,
+            3.895033087999991,
+            3.9080027830002564,
+            3.9562371059998895,
+            3.845979742000054
+          ]
+        },
+        "parsing_s": {
+          "mean": 3.8827599396000094,
+          "std": 0.04993644401333171,
+          "samples": [
+            3.827538140999877,
+            3.890367015000038,
+            3.9031542160000754,
+            3.9515103310000086,
+            3.841229995000049
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.004777320600032909,
+          "std": 9.316607227589224e-05,
+          "samples": [
+            0.004895441000144274,
+            0.00466607299995303,
+            0.004848567000180992,
+            0.004726774999880945,
+            0.0047497470000053
+          ]
+        },
+        "peak_rss_bytes": 926584832,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 3,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "search_and_ocr_preparation": 0.008391508000158865,
+          "rendering": 0.19183608200023627,
+          "render_cache_and_copy": 0.05668561499965108,
+          "line_detection": 0.26228755599981923,
+          "white_strips": 0.034018769999875076,
+          "connected_components": 1.7777570480000122,
+          "component_bounds": 0.2316397939998751,
+          "native_extraction": 0.5513948199991319,
+          "text_and_ocr_preparation": 0.00833857699831242,
+          "column_detection": 0.7643696920008551,
+          "grey_rows": 0.06034137200003897
+        },
+        "phase_calls": {
+          "search_and_ocr_preparation": 3,
+          "rendering": 6,
+          "render_cache_and_copy": 18,
+          "line_detection": 3,
+          "white_strips": 6,
+          "connected_components": 6,
+          "component_bounds": 6,
+          "native_extraction": 531,
+          "text_and_ocr_preparation": 531,
+          "column_detection": 6,
+          "grey_rows": 3
+        },
+        "cold_import_s": {
+          "mean": 4.036943483599998,
+          "std": 0.44961509175270625,
+          "samples": [
+            3.9813231529999484,
+            3.5752771009999833,
+            4.671289430999877,
+            4.2810185920000094,
+            3.6758091410001725
+          ]
+        },
+        "cold_total_s": {
+          "mean": 7.882664744600061,
+          "std": 0.43138548063918103,
+          "samples": [
+            7.814616379999961,
+            7.465146847000142,
+            8.486759077999977,
+            8.134421240000165,
+            7.512380178000058
+          ]
+        }
+      },
+      "after": {
+        "total_s": {
+          "mean": 3.3783769978000238,
+          "std": 0.023797362217063942,
+          "samples": [
+            3.3551026750001256,
+            3.39738148299989,
+            3.3534425459999966,
+            3.4055135169999176,
+            3.3804447680001886
+          ]
+        },
+        "parsing_s": {
+          "mean": 3.373581868400015,
+          "std": 0.02374734441288382,
+          "samples": [
+            3.350239884000075,
+            3.392393889999994,
+            3.3488194009999006,
+            3.4007740399999875,
+            3.3756821270001183
+          ]
+        },
+        "serialisation_s": {
+          "mean": 0.004795129400008591,
+          "std": 0.00013725127411090335,
+          "samples": [
+            0.004862791000050493,
+            0.004987592999896151,
+            0.004623145000095974,
+            0.004739476999930048,
+            0.004762641000070289
+          ]
+        },
+        "peak_rss_bytes": 798867456,
+        "environment": {
+          "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+          "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+          "cpu": "",
+          "logical_cpus": 4,
+          "threads": 3,
+          "dependencies": {
+            "pymupdf": "1.26.0",
+            "numpy": "2.3.2",
+            "scipy": "1.16.1",
+            "pandas": "3.0.3",
+            "paddleocr": "3.2.0",
+            "paddlex": "3.2.0",
+            "paddlepaddle": "3.2.0",
+            "paddlepaddle-gpu": null,
+            "psutil": "7.2.2"
+          },
+          "thread_environment": {
+            "OMP_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "CUDA_VISIBLE_DEVICES": "-1"
+          }
+        },
+        "phases_s": {
+          "search_and_ocr_preparation": 0.008394810999789115,
+          "rendering": 0.19354715600024974,
+          "render_cache_and_copy": 0.05556979799939654,
+          "line_detection": 0.2525590610000563,
+          "white_strips": 0.013401657000258638,
+          "connected_components": 1.6991011470004196,
+          "component_bounds": 0.22227662100044654,
+          "native_extraction": 0.10996674899706704,
+          "text_and_ocr_preparation": 0.0068834010060072615,
+          "column_detection": 0.7114263649984878,
+          "grey_rows": 0.05799409199994443
+        },
+        "phase_calls": {
+          "search_and_ocr_preparation": 3,
+          "rendering": 6,
+          "render_cache_and_copy": 18,
+          "line_detection": 3,
+          "white_strips": 6,
+          "connected_components": 6,
+          "component_bounds": 6,
+          "native_extraction": 531,
+          "text_and_ocr_preparation": 531,
+          "column_detection": 6,
+          "grey_rows": 3
+        },
+        "cold_import_s": {
+          "mean": 0.5842976583999644,
+          "std": 0.027418143904017936,
+          "samples": [
+            0.5606652389999454,
+            0.6126439619999928,
+            0.5555955509998967,
+            0.5799595029998272,
+            0.6126240370001597
+          ]
+        },
+        "cold_total_s": {
+          "mean": 4.00486707240002,
+          "std": 0.03614933919086616,
+          "samples": [
+            3.9799601230001826,
+            4.013710887000116,
+            4.052213553999991,
+            3.9592461019997245,
+            4.019204696000088
+          ]
+        }
+      },
+      "inputs": {
+        "0.pdf": "1af735d649dcab800f93ca7db424e6311dcbf1c07ba7e88788d8e70699144eff"
+      },
+      "output_sha256": "79d14bdf5c357346f3ab16671b73dab221865dac358b51cae76c0b1905b80aa6",
+      "warnings": [],
+      "reduction_percent": 13.09724456181337
+    }
+  },
+  "local": {
+    "practice": {
+      "before_s": {
+        "mean": 6.418764748599972,
+        "std": 0.19233772400952331,
+        "samples": [
+          6.638070362000008,
+          6.60832901699996,
+          6.222272713999985,
+          6.2752640189999624,
+          6.349887630999945
+        ]
+      },
+      "after_s": {
+        "mean": 2.7964162094000016,
+        "std": 0.019310730492881015,
+        "samples": [
+          2.8012257539999723,
+          2.7974795460000337,
+          2.8067372230000274,
+          2.763522988000034,
+          2.813115535999941
+        ]
+      },
+      "before_peak_mib": 1577.91796875,
+      "after_peak_mib": 1449.12890625,
+      "before_phases_s": {
+        "native_extraction": 3.665948595000259,
+        "text_and_ocr_preparation": 0.2014287219990365,
+        "rendering": 0.688253067999824,
+        "render_cache_and_copy": 0.3434994870002015,
+        "line_detection": 0.700757353000256,
+        "connected_components": 0.14884725799976195,
+        "component_bounds": 0.019595642999888696,
+        "column_detection": 0.06400210100059667,
+        "white_strips": 0.3073270399998478,
+        "grey_rows": 0.05012401199985561,
+        "ocr_initialisation": 1.4231110729999727,
+        "ocr_inference": 0.4295947709999268
+      },
+      "after_phases_s": {
+        "native_extraction": 0.34709590299945603,
+        "text_and_ocr_preparation": 0.16800493499886215,
+        "search_and_ocr_preparation": 0.04183279399995854,
+        "rendering": 0.6922442210000668,
+        "render_cache_and_copy": 0.34303924500028415,
+        "line_detection": 0.6638896930008968,
+        "connected_components": 0.15185617000020102,
+        "component_bounds": 0.019453754999915418,
+        "column_detection": 0.06305552400021952,
+        "white_strips": 0.06155194600074765,
+        "grey_rows": 0.04909215799960975,
+        "ocr_initialisation": 6.364971553999965,
+        "ocr_inference": 0.4277941310000415
+      },
+      "before_calls": {
+        "native_extraction": 1781,
+        "text_and_ocr_preparation": 1781,
+        "rendering": 19,
+        "render_cache_and_copy": 1093,
+        "line_detection": 493,
+        "connected_components": 45,
+        "component_bounds": 45,
+        "column_detection": 45,
+        "white_strips": 99,
+        "grey_rows": 45,
+        "ocr_initialisation": 5,
+        "ocr_inference": 5
+      },
+      "after_calls": {
+        "native_extraction": 1781,
+        "text_and_ocr_preparation": 1781,
+        "search_and_ocr_preparation": 5,
+        "rendering": 19,
+        "render_cache_and_copy": 1093,
+        "line_detection": 493,
+        "connected_components": 45,
+        "component_bounds": 45,
+        "column_detection": 45,
+        "white_strips": 99,
+        "grey_rows": 45,
+        "ocr_initialisation": 5,
+        "ocr_inference": 5
+      },
+      "environment": {
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+        "cpu": "x86_64",
+        "logical_cpus": 16,
+        "threads": 29,
+        "dependencies": {
+          "pymupdf": "1.26.0",
+          "numpy": "2.3.2",
+          "scipy": "1.16.1",
+          "pandas": "3.0.3",
+          "paddleocr": "3.2.0",
+          "paddlex": "3.2.0",
+          "paddlepaddle": "3.2.0",
+          "paddlepaddle-gpu": null,
+          "psutil": "7.2.2"
+        },
+        "thread_environment": {
+          "OMP_NUM_THREADS": "2",
+          "OPENBLAS_NUM_THREADS": "2",
+          "MKL_NUM_THREADS": "2",
+          "CUDA_VISIBLE_DEVICES": "-1"
+        }
+      },
+      "inputs": {
+        "0.pdf": "349153e7b44f6493cbace21ce0515fd32e01cd5622cc0716f404197ceba584c7",
+        "1.pdf": "82fec36816dbbed999787ba98ac88efd13a69180ad510b29cd96002b8e77f873"
+      }
+    },
+    "qualifying": {
+      "before_s": {
+        "mean": 22.80907914239997,
+        "std": 0.2148172855208243,
+        "samples": [
+          22.721011427999883,
+          22.750528015999976,
+          22.685966229999963,
+          22.69709758700003,
+          23.190792450999993
+        ]
+      },
+      "after_s": {
+        "mean": 13.773860819200001,
+        "std": 0.16532461610033317,
+        "samples": [
+          13.834823374000052,
+          13.76743561099994,
+          14.012362254999971,
+          13.680971641000042,
+          13.573711215000003
+        ]
+      },
+      "before_peak_mib": 5404.64453125,
+      "after_peak_mib": 5250.734375,
+      "before_phases_s": {
+        "native_extraction": 9.35543815100118,
+        "text_and_ocr_preparation": 0.3340562989997693,
+        "rendering": 1.5226733730001456,
+        "render_cache_and_copy": 0.5125948910007878,
+        "line_detection": 1.0148485449993814,
+        "connected_components": 0.24774387100006834,
+        "component_bounds": 0.034526907999975265,
+        "column_detection": 0.10597975500024859,
+        "white_strips": 0.3592850639998346,
+        "grey_rows": 0.1262145409995128,
+        "ocr_initialisation": 1.4185994289999826,
+        "ocr_inference": 9.438656225999978
+      },
+      "after_phases_s": {
+        "native_extraction": 0.8026309819980497,
+        "text_and_ocr_preparation": 0.2802275310050959,
+        "search_and_ocr_preparation": 0.12428778299982923,
+        "rendering": 1.3198726210000586,
+        "render_cache_and_copy": 0.5037462450016505,
+        "line_detection": 0.9624043719985025,
+        "connected_components": 0.24936397100009344,
+        "component_bounds": 0.03357529200013687,
+        "column_detection": 0.1044989349997536,
+        "white_strips": 0.09405279200012728,
+        "grey_rows": 0.13221200200013072,
+        "ocr_initialisation": 4.718651677000025,
+        "ocr_inference": 9.321188580000012
+      },
+      "before_calls": {
+        "native_extraction": 3867,
+        "text_and_ocr_preparation": 3867,
+        "rendering": 34,
+        "render_cache_and_copy": 1518,
+        "line_detection": 992,
+        "connected_components": 24,
+        "component_bounds": 24,
+        "column_detection": 24,
+        "white_strips": 54,
+        "grey_rows": 23,
+        "ocr_initialisation": 4,
+        "ocr_inference": 4
+      },
+      "after_calls": {
+        "native_extraction": 3867,
+        "text_and_ocr_preparation": 3867,
+        "search_and_ocr_preparation": 14,
+        "rendering": 34,
+        "render_cache_and_copy": 1518,
+        "line_detection": 992,
+        "connected_components": 24,
+        "component_bounds": 24,
+        "column_detection": 24,
+        "white_strips": 54,
+        "grey_rows": 23,
+        "ocr_initialisation": 4,
+        "ocr_inference": 4
+      },
+      "environment": {
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+        "cpu": "x86_64",
+        "logical_cpus": 16,
+        "threads": 30,
+        "dependencies": {
+          "pymupdf": "1.26.0",
+          "numpy": "2.3.2",
+          "scipy": "1.16.1",
+          "pandas": "3.0.3",
+          "paddleocr": "3.2.0",
+          "paddlex": "3.2.0",
+          "paddlepaddle": "3.2.0",
+          "paddlepaddle-gpu": null,
+          "psutil": "7.2.2"
+        },
+        "thread_environment": {
+          "OMP_NUM_THREADS": "2",
+          "OPENBLAS_NUM_THREADS": "2",
+          "MKL_NUM_THREADS": "2",
+          "CUDA_VISIBLE_DEVICES": "-1"
+        }
+      },
+      "inputs": {
+        "0.pdf": "bcee017315239a87fc53b369f44289ab16380465ce4999047d64b5c45d9cdd41",
+        "2.pdf": "31a35ecc09913bc32908be8e1cce7d2fe577c980756be1f4085af56baee83101"
+      }
+    },
+    "race": {
+      "before_s": {
+        "mean": 29.20452907899994,
+        "std": 0.10865682139301334,
+        "samples": [
+          29.130374528999937,
+          29.101263454999867,
+          29.35816634799994,
+          29.156523497999956,
+          29.276317565
+        ]
+      },
+      "after_s": {
+        "mean": 10.376795158599975,
+        "std": 0.09670607197893927,
+        "samples": [
+          10.54766779800002,
+          10.316931705000002,
+          10.357639357999915,
+          10.326302363999957,
+          10.335434567999982
+        ]
+      },
+      "before_peak_mib": 2275.03515625,
+      "after_peak_mib": 1900.765625,
+      "before_phases_s": {
+        "native_extraction": 18.946101953999914,
+        "text_and_ocr_preparation": 0.6744557139984408,
+        "rendering": 3.107596408999939,
+        "render_cache_and_copy": 1.1433417739995093,
+        "line_detection": 2.3034460710016447,
+        "connected_components": 0.46913772199945925,
+        "component_bounds": 0.061058029999458086,
+        "column_detection": 0.20121986700064554,
+        "white_strips": 0.5335408090002147,
+        "grey_rows": 0.21747587900028975,
+        "ocr_initialisation": 1.358341482000128,
+        "ocr_inference": 1.2489917560000094
+      },
+      "after_phases_s": {
+        "native_extraction": 1.6150816799934091,
+        "text_and_ocr_preparation": 0.5549773679985037,
+        "search_and_ocr_preparation": 0.19015913999999157,
+        "rendering": 2.868084821999787,
+        "render_cache_and_copy": 0.9643485300011889,
+        "line_detection": 2.200583427000197,
+        "connected_components": 0.4718859969998448,
+        "component_bounds": 0.06037086100002398,
+        "column_detection": 0.19576818600057777,
+        "white_strips": 0.1655004099989128,
+        "grey_rows": 0.2075778570009561,
+        "ocr_initialisation": 4.694585354999958,
+        "ocr_inference": 0.833148658000141
+      },
+      "before_calls": {
+        "native_extraction": 8262,
+        "text_and_ocr_preparation": 8262,
+        "rendering": 89,
+        "render_cache_and_copy": 2757,
+        "line_detection": 1085,
+        "connected_components": 101,
+        "component_bounds": 101,
+        "column_detection": 101,
+        "white_strips": 186,
+        "grey_rows": 101,
+        "ocr_initialisation": 7,
+        "ocr_inference": 7
+      },
+      "after_calls": {
+        "native_extraction": 8072,
+        "text_and_ocr_preparation": 8072,
+        "search_and_ocr_preparation": 31,
+        "rendering": 85,
+        "render_cache_and_copy": 2731,
+        "line_detection": 1083,
+        "connected_components": 100,
+        "component_bounds": 100,
+        "column_detection": 100,
+        "white_strips": 184,
+        "grey_rows": 99,
+        "ocr_initialisation": 6,
+        "ocr_inference": 6
+      },
+      "environment": {
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+        "cpu": "x86_64",
+        "logical_cpus": 16,
+        "threads": 30,
+        "dependencies": {
+          "pymupdf": "1.26.0",
+          "numpy": "2.3.2",
+          "scipy": "1.16.1",
+          "pandas": "3.0.3",
+          "paddleocr": "3.2.0",
+          "paddlex": "3.2.0",
+          "paddlepaddle": "3.2.0",
+          "paddlepaddle-gpu": null,
+          "psutil": "7.2.2"
+        },
+        "thread_environment": {
+          "OMP_NUM_THREADS": "2",
+          "OPENBLAS_NUM_THREADS": "2",
+          "MKL_NUM_THREADS": "2",
+          "CUDA_VISIBLE_DEVICES": "-1"
+        }
+      },
+      "inputs": {
+        "0.pdf": "c0b983a54efb8ffc8573214080195f12f1347528fcefcf51abd2ac6bff9f6fe2",
+        "1.pdf": "54b7c5aea0b25350d5a2d080eed57e4921d16957c8a02d32587fc300a3559495",
+        "2.pdf": "1c8e85b5f657fe0c6dd351de3638decfff0e4537e8e88628f6684556be470e59",
+        "3.pdf": "2720cd7b0e3086c9890c7d1948d95ac2e7109080fc6825c418cfea2405fcfa84"
+      }
+    },
+    "sprint": {
+      "before_s": {
+        "mean": 11.300057060599965,
+        "std": 0.05682322724268372,
+        "samples": [
+          11.275335314999893,
+          11.275193013999797,
+          11.383310609000091,
+          11.23746174200005,
+          11.328984622999997
+        ]
+      },
+      "after_s": {
+        "mean": 4.120491037400006,
+        "std": 0.04359344561148096,
+        "samples": [
+          4.122927518999973,
+          4.169702010000037,
+          4.10568008000007,
+          4.055833901000028,
+          4.148311676999924
+        ]
+      },
+      "before_peak_mib": 1960.140625,
+      "after_peak_mib": 1633.3984375,
+      "before_phases_s": {
+        "native_extraction": 6.602600804001668,
+        "text_and_ocr_preparation": 0.1971525659996587,
+        "rendering": 1.3512294779998228,
+        "render_cache_and_copy": 0.4649511650020486,
+        "line_detection": 0.9433399109989296,
+        "connected_components": 0.2676540469999509,
+        "component_bounds": 0.03515057900017382,
+        "column_detection": 0.11576850299888974,
+        "white_strips": 0.3721323709985427,
+        "grey_rows": 0.07748972800004594,
+        "ocr_initialisation": 1.3704412029999276,
+        "ocr_inference": 0.9217087060001177
+      },
+      "after_phases_s": {
+        "native_extraction": 0.4864184410029111,
+        "text_and_ocr_preparation": 0.14945815899545778,
+        "search_and_ocr_preparation": 0.1348687240002846,
+        "rendering": 1.0954036760000463,
+        "render_cache_and_copy": 0.4594057960018745,
+        "line_detection": 0.8320023990002028,
+        "connected_components": 0.24578225699985978,
+        "component_bounds": 0.03178189699997347,
+        "column_detection": 0.10657477400025073,
+        "white_strips": 0.07041352599844686,
+        "grey_rows": 0.06521377499996106,
+        "ocr_initialisation": 4.585759767000013,
+        "ocr_inference": 0.5597176850000096
+      },
+      "before_calls": {
+        "native_extraction": 2703,
+        "text_and_ocr_preparation": 2703,
+        "rendering": 37,
+        "render_cache_and_copy": 898,
+        "line_detection": 312,
+        "connected_components": 59,
+        "component_bounds": 59,
+        "column_detection": 59,
+        "white_strips": 113,
+        "grey_rows": 59,
+        "ocr_initialisation": 2,
+        "ocr_inference": 2
+      },
+      "after_calls": {
+        "native_extraction": 2529,
+        "text_and_ocr_preparation": 2529,
+        "search_and_ocr_preparation": 11,
+        "rendering": 33,
+        "render_cache_and_copy": 876,
+        "line_detection": 310,
+        "connected_components": 58,
+        "component_bounds": 58,
+        "column_detection": 58,
+        "white_strips": 111,
+        "grey_rows": 57,
+        "ocr_initialisation": 1,
+        "ocr_inference": 1
+      },
+      "environment": {
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+        "cpu": "x86_64",
+        "logical_cpus": 16,
+        "threads": 30,
+        "dependencies": {
+          "pymupdf": "1.26.0",
+          "numpy": "2.3.2",
+          "scipy": "1.16.1",
+          "pandas": "3.0.3",
+          "paddleocr": "3.2.0",
+          "paddlex": "3.2.0",
+          "paddlepaddle": "3.2.0",
+          "paddlepaddle-gpu": null,
+          "psutil": "7.2.2"
+        },
+        "thread_environment": {
+          "OMP_NUM_THREADS": "2",
+          "OPENBLAS_NUM_THREADS": "2",
+          "MKL_NUM_THREADS": "2",
+          "CUDA_VISIBLE_DEVICES": "-1"
+        }
+      },
+      "inputs": {
+        "0.pdf": "4d8d3162f63aaeca1d786fa63f496ee02e97cbfc109bf714780e124b941261b5",
+        "1.pdf": "0fe02bc46b063db9e4ded3f8dbd012bbf54bbcbf11c448de9be48761fcc0ef79",
+        "2.pdf": "a142a239e82d4bed42e78aabcf32d629a9031d46300fc82bc7cdf5a30286c697",
+        "3.pdf": "5084939a1eefb9f3c97c1c3a0aabd8e1b84cf16fc4cdebe266f9b67fba79a333"
+      }
+    },
+    "ocr": {
+      "before_s": {
+        "mean": 60.4816683728,
+        "std": 0.3106907344466659,
+        "samples": [
+          60.6629665490002,
+          60.708482899000046,
+          60.655396642999904,
+          59.96452885400004,
+          60.41696691899983
+        ]
+      },
+      "after_s": {
+        "mean": 21.479853684399995,
+        "std": 0.10946067726453873,
+        "samples": [
+          21.64610646099993,
+          21.42764623200003,
+          21.389876706999985,
+          21.400086740000006,
+          21.535552282000026
+        ]
+      },
+      "before_peak_mib": 2897.765625,
+      "after_peak_mib": 2463.60546875,
+      "before_phases_s": {
+        "native_extraction": 29.135117961993046,
+        "text_and_ocr_preparation": 1.380905037003231,
+        "rendering": 3.9450668669987863,
+        "render_cache_and_copy": 1.4050209210008688,
+        "ocr_initialisation": 1.3983735520007485,
+        "ocr_inference": 19.39102377299946,
+        "line_detection": 2.5363730599985956,
+        "connected_components": 0.559506945000976,
+        "component_bounds": 0.07366606400000819,
+        "column_detection": 0.2431963189999351,
+        "white_strips": 0.6856960250031534,
+        "grey_rows": 0.240036764995466
+      },
+      "after_phases_s": {
+        "native_extraction": 1.640870421999125,
+        "text_and_ocr_preparation": 0.9806090090030466,
+        "rendering": 3.489202827999634,
+        "render_cache_and_copy": 1.2228779150013906,
+        "ocr_initialisation": 4.7736135580003065,
+        "ocr_inference": 9.679569081999944,
+        "search_and_ocr_preparation": 0.26851366499965934,
+        "line_detection": 2.373807883000268,
+        "connected_components": 0.5512326239999084,
+        "component_bounds": 0.07439956699965933,
+        "column_detection": 0.23423171799970532,
+        "white_strips": 0.17572545799987438,
+        "grey_rows": 0.23204010899905825
+      },
+      "before_calls": {
+        "native_extraction": 9010,
+        "text_and_ocr_preparation": 9010,
+        "rendering": 104,
+        "render_cache_and_copy": 3587,
+        "ocr_initialisation": 308,
+        "ocr_inference": 308,
+        "line_detection": 1160,
+        "connected_components": 116,
+        "component_bounds": 116,
+        "column_detection": 116,
+        "white_strips": 199,
+        "grey_rows": 114
+      },
+      "after_calls": {
+        "native_extraction": 8834,
+        "text_and_ocr_preparation": 8834,
+        "rendering": 99,
+        "render_cache_and_copy": 3403,
+        "ocr_initialisation": 155,
+        "ocr_inference": 155,
+        "search_and_ocr_preparation": 33,
+        "line_detection": 1158,
+        "connected_components": 115,
+        "component_bounds": 115,
+        "column_detection": 115,
+        "white_strips": 197,
+        "grey_rows": 112
+      },
+      "environment": {
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+        "cpu": "x86_64",
+        "logical_cpus": 16,
+        "threads": 30,
+        "dependencies": {
+          "pymupdf": "1.26.0",
+          "numpy": "2.3.2",
+          "scipy": "1.16.1",
+          "pandas": "3.0.3",
+          "paddleocr": "3.2.0",
+          "paddlex": "3.2.0",
+          "paddlepaddle": "3.2.0",
+          "paddlepaddle-gpu": null,
+          "psutil": "7.2.2"
+        },
+        "thread_environment": {
+          "OMP_NUM_THREADS": "2",
+          "OPENBLAS_NUM_THREADS": "2",
+          "MKL_NUM_THREADS": "2",
+          "CUDA_VISIBLE_DEVICES": "-1"
+        }
+      },
+      "inputs": {
+        "0.pdf": "b224419d42721123b0a47f77143b3d04017341dcf4085f3184d60ee510860648",
+        "1.pdf": "a733a4911268073ad37b074a10e914c6f37c57d5bbc1bf61f35dc4c540817cb7",
+        "2.pdf": "10a02aa408fa05162cf81a50ec4dd3fddba4faf9042652d605017468b55a7793",
+        "3.pdf": "acfaa450f7ff89391a0e04ee8dc78d84fb82df38aacccaedad4369d679a9d89f"
+      }
+    }
+  },
+  "local_startup": {
+    "before": {
+      "import_s": {
+        "mean": 3.9663819295999927,
+        "std": 0.33629173460570205,
+        "samples": [
+          4.47170654699994,
+          3.9489912660000073,
+          4.040660688000003,
+          3.814027696000039,
+          3.5565234509999755
+        ]
+      },
+      "peak_mib": {
+        "mean": 216.13828125,
+        "std": 0.7023248485359846,
+        "samples": [
+          217.390625,
+          215.86328125,
+          215.890625,
+          215.80078125,
+          215.74609375
+        ]
+      }
+    },
+    "after": {
+      "import_s": {
+        "mean": 0.5983143631999838,
+        "std": 0.00769156368490862,
+        "samples": [
+          0.5919812500000035,
+          0.6001765969999724,
+          0.5886582669999143,
+          0.6055165169999555,
+          0.6052391850000731
+        ]
+      },
+      "peak_mib": {
+        "mean": 160.8484375,
+        "std": 0.1103956286463316,
+        "samples": [
+          160.859375,
+          160.671875,
+          160.90234375,
+          160.96875,
+          160.83984375
+        ]
+      }
+    }
+  },
+  "gpu_diagnostic_paddle_version": "3.1.1",
+  "gpu_diagnostic": {
+    "cpu": {
+      "import_s": {
+        "mean": 3.4700935960000026,
+        "std": 0.7860997963830061,
+        "samples": [
+          4.788174703000003,
+          3.030285507000002,
+          3.375278946999998,
+          3.413885851999993,
+          2.742842971000016
+        ]
+      },
+      "initialisation_s": {
+        "mean": 1.5412102090000004,
+        "std": 0.08483508535588158,
+        "samples": [
+          1.6843758369999975,
+          1.4742326220000024,
+          1.542378210999999,
+          1.5226844790000058,
+          1.4823798959999976
+        ]
+      },
+      "inference_s": [
+        {
+          "mean": 0.04081508983999924,
+          "std": 0.0005707230342678866,
+          "samples": [
+            0.04007886660000111,
+            0.04077542320000305,
+            0.04166241859999502,
+            0.040918624200000406,
+            0.04064011659999665
+          ]
+        },
+        {
+          "mean": 3.1489657682400005,
+          "std": 0.06848982524179112,
+          "samples": [
+            3.2097876598000012,
+            3.2188345478000002,
+            3.1597469024000047,
+            3.0727935479999955,
+            3.0836661832000005
+          ]
+        }
+      ]
+    },
+    "gpu": {
+      "import_s": {
+        "mean": 3.313132577800002,
+        "std": 0.2869452969009585,
+        "samples": [
+          3.4001889840000104,
+          3.328365722000001,
+          3.738436773000018,
+          3.022148313999992,
+          3.0765230959999883
+        ]
+      },
+      "initialisation_s": {
+        "mean": 2.684969017200001,
+        "std": 0.6738184551474568,
+        "samples": [
+          3.848431626000007,
+          2.685750568000003,
+          2.338467086999998,
+          2.3395983929999886,
+          2.212597412000008
+        ]
+      },
+      "inference_s": [
+        {
+          "mean": 0.013395568479999157,
+          "std": 0.0004201774073286273,
+          "samples": [
+            0.014110440400008884,
+            0.01310130119999826,
+            0.013164004599991586,
+            0.013164902799996981,
+            0.01343719340000007
+          ]
+        },
+        {
+          "mean": 0.8200849646400025,
+          "std": 0.029562543626347092,
+          "samples": [
+            0.8623153640000112,
+            0.8131743959999994,
+            0.8108316794000018,
+            0.8319440368000016,
+            0.7821593469999982
+          ]
+        }
+      ]
+    },
+    "equivalence": [
+      {
+        "sha256": "6eb012b9275278b5c118ceb834542147bc30feb4547eef9172e5982a39a78827",
+        "shape": [
+          83,
+          417,
+          3
+        ],
+        "texts_equal": true,
+        "boxes_equal": true,
+        "cpu_text_count": 1,
+        "gpu_text_count": 1
+      },
+      {
+        "sha256": "e4678d55a20c0d56923bf696cce4c4d55454e8a21e391feff7f792b9ac5f9a3d",
+        "shape": [
+          1667,
+          2250,
+          3
+        ],
+        "texts_equal": true,
+        "boxes_equal": true,
+        "cpu_text_count": 219,
+        "gpu_text_count": 219
+      }
+    ]
+  },
+  "independent": {
+    "native_only_s": {
+      "practice": {
+        "mean": 3.0616111086,
+        "std": 0.32680903553555984,
+        "samples": [
+          2.9939813239999964,
+          3.5946931560000053,
+          2.809844577000007,
+          2.793137268999999,
+          3.1163992169999943
+        ]
+      },
+      "qualifying": {
+        "mean": 14.684644997799996,
+        "std": 0.6618922714836292,
+        "samples": [
+          14.927423687000001,
+          14.049855993999998,
+          15.519393044999987,
+          13.965433639999986,
+          14.961118623000004
+        ]
+      },
+      "race": {
+        "mean": 11.561778434399997,
+        "std": 0.1538310952680141,
+        "samples": [
+          11.706386925999993,
+          11.71106198199999,
+          11.340883716000008,
+          11.525123218000004,
+          11.525436329999991
+        ]
+      },
+      "sprint": {
+        "mean": 5.201514226199981,
+        "std": 0.03632460599316173,
+        "samples": [
+          5.198480216000007,
+          5.174751021999981,
+          5.211058070999968,
+          5.165509309999976,
+          5.257772511999974
+        ]
+      },
+      "ocr": {
+        "mean": 31.488678851600003,
+        "std": 0.3797158235122634,
+        "samples": [
+          31.254487852000068,
+          31.182607404999942,
+          31.232885684999985,
+          31.735166468000045,
+          32.03824684799997
+        ]
+      }
+    },
+    "without_classification_reuse_s": {
+      "mean": 32.0585135408,
+      "std": 0.2660139540180887,
+      "samples": [
+        31.725612270999996,
+        31.97363729,
+        31.999968139000003,
+        32.451847703,
+        32.141502301
+      ]
+    },
+    "white_strips_s": {
+      "before": [
+        0.0033187524499993515,
+        0.0031247364999998696,
+        0.0031046887499996956,
+        0.0031208193499992374,
+        0.0031981415000004176
+      ],
+      "after": [
+        0.0007952998500002195,
+        0.0007790782000000717,
+        0.0007760534000013309,
+        0.0007793825999996784,
+        0.000757292499999096
+      ]
+    },
+    "rejected_mask_s_mean_std": {
+      "before": [
+        0.02435972875999937,
+        0.0007064705514279074
+      ],
+      "after": [
+        0.024428246229999784,
+        0.0008306452267826037
+      ]
+    },
+    "rejected_layout_300_practice_s": {
+      "mean": 2.731937420999998,
+      "std": 0.04839141523920839,
+      "samples": [
+        2.8103467450000608,
+        2.688977977000036,
+        2.6949335100000553,
+        2.7339151489999267,
+        2.7315137239999103
+      ]
+    }
+  }
+}
