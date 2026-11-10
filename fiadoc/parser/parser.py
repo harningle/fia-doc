@@ -1464,6 +1464,9 @@ class RaceParser(BaseParser):
         df.finishing_status = df.finishing_status.astype(int)
 
         # Merge in starting grid from lap chart PDF
+        # Lap parsing needs classification before it can return the grid. Populate the existing
+        # cached property now to avoid recursively parsing the classification (and OCR) twice.
+        self.classification_df = df
         try:
             df = df.merge(self.starting_grid, on='car_no', how='left')
         except:  # TODO: dirty catch  # noqa: E722

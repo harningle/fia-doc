@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import warnings
+import weakref
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
@@ -16,7 +17,6 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import pymupdf
-from paddleocr import PaddleOCR
 
 from .._constants import DPI
 from ..utils import _detect_pymupdf_default_dpi
@@ -66,6 +66,8 @@ _ocr_debug_counter: int = 0
 @cache
 def get_ocr_instance():
     """Initialises and returns a singleton PaddleOCR instance"""
+    from paddleocr import PaddleOCR  # noqa: PLC0415
+
     return PaddleOCR(
         lang='en',
         use_doc_orientation_classify=False,
@@ -81,6 +83,7 @@ class Page:
         self.w = page.bound()[2]   # Width and height, for convenience
         self.h = page.bound()[3]
         self._pixmap_cache: dict[tuple[int, int, bool], npt.NDArray[np.uint8]] = {}
+        self._displaylist: Optional[pymupdf.DisplayList] = None
 
     def _get_full_page_pixmap(self, dpi: int, annots: bool = True) -> npt.NDArray[np.uint8]:
         """Get the full-page pixmap at the given DPI and rotation, caching on first access
@@ -234,6 +237,46 @@ class Page:
                 to_page_bound[0] + (bbox[2] - from_page_bound[0]) * scale_x,
                 to_page_bound[1] + (bbox[3] - from_page_bound[1]) * scale_y)
 
+    def _get_native_text(self, option: str, **kwargs):
+        """Reuse page interpretation while retaining MuPDF's per-character clipping.
+
+        A full-page TextPage cannot be reused here: PyMuPDF ignores subsequent clip arguments.
+        Replay the page's unrotated display list into a fresh, clipped text device instead.
+        This retains native span grouping, superscript flags and extraction order.
+        """
+        page = self._pymupdf_page
+        if kwargs.get('textpage') is not None:
+            return page.get_text(option=option, **kwargs)
+
+        rotation = page.rotation
+        if rotation:
+            page.set_rotation(0)
+        try:
+            if self._displaylist is None:
+                self._displaylist = page.get_displaylist()
+            clip = kwargs.get('clip')
+            clip = pymupdf.Rect(page.rect if clip is None else clip)
+            flags = kwargs.get('flags')
+            if flags is None:
+                flags = getattr(pymupdf, 'TEXTFLAGS_' + option.upper())
+            mupdf = pymupdf.mupdf
+            raw = mupdf.FzStextPage(mupdf.FzRect(*clip))
+            device = mupdf.fz_new_stext_device(raw, mupdf.FzStextOptions(flags))
+            try:
+                mupdf.fz_run_display_list(
+                    self._displaylist.this, device, mupdf.FzMatrix(1, 0, 0, 1, 0, 0),
+                    mupdf.FzRect(mupdf.FzRect.Fixed_INFINITE), mupdf.FzCookie()
+                )
+            finally:
+                mupdf.fz_close_device(device)
+            textpage = pymupdf.TextPage(raw)
+            textpage.parent = weakref.proxy(page)
+        finally:
+            if rotation:
+                page.set_rotation(rotation)
+        kwargs['textpage'] = textpage
+        return page.get_text(option=option, **kwargs)
+
     def _native_get_text(
             self,
             option: Literal['text', 'words', 'blocks', 'dict'] = 'text',
@@ -257,7 +300,7 @@ class Page:
         if option not in {'text', 'words', 'blocks', 'dict'}:
             raise NotImplementedError(f'`option` can only be one of "text", "words", '
                                       f'"blocks", or "dict". Got "{option}"')
-        res = self._pymupdf_page.get_text(option=option, **kwargs)
+        res = self._get_native_text(option=option, **kwargs)
 
         def _has_strikeout(tb: TextBlock) -> bool:
             l, t, r, b = tb.bbox
@@ -867,7 +910,7 @@ class Page:
         pixmap_arr: npt.NDArray[np.uint8] = self.get_pixmap_array(clip=clip)
 
         # Find all white rows, i.e. strictly all pixels in the row are white (RGB = 255)
-        is_white: npt.NDArray[np.bool_] = np.all(pixmap_arr == 255, axis=(1, 2))  # noqa: PLR2004
+        is_white: npt.NDArray[np.bool_] = (np.min(pixmap_arr, axis=(1, 2)) == 255)  # noqa: PLR2004
 
         # Pad with a black row on top and bottom to simplify. diff calculation later
         padded: npt.NDArray[np.bool_] = np.concatenate([[False], is_white, [False]])

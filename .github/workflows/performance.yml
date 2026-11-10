@@ -1,0 +1,66 @@
+name: Performance comparison
+
+on:
+  push:
+    branches: [perf]
+    paths: [".github/workflows/performance.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      FIADOC_CACHE_DIR: ${{ github.workspace }}/.fiadoc-cache
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      CUDA_VISIBLE_DEVICES: "-1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.FIADOC_CACHE_DIR }}
+          key: fiadoc-pdfs-${{ runner.os }}-performance
+          restore-keys: fiadoc-pdfs-${{ runner.os }}-
+      - uses: actions/cache@v5
+        with:
+          path: ~/.paddlex/official_models
+          key: fiadoc-ocr-paddle-3.2.0-${{ runner.os }}
+      - name: Install matched CPU dependencies
+        run: |
+          python -m venv "$HOME/.virtualenvs/fia-doc-perf"
+          source "$HOME/.virtualenvs/fia-doc-perf/bin/activate"
+          python -m pip install . -r requirements-dev.txt numpy==2.3.2 scipy==1.16.1 pandas==3.0.3 paddlex==3.2.0 pydantic==2.11.7 opencv-python==4.10.0.84 opencv-contrib-python==4.10.0.84 matplotlib==3.10.5 protobuf==6.31.1 huggingface-hub==0.34.4
+          python -m pip freeze > "$RUNNER_TEMP/perf-dependencies.txt"
+      - name: Check classification property access order
+        run: |
+          source "$HOME/.virtualenvs/fia-doc-perf/bin/activate"
+          pytest fiadoc/tests/test_race_performance.py -q
+      - name: Compare main and perf
+        run: |
+          source "$HOME/.virtualenvs/fia-doc-perf/bin/activate"
+          git worktree add "$RUNNER_TEMP/fiadoc-baseline" 8faa946
+          cp scripts/profiler.py "$RUNNER_TEMP/fiadoc-baseline/scripts/profiler.py"
+          python "$RUNNER_TEMP/fiadoc-baseline/scripts/profiler.py" --cold-repeat 0 --output "$RUNNER_TEMP/perf-baseline" --inputs "$RUNNER_TEMP/perf-inputs"
+          python scripts/profiler.py --cold-repeat 0 --output "$RUNNER_TEMP/perf-candidate" --inputs "$RUNNER_TEMP/perf-inputs" --compare "$RUNNER_TEMP/perf-baseline"
+          python "$RUNNER_TEMP/fiadoc-baseline/scripts/profiler.py" --output "$RUNNER_TEMP/perf-baseline-native" --inputs "$RUNNER_TEMP/perf-inputs" --cases entry_list pit_stop
+          python scripts/profiler.py --output "$RUNNER_TEMP/perf-candidate-native" --inputs "$RUNNER_TEMP/perf-inputs" --cases entry_list pit_stop --compare "$RUNNER_TEMP/perf-baseline-native"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            ${{ runner.temp }}/perf-baseline
+            ${{ runner.temp }}/perf-candidate
+            ${{ runner.temp }}/perf-baseline-native
+            ${{ runner.temp }}/perf-candidate-native
+            ${{ runner.temp }}/perf-dependencies.txt
